@@ -263,7 +263,7 @@ def test_cup_diameters_stand_between_the_face_view_and_the_section() -> None:
     od_box = estimate_text_box("Ø.44", anchor=od_anchor, height=0.0035, reference=2)
     cbore_anchor = drawing.SECTION_KEEP["CboreDia"]
     cbore_box = estimate_text_box(
-        "Ø.19", anchor=cbore_anchor, height=0.0035, reference=2
+        "Ø.25", anchor=cbore_anchor, height=0.0035, reference=2
     )
     assert od_box is not None and cbore_box is not None
     # Clear of the face view's centre-mark tail and of the section.
@@ -322,7 +322,7 @@ def test_floor_corners_are_max_limits_that_clear_their_mates() -> None:
     cbore_min = spec.CBORE_DIA - _band(spec.CBORE_DIA_PLACES)
     clearance = cbore_min / 2.0 - spec.POCKET_FLOOR_R_MAX - screw.HEAD_DIA / 2.0
     assert spec.HEAD_CORNER_CLEARANCE_MIN == pytest.approx(clearance)
-    assert clearance == pytest.approx(0.010 * IN, abs=1e-9)
+    assert clearance == pytest.approx(0.040 * IN, abs=1e-9)
 
 
 def test_a_sharper_journal_chamfer_refuses_the_pilot_corner(monkeypatch) -> None:
@@ -341,13 +341,13 @@ def test_no_dimension_carries_a_model_band() -> None:
 
 def test_owner_sizes_follow_the_bush_stub() -> None:
     """Owner ruling 2026-11-20 (Pedro), #2425: "pd-16 diameter should also be
-    reduced to match new knob bush"."""
+    reduced to match new knob bush"; #3741 widens the rear pocket to .25."""
     assert spec.OD == pytest.approx(0.44 * IN)
     assert round(bush.PRESS_DIA / IN, spec.OD_PLACES) == pytest.approx(spec.OD / IN)
     assert spec.LENGTH == pytest.approx(0.36 * IN)
     assert spec.PILOT_DEPTH == pytest.approx(0.152 * IN)
     assert spec.CLEAR_HOLE_DIA == pytest.approx(0.113 * IN)  # #33
-    assert spec.CBORE_DIA == pytest.approx(0.19 * IN)
+    assert spec.CBORE_DIA == pytest.approx(0.25 * IN)
     assert (spec.CBORE_DIA_PLACES, spec.CBORE_DEPTH_PLACES) == (2, 3)
     assert spec.CBORE_DEPTH == pytest.approx(0.108 * IN)
     assert spec.WEB == pytest.approx(0.100 * IN)
@@ -366,10 +366,10 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
     assert spec.WEB_MIN == pytest.approx(web_min)
     assert spec.PILOT_WALL_WORST == pytest.approx(pilot_wall)
     assert spec.CBORE_WALL_WORST == pytest.approx(cbore_wall)
-    # .080 web (exactly the target), .0885 (the +.003 pilot) and .115 rings.
+    # .080 web (exactly the target), .0885 (the +.003 pilot) and .085 rings.
     assert web_min == pytest.approx(0.080 * IN, abs=1e-9)
     assert pilot_wall == pytest.approx(0.0885 * IN, abs=1e-9)
-    assert cbore_wall == pytest.approx(0.115 * IN, abs=1e-9)
+    assert cbore_wall == pytest.approx(0.085 * IN, abs=1e-9)
     for wall in (web_min, pilot_wall, cbore_wall):
         assert wall >= WALL_TARGET_MM - 1e-9
 
@@ -481,7 +481,7 @@ def test_the_head_seats_on_the_web_inside_the_pocket() -> None:
     assert spec.HEAD_BEARING_LAND == pytest.approx((screw.HEAD_DIA - hole_max) / 2.0)
     assert spec.HEAD_BEARING_LAND > 0.0
     cbore_min = spec.CBORE_DIA - _band(spec.CBORE_DIA_PLACES)
-    assert (cbore_min - screw.HEAD_DIA) / 2.0 == pytest.approx(0.020 * IN, abs=1e-9)
+    assert (cbore_min - screw.HEAD_DIA) / 2.0 == pytest.approx(0.050 * IN, abs=1e-9)
     depth_min = spec.CBORE_DEPTH - _band(spec.CBORE_DEPTH_PLACES)
     assert depth_min - screw.HEAD_H == pytest.approx(0.020 * IN, abs=1e-9)
     # The screw's clearance drill is the #2 close fit, never the tap drill.
@@ -529,11 +529,17 @@ def _plane_face(normal: tuple[float, float, float], offset_mm: float):
     return FaceGeometry(None, SURFACE_PLANE, (*normal, *point), normal, ())
 
 
-def _cylinder_face(dia_mm: float):
+def _cylinder_face(dia_mm: float, y_span_mm: tuple[float, float] | None = None):
     from _gtol_face import SURFACE_CYLINDER, FaceGeometry
 
+    r_m = dia_mm / 2000
+    box = (
+        ()
+        if y_span_mm is None
+        else (-r_m, y_span_mm[0] / 1000, -r_m, r_m, y_span_mm[1] / 1000, r_m)
+    )
     return FaceGeometry(
-        None, SURFACE_CYLINDER, (0.0, 0.0, 0.0, 0.0, 1.0, 0.0, dia_mm / 2000), None, ()
+        None, SURFACE_CYLINDER, (0.0, 0.0, 0.0, 0.0, 1.0, 0.0, r_m), None, box
     )
 
 
@@ -544,14 +550,27 @@ def test_each_declared_cup_face_has_exactly_one_owner() -> None:
     faces = {
         "front_face": [_plane_face((0.0, -1.0, 0.0), 0.0)],
         "rear_face": [_plane_face((0.0, 1.0, 0.0), spec.LENGTH)],
-        "outside": [_cylinder_face(spec.OD)],
+        "outside": [_cylinder_face(spec.OD, (0.0, spec.LENGTH))],
         "pilot": [
-            _cylinder_face(spec.BORE_DIA),
+            _cylinder_face(
+                spec.BORE_DIA, (0.0, spec.PILOT_DEPTH - spec.PILOT_FLOOR_R_MAX)
+            ),
             _plane_face((0.0, -1.0, 0.0), -spec.PILOT_DEPTH),
         ],
-        "web_hole": [_cylinder_face(spec.CLEAR_HOLE_DIA)],
+        "web_hole": [
+            _cylinder_face(
+                spec.CLEAR_HOLE_DIA,
+                (spec.PILOT_DEPTH, spec.LENGTH - spec.CBORE_DEPTH),
+            )
+        ],
         "pocket": [
-            _cylinder_face(spec.CBORE_DIA),
+            _cylinder_face(
+                spec.CBORE_DIA,
+                (
+                    spec.LENGTH - spec.CBORE_DEPTH + spec.POCKET_FLOOR_R_MAX,
+                    spec.LENGTH,
+                ),
+            ),
             _plane_face((0.0, 1.0, 0.0), spec.LENGTH - spec.CBORE_DEPTH),
         ],
     }
@@ -583,7 +602,7 @@ def test_declarations_print_the_sheets_bands_and_supply_sizes() -> None:
     assert inch(features["pilot"]["diametral_clearance"]) == [0.0005, 0.005]
     assert inch([features["pilot"]["corner_radius_max"]]) == [0.005]
     assert inch(features["web_hole"]["dia"]) == [0.113, 0.117]
-    assert inch(features["pocket"]["dia"]) == [0.18, 0.2]
+    assert inch(features["pocket"]["dia"]) == [0.24, 0.26]
     assert inch(features["pocket"]["depth"]) == [0.103, 0.113]
     assert inch([features["pocket"]["corner_radius_max"]]) == [0.01]
     # Note 1: length and pilot depth are supply sizes; the front face is

@@ -146,29 +146,3 @@ feed_mm_rev = 0.0254
 description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/8 x 1-1/4 in"
 [stock.c360-square-5mm-key]
 description = "C36000 brass key stock, DIN 6880 undersized, square bar, 5 x 5 mm"
-
-# --- MHA-PN-02 pen hanger (cad/process/pn_pen_hanger/plan.toml) ---
-# The owned 3/16 in end mill (cad/config/shop-equipment/tools-cutting.toml
-# tools.endmill-carbide-3fl-3-16: McMaster 88815A23, 3 flutes, 2 in OAL, 2
-# on hand). flute_length_mm: 5/8 in, the standard length of cut of a 3/16
-# in 3-flute 2 in OAL carbide square end mill (Kyocera SGS 39723 listing,
-# salcotoolsupply.com/sgs-3-16-dia-3-flute-square-end-end-mill-39723/, read
-# 2026-11-22; McMaster's 88815A23 page not read: confirm on the tool). The
-# pen hanger's slots need .43 of it.
-[tools.endmill-carbide-3fl-3-16]  # inventory tools.endmill-carbide-3fl-3-16
-description = "3/16 in 3-flute uncoated carbide square end mill, 2 in OAL (McMaster 88815A23)"
-diameter_mm = 4.7625
-flute_length_mm = 15.875
-# Its setting in the strap's 1018: 6G Tools "Carbide End Mill Feeds and
-# Speeds, General Purpose Uncoated" (www.6gtools.com/uploaded/files/
-# feedsandspeeds/Carbide_End_Mill_Feeds_And_Speeds_General_Purpose_Uncoated.pdf,
-# read 2026-11-22), row Mild Steel 1018: 350 SFM, 3/16 in .0011 in/tooth.
-# 350 SFM is 7130 rpm on the 3/16 in: it runs at the spindle's 2800 (137
-# ft/min).
-[settings.pn-em-3-16-1018-cf]
-tool = "endmill-carbide-3fl-3-16"
-material = "rocker-1018-cold-finished"
-rpm = 2800
-chip_load_mm_per_tooth = 0.02794  # .0011 in; 2800 × 3 × .0011 = 9.24 in/min
-flutes = 3
-feed_unit = "in/min"

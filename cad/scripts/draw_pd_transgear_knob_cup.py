@@ -220,7 +220,7 @@ DEPTH_TEXT_HALF_WIDTH = 0.012  # "SEE NOTE 1", 23.9 mm on the r5 render
 CBORE_DEPTH_TEXT_HALF_WIDTH = len(CBORE_DEPTH_CALLOUT) * 0.00277 / 2.0
 SECTION_KEEP = {
     "CupDia": (REAR_FACE_X - 0.030, SECTION_CENTER[1]),
-    "CboreDia": (REAR_FACE_X - 0.012, SECTION_CENTER[1] - HALF_CBORE - 0.007),
+    "CboreDia": (REAR_FACE_X - 0.012, SECTION_CENTER[1] - HALF_CBORE - 0.0055),
     "CboreDepth": (
         REAR_FACE_X - 0.0025 - CBORE_DEPTH_TEXT_HALF_WIDTH, SECTION_TOP + 0.010
     ),
@@ -349,7 +349,10 @@ requirement(
 requirement(
     "pilot",
     kind="counterbore",
-    faces=(CylinderFace(BORE_DIA), PlanarFace((0.0, -1.0, 0.0), -PILOT_DEPTH)),
+    faces=(
+        CylinderFace(BORE_DIA, contains_y_mm=PILOT_DEPTH / 2.0),
+        PlanarFace((0.0, -1.0, 0.0), -PILOT_DEPTH),
+    ),
     requirements=("dia_ref", "depth", "corner_radius_max", "diametral_clearance"),
     fields={
         "at": ([0.0, PILOT_DEPTH, 0.0], ("PILOT_DEPTH",)),
@@ -404,7 +407,7 @@ requirement(
     "pocket",
     kind="counterbore",
     faces=(
-        CylinderFace(CBORE_DIA),
+        CylinderFace(CBORE_DIA, contains_y_mm=LENGTH - CBORE_DEPTH / 2.0),
         PlanarFace((0.0, 1.0, 0.0), LENGTH - CBORE_DEPTH),
     ),
     requirements=("dia", "depth", "corner_radius_max"),

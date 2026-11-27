@@ -804,7 +804,7 @@ description = "Round adjustable split dies, HSS, 13/16 in OD: #0-80 UNF and #4-4
 [tools.endmill-carbide-3-32]  # MHA-PD-27 flat floor for the Ø.110 counterbore
 description = "3/32 in square carbide end mill, .47 in or more of reach"
 diameter_mm = 2.38125
-[tools.endmill-hss-2fl-1-4]  # inventory tools.endmill-hss-2fl-1-4; MHA-DT-16 and the MHA-PD-16 pilot's flat floor (#2425)
+[tools.endmill-hss-2fl-1-4]  # inventory tools.endmill-hss-2fl-1-4; MHA-DT-16 and the MHA-PD-16 pilot's and head pocket's flat floors (#2425, #3741)
 description = "1/4 in HSS 2-flute square end mill, 5/8 in LOC (McMaster 3051A51)"
 diameter_mm = 6.35
 [tools.drill-27-64]  # 115-piece index; MHA-DT-27 winding mandrel (shank) and the MHA-PD-19 press hole's pre-drill (#2425)

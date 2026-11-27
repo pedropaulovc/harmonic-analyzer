@@ -1,24 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
-  <!-- To scale, 400 px/in, from above (the cross-slide at the bottom): the cup Ø.44 (cad.outside_dia_mm), its front face .36 (cad.rear_face_length_in) behind Z0, the jaws on .18 of it (regrip_grip_in) over the shim wrap (its thickness not drawn), nothing behind it; the parted end .02 over length (regrip_allowance_in). Inside, the pilot Ø.250 .152 deep, the web, the #33 hole from the front face to .30 (its point short of the rear face), the pocket Ø.1875 (the 3/16 end mill) .108 deep (cad.pocket_depth_in). The 3-jaw's body and jaws are schematic (their sizes are not on record); the jaws drawn stepped, clear of the cup's front face. The 3/16 TiN HSS end mill to scale (shop endmill-hss-tin-2fl-3-16, Ø4.7625 mm = 75 px), its square end drawn as the near half of its end face, an arc 12 % of its diameter deep, its apex at the pocket's floor .108 from Z0. Drawn short to a break line (its length out of the chuck is not on record). -->
+  <!-- To scale, 400 px/in, from above (the cross-slide at the bottom): the cup Ø.44 (cad.outside_dia_mm), its front face .36 (cad.rear_face_length_in) behind Z0, the jaws on .18 of it (regrip_grip_in) over the shim wrap (its thickness not drawn), nothing behind it; the parted end .02 over length (regrip_allowance_in). Inside, the pilot Ø.250 .152 deep, the web, the #33 hole from the front face to .30 (its point short of the rear face), the pocket Ø.250 (the 1/4 end mill) .108 deep (cad.pocket_depth_in). The 3-jaw's body and jaws are schematic (their sizes are not on record); the jaws drawn stepped, clear of the cup's front face. The 1/4 HSS end mill to scale (shop endmill-hss-2fl-1-4, Ø6.35 mm = 100 px), its square end drawn as the near half of its end face, an arc 12 % of its diameter deep, its apex at the pocket's floor .108 from Z0. Drawn short to a break line (its length out of the chuck is not on record). -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Setup 2, Op 120: the 3/16 end mill from the tailstock plunges the head pocket (to scale, 400 px/in)</text>
+  <text class="title" x="20" y="22">Setup 2, Op 120: the 1/4 end mill from the tailstock plunges the head pocket (to scale, 400 px/in)</text>
   <rect class="fixture-vise" x="260" y="40" width="56" height="330"/>
   <rect class="part-kept" x="376" y="117" width="144" height="176"/>
   <rect class="holes" x="376" y="155" width="60.8" height="100"/>
   <rect class="holes" x="376" y="182.4" width="120" height="45.2"/>
   <path class="holes" d="M496 182.4L509.58 205L496 227.6Z"/>
-  <rect class="part-removed" x="476.8" y="167.5" width="43.2" height="75"/>
+  <rect class="part-removed" x="476.8" y="155" width="43.2" height="100"/>
   <path class="clamp" d="M316 73L448 73L448 117L376 117L376 103L316 103Z"/>
   <path class="clamp" d="M316 337L448 337L448 293L376 293L376 307L316 307Z"/>
   <line class="centre-line" x1="20" y1="205" x2="740" y2="205"/>
-  <path class="cutter" d="M485.8 167.5L740 167.5L737 175L740 182.5L737 190L740 197.5L737 205L740 212.5L737 220L740 227.5L737 235L740 242.5L485.8 242.5A9 37.5 0 0 1 485.8 167.5Z"/>
-  <line class="arrow" x1="720" y1="153" x2="660" y2="153"/>
+  <path class="cutter" d="M488.8 155L740 155L737 165L740 175L737 185L740 195L737 205L740 215L737 225L740 235L737 245L740 255L488.8 255A12 50 0 0 1 488.8 155Z"/>
+  <line class="arrow" x1="720" y1="141" x2="660" y2="141"/>
   <line class="datum" x1="520" y1="52" x2="520" y2="96"/>
   <text class="datum-label" x="526" y="62">Z0 the rear face</text>
-  <text class="label" x="470" y="340">3/16 end mill, short in the drill chuck, plunged</text>
+  <text class="label" x="470" y="340">1/4 end mill, short in the drill chuck, plunged</text>
   <text class="label" x="470" y="356">to {{cad.pocket_depth_in:.3dot}}, backing out every .03, on the #33 hole</text>
-  <line class="leader" x1="520" y1="328" x2="580" y2="235"/>
-  <circle class="leader-dot" cx="580" cy="235" r="2"/>
+  <line class="leader" x1="520" y1="328" x2="580" y2="245"/>
+  <circle class="leader-dot" cx="580" cy="245" r="2"/>
   <text class="label" x="14" y="48">3-jaw over the shim</text>
   <text class="label" x="14" y="64">wrap, as Op 100</text>
   <line class="leader" x1="140" y1="60" x2="412" y2="101"/>
