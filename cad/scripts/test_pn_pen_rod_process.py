@@ -4,8 +4,8 @@ The 6 in 4-jaw closes no smaller than Ø.2865 (the owner's least grip,
 2026-11-24; ``cad/process/shop/common.toml`` ``workholding.chuck-4jaw-6``)
 and the rod's square is .1950-.1970 across its flats (#3495), so each jaw
 bears on a soft packing strip on its flat (delegated ruling 2026-11-27
-(Main), precedent: the transgear pin's split bush, #3494; owner review
-#2144 (D57)). These tests hold the plan's strip thickness and width to the
+(Main), no precedent (pattern: the transgear pin's split bush, #3494); owner
+review #2144 (D57)). These tests hold the plan's strip thickness and width to the
 chuck and the drawing's square.
 """
 
