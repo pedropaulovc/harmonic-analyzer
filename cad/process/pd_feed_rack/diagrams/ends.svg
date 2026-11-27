@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 600" width="760" height="600" font-family="sans-serif" font-size="13">
+  <!-- Hand picture from the front (the operator's side, looking +Y): +X to the right, +Z up; the fixed jaw behind the strip, the moving jaw in front not drawn. To scale at 6 px/mm from the strip's 4.7625 mm height (cad.teeth_height_ref): the nominal strip teeth up, 32 DP teeth from cad.teeth_pitch_ref, the LEFT end at X0 (process.left_end_skim_mm, .030, removed: the hatched sliver), the jaws' left side 6.86 mm right of X0 (process.end_overhang_mm less the skim), the stack (1 in on 9/16 in parallels, process.riser_height_mm) from 35.39 mm, drawn to a break line; the jaw tops 0.495 mm over the nominal crests (process.vise_jaw_height_mm). The 1/4 in end mill (Ø6.35, process.em_dia_mm) at the last pass, its centre 3.175 left of X0, its end process.end_past_mm (.020) under the flat top, drawn to a break line above (5/8 in out of the collet, process.em_projection_mm). Inset from above at 10 px/mm: the same pass running -Y. -->
+  <rect class="paper" x="0" y="0" width="760" height="600"/>
+  <text class="title" x="20" y="24">Setup 2, FR01: the end mill's side on the left end's last pass (to scale, 6 px/mm)</text>
+  <rect class="fixture-vise" x="241.15" y="516.7" width="508.85" height="14"/>
+  <path class="clamp" d="M241.15 247.03L750 247.03L750 247.03L753 254.12L750 261.22L753 268.32L750 275.41L753 282.51L750 289.61L753 296.7L750 303.8L753 310.9L750 317.99L753 325.09L750 332.19L753 339.28L750 346.38L753 353.48L750 360.57L753 367.67L750 374.77L753 381.86L750 388.96L753 396.06L750 403.15L753 410.25L750 417.35L753 424.44L750 431.54L753 438.64L750 445.73L753 452.83L750 459.93L753 467.02L750 474.12L753 481.22L750 488.31L753 495.41L750 502.51L753 509.6L750 516.7L241.15 516.7Z"/>
+  <path class="fixture-support" d="M412.37 278.57L746 278.57L746 278.57L749 285.58L746 292.58L749 299.59L746 306.59L749 313.59L746 320.6L749 327.6L746 334.6L749 341.61L746 348.61L749 355.62L746 362.62L749 369.62L746 376.63L749 383.63L746 390.63L749 397.64L746 404.64L749 411.64L746 418.65L749 425.65L746 432.66L749 439.66L746 446.66L749 453.67L746 460.67L749 467.67L746 474.68L749 481.68L746 488.69L749 495.69L746 502.69L749 509.7L746 516.7L412.37 516.7Z"/>
+  <rect class="part-removed" x="195.43" y="250" width="4.57" height="28.57"/>
+  <path class="part-kept" d="M200 278.57L200 250L202.01 250L205.91 260.72L209.05 260.72L212.95 250L216.97 250L220.87 260.72L224.02 260.72L227.92 250L231.93 250L235.83 260.72L238.98 260.72L242.88 250L246.89 250L250.79 260.72L253.94 260.72L257.84 250L261.85 250L265.75 260.72L268.9 260.72L272.8 250L276.82 250L280.72 260.72L283.86 260.72L287.76 250L291.78 250L295.68 260.72L298.83 260.72L302.73 250L306.74 250L310.64 260.72L313.79 260.72L317.69 250L321.7 250L325.6 260.72L328.75 260.72L332.65 250L336.66 250L340.56 260.72L343.71 260.72L347.61 250L351.63 250L355.53 260.72L358.67 260.72L362.57 250L366.59 250L370.49 260.72L373.63 260.72L377.53 250L381.55 250L385.45 260.72L388.6 260.72L392.5 250L396.51 250L400.41 260.72L403.56 260.72L407.46 250L411.47 250L415.37 260.72L418.52 260.72L422.42 250L426.43 250L430.33 260.72L433.48 260.72L437.38 250L441.4 250L445.3 260.72L448.44 260.72L452.34 250L456.36 250L460.26 260.72L463.41 260.72L467.31 250L471.32 250L475.22 260.72L478.37 260.72L482.27 250L486.28 250L490.18 260.72L493.33 260.72L497.23 250L501.24 250L505.14 260.72L508.29 260.72L512.19 250L516.21 250L520.11 260.72L523.25 260.72L527.15 250L531.17 250L535.07 260.72L538.21 260.72L542.12 250L546.13 250L550.03 260.72L553.18 260.72L557.08 250L561.09 250L564.99 260.72L568.14 260.72L572.04 250L576.05 250L579.95 260.72L583.1 260.72L587 250L591.01 250L594.91 260.72L598.06 260.72L601.96 250L605.98 250L609.88 260.72L613.02 260.72L616.92 250L620.94 250L624.84 260.72L627.99 260.72L631.89 250L635.9 250L639.8 260.72L642.95 260.72L646.85 250L650.86 250L654.76 260.72L657.91 260.72L661.81 250L665.82 250L669.72 260.72L672.87 260.72L676.77 250L680.79 250L684.69 260.72L687.83 260.72L691.73 250L695.75 250L699.65 260.72L702.8 260.72L706.7 250L710.71 250L714.61 260.72L717.76 260.72L721.66 250L725.67 250L729.57 260.72L732.72 260.72L736.62 250L740.63 250L744.53 260.72L747.68 260.72L751.58 250L755.59 250L759.5 260.72L762.64 260.72L766.54 250L770.56 250L774.46 260.72L777.6 260.72L781.5 250L785.52 250L789.42 260.72L792.57 260.72L796.47 250L800 250L800 278.57Z"/>
+  <path class="cutter" d="M200 277.97L200 180L193.65 183L187.3 180L180.95 183L174.6 180L168.25 183L161.9 180L161.9 277.97A19.05 4.57 0 0 0 200 277.97Z"/>
+  <line class="arrow" x1="180.95" y1="190" x2="180.95" y2="210"/>
+  <line class="datum" x1="200" y1="220" x2="200" y2="546.7"/>
+  <text class="datum-label" x="206" y="544.7">X0 the finished LEFT end</text>
+  <line class="datum" x1="20" y1="250" x2="157.9" y2="250"/>
+  <text class="datum-label" x="20" y="244">Z0 the crests</text>
+  <text class="label" x="206.95" y="158">1/4 in end mill, 5/8 out of the collet,</text>
+  <text class="label" x="206.95" y="174">on the left end's last pass (one way, −Y)</text>
+  <line class="leader" x1="204.95" y1="180" x2="200" y2="200"/>
+  <circle class="leader-dot" cx="200" cy="200" r="2"/>
+  <text class="label" x="20" y="420">its end {{process.end_past_mm:in.3dot}} under</text>
+  <text class="label" x="20" y="436">the flat top, clear of</text>
+  <text class="label" x="20" y="452">the jaws and the stack</text>
+  <line class="leader" x1="18" y1="406" x2="180.95" y2="282.54"/>
+  <circle class="leader-dot" cx="180.95" cy="282.54" r="2"/>
+  <text class="label" x="240" y="222">the piece teeth up, front face at the fixed jaw (behind)</text>
+  <line class="leader" x1="238" y1="228" x2="440" y2="252"/>
+  <circle class="leader-dot" cx="440" cy="252" r="2"/>
+  <text class="label" x="420" y="550.7">one stack, 1 in on 9/16 in parallels,</text>
+  <text class="label" x="420" y="566.7">against the fixed jaw</text>
+  <line class="leader" x1="418" y1="536.7" x2="432.37" y2="486.7"/>
+  <circle class="leader-dot" cx="432.37" cy="486.7" r="2"/>
+  <text class="label-on-clamp" x="247.15" y="367.03">fixed jaw (behind);</text>
+  <text class="label-on-clamp" x="247.15" y="383.03">the moving jaw, in front,</text>
+  <text class="label-on-clamp" x="247.15" y="399.03">not drawn</text>
+  <line class="dims" x1="470" y1="40" x2="740" y2="40"/>
+  <line class="dims" x1="470" y1="40" x2="470" y2="205"/>
+  <line class="dims" x1="740" y1="40" x2="740" y2="205"/>
+  <line class="dims" x1="470" y1="205" x2="740" y2="205"/>
+  <rect class="part-kept" x="540" y="60" width="195" height="47.62"/>
+  <rect class="part-removed" x="532.38" y="60" width="7.62" height="47.62"/>
+  <circle class="cutter" cx="508.25" cy="83.81" r="31.75"/>
+  <line class="arrow" x1="508.25" y1="119.56" x2="508.25" y2="141.56"/>
+  <text class="datum-label" x="544" y="54">Y0 the front face, top edge</text>
+  <text class="label" x="548" y="140">from above, 10 px/mm:</text>
+  <text class="label" x="548" y="156">the pass runs −Y,</text>
+  <text class="label" x="548" y="172">the strip on the cutter's</text>
+  <text class="label" x="548" y="188">left: conventional</text>
+</svg>

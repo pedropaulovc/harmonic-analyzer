@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Hand picture from the front (looking +Y): +X to the right, +Z up. To scale at 5.5 px/mm from the strip's 4.7625 mm height: the nominal strip teeth up, 32 DP teeth from cad.teeth_pitch_ref with a tooth centre at each tap station (cad.tap_1_x_mm ... cad.tap_4_x_mm); X0 the LEFT end; the jaws' left side 120.65 mm from it (process.measure_overhang_mm), the fixed jaw drawn behind the strip to a break line, the moving jaw in front not drawn, the stack under the jaws off the picture. The rod, the #49 drill's shank (Ø1.8542, process.rod_dia_mm), seated in the space on tap 1's tooth's left, its centre 4.967 mm over the flat top (pd_feed_rack_spec.rack_gauge_pin_contact_mm). The .200 in edge finder (Ø5.08) touching it from the left, its tip .008 over the crests, drawn to a break line (its length not on record). -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="24">Setup 2, hold A: the edge finder on the rod at tap 1's tooth (to scale, 5.5 px/mm)</text>
+  <path class="clamp" d="M703.58 247.28L750 247.28L750 247.28L753 254.37L750 261.46L753 268.55L750 275.64L753 282.73L750 289.82L753 296.92L750 304.01L753 311.1L750 318.19L753 325.28L750 332.37L753 339.46L750 346.55L753 353.65L750 360.74L753 367.83L750 374.92L753 382.01L750 389.1L753 396.19L703.58 396.19Z"/>
+  <path class="part-kept" d="M40 276.19L40 250L41.84 250L45.41 259.82L48.3 259.82L51.88 250L55.55 250L59.13 259.82L62.02 259.82L65.59 250L69.27 250L72.84 259.82L75.73 259.82L79.31 250L82.98 250L86.56 259.82L89.45 259.82L93.02 250L96.7 250L100.28 259.82L103.16 259.82L106.74 250L110.41 250L113.99 259.82L116.88 259.82L120.45 250L124.13 250L127.71 259.82L130.59 259.82L134.17 250L137.84 250L141.42 259.82L144.31 259.82L147.88 250L151.56 250L155.14 259.82L158.02 259.82L161.6 250L165.27 250L168.85 259.82L171.74 259.82L175.31 250L178.99 250L182.57 259.82L185.45 259.82L189.03 250L192.7 250L196.28 259.82L199.17 259.82L202.74 250L206.42 250L210 259.82L212.88 259.82L216.46 250L220.13 250L223.71 259.82L226.6 259.82L230.17 250L233.85 250L237.43 259.82L240.31 259.82L243.89 250L247.57 250L251.14 259.82L254.03 259.82L257.6 250L261.28 250L264.86 259.82L267.74 259.82L271.32 250L275 250L278.57 259.82L281.46 259.82L285.03 250L288.71 250L292.29 259.82L295.17 259.82L298.75 250L302.43 250L306 259.82L308.89 259.82L312.46 250L316.14 250L319.72 259.82L322.6 259.82L326.18 250L329.86 250L333.43 259.82L336.32 259.82L339.89 250L343.57 250L347.15 259.82L350.03 259.82L353.61 250L357.29 250L360.86 259.82L363.75 259.82L367.32 250L371 250L374.58 259.82L377.46 259.82L381.04 250L384.72 250L388.29 259.82L391.18 259.82L394.75 250L398.43 250L402.01 259.82L404.89 259.82L408.47 250L412.15 250L415.72 259.82L418.61 259.82L422.18 250L425.86 250L429.44 259.82L432.32 259.82L435.9 250L439.58 250L443.15 259.82L446.04 259.82L449.61 250L453.29 250L456.87 259.82L459.75 259.82L463.33 250L467.01 250L470.58 259.82L473.47 259.82L477.04 250L480.72 250L484.3 259.82L487.18 259.82L490.76 250L494.44 250L498.01 259.82L500.9 259.82L504.47 250L508.15 250L511.73 259.82L514.61 259.82L518.19 250L521.87 250L525.44 259.82L528.33 259.82L531.9 250L535.58 250L539.16 259.82L542.04 259.82L545.62 250L549.3 250L552.87 259.82L555.76 259.82L559.33 250L563.01 250L566.59 259.82L569.47 259.82L573.05 250L576.73 250L580.3 259.82L583.19 259.82L586.76 250L590.44 250L594.02 259.82L596.9 259.82L600.48 250L604.16 250L607.73 259.82L610.62 259.82L614.19 250L617.87 250L621.45 259.82L624.33 259.82L627.91 250L631.59 250L635.16 259.82L638.05 259.82L641.62 250L645.3 250L648.88 259.82L651.76 259.82L655.34 250L659.02 250L662.59 259.82L665.48 259.82L669.05 250L672.73 250L676.31 259.82L679.19 259.82L682.77 250L686.45 250L690.02 259.82L692.91 259.82L696.48 250L700.16 250L703.74 259.82L706.62 259.82L710.2 250L713.88 250L717.45 259.82L720.34 259.82L723.91 250L727.59 250L731.17 259.82L734.05 259.82L737.63 250L741.31 250L744.88 259.82L747.77 259.82L751.34 250L755.02 250L758.6 259.82L761.48 259.82L765.06 250L768.74 250L772.31 259.82L775.2 259.82L778.77 250L782.45 250L782.5 250.14L782.5 276.19Z"/>
+  <circle class="part-rest" cx="321.16" cy="248.88" r="5.1"/>
+  <path class="cutter" d="M316.06 245.53L316.06 158.88L309.07 161.88L302.09 158.88L295.1 161.88L288.12 158.88L288.12 245.53A13.97 3.35 0 0 0 316.06 245.53Z"/>
+  <line class="arrow" x1="280.09" y1="208.88" x2="296.09" y2="208.88"/>
+  <line class="centre-line" x1="328.02" y1="230" x2="328.02" y2="296.19"/>
+  <line class="datum" x1="40" y1="190" x2="40" y2="336.19"/>
+  <text class="datum-label" x="46" y="352.19">X0 the LEFT end</text>
+  <text class="label" x="150" y="120">edge finder (900 rpm), its tip .008 over the crests,</text>
+  <text class="label" x="150" y="136">touching the rod from the left; then from the right</text>
+  <line class="leader" x1="148" y1="142" x2="302.09" y2="178.88"/>
+  <circle class="leader-dot" cx="302.09" cy="178.88" r="2"/>
+  <text class="label" x="260" y="360">#49 drill's shank (the rod) in the space</text>
+  <text class="label" x="260" y="376">on tap 1's tooth's left: the tooth's centre</text>
+  <text class="label" x="260" y="392">t = the rod's middle + {{process.half_pitch_mm:.3f}}</text>
+  <line class="leader" x1="258" y1="346" x2="321.16" y2="254.88"/>
+  <circle class="leader-dot" cx="321.16" cy="254.88" r="2"/>
+  <text class="label" x="695.58" y="217.28" text-anchor="end">jaws' left side</text>
+  <line class="leader" x1="697.58" y1="223.28" x2="707.58" y2="251.28"/>
+  <circle class="leader-dot" cx="707.58" cy="251.28" r="2"/>
+  <text class="label" x="695.58" y="336.19" text-anchor="end">fixed jaw (behind)</text>
+  <line class="leader" x1="697.58" y1="322.19" x2="723.58" y2="316.19"/>
+  <circle class="leader-dot" cx="723.58" cy="316.19" r="2"/>
+  <text class="label" x="40" y="420">LEFT end {{process.measure_overhang_mm:in.2f}} in out past the jaws; the stack is under the jaws, off the picture</text>
+  <text class="label" x="336.02" y="224">tap 1's tooth</text>
+</svg>
