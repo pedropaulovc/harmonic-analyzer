@@ -101,14 +101,19 @@ def recipe_files(stem: str) -> dict[str, str]:
 def geometry_inputs(stem: str) -> dict[str, str]:
     """Each ``geometry`` key input of ``stem``'s STEP, repo-relative, and its
     doit content digest, read from this checkout: the sources, and the digest
-    of the fastener-catalog rows the part reads (the sidecar dodo keys on)."""
+    of the fastener-catalog rows the part reads (the sidecar dodo keys on).
+    The release revision is left out, as in :func:`recipe_files`: cutting a
+    release bumps it without changing any geometry."""
     dodo = _dodo()
     out = dodo.CAD_OUT.resolve()
+    release = Path(dodo.RELEASE_VERSION_FILE).resolve()
     inputs = {}
     for path in _geometry_deps(dodo, stem):
         if (
-            out in path.parents and not _fastener_sidecar(dodo, path)
-        ) or not path.is_relative_to(REPO.resolve()):
+            path == release
+            or (out in path.parents and not _fastener_sidecar(dodo, path))
+            or not path.is_relative_to(REPO.resolve())
+        ):
             continue
         inputs[path.relative_to(REPO.resolve()).as_posix()] = (
             dodo.ContentChecker._digest(str(path))

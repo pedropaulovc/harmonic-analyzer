@@ -272,3 +272,16 @@ def test_unknown_parts_are_refused() -> None:
     with pytest.raises(SystemExit) as refused:
         fetch_features.main(["fr_vn_lag_screw"])
     assert refused.value.code == 2
+
+
+def test_geometry_inputs_read_the_real_graph() -> None:
+    # The real graph, no doubles: a part keyed on its fastener-catalog rows.
+    stem = "dt_cone_tip_end_screw"
+    inputs = _features_provenance.geometry_inputs(stem)
+    assert f"cad/scripts/build_{stem}.py" in inputs
+    assert f"cad/out/.fastener-catalog/part-{stem}.digest" in inputs
+    # Cutting a release bumps release.yaml without changing any geometry.
+    assert "cad/config/release.yaml" not in inputs
+    recipe = _features_provenance.recipe_files(stem)
+    assert recipe["cad/scripts/_fastener_catalog.py"] == "geometry"
+    assert "cad/config/release.yaml" not in recipe
