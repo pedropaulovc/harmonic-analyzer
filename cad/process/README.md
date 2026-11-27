@@ -498,8 +498,11 @@ plan, once per part it binds: `fetch_features.py sh_column_clamp_front` and
 above; it rebinds the
 manifest to this checkout's declarations, and reports a bundle whose geometry
 has moved past the release, or any bundle from a release cut before face
-inventories shipped (#3232), as STALE and writes nothing; see
-[features and travelers](../docs/pipeline/features-travelers.md)). All three use the latest
+inventories shipped (#3232), as STALE and writes nothing; a bundle restored by
+hand from a farm run's `out/features/<stem>/` (STEPs and `.faces.json` only) is
+bound and stamped by `fetch_features.py --trust-step <stem>`, which trusts that
+the STEP was built from this checkout's geometry inputs and warns that it does;
+see [features and travelers](../docs/pipeline/features-travelers.md)). All three use the latest
 prechips release from PyPI (`@latest` makes uv revalidate its index and skip
 any `uv tool install`-ed copy), so they need `uv` and network access. The doit
 task always runs when requested.

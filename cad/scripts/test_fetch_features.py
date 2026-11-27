@@ -239,6 +239,76 @@ def test_check_reports_a_copied_bundle_against_this_checkout(
     assert "unreadable bundle" in capsys.readouterr().err
 
 
+def test_trust_step_stamps_a_bundle_restored_from_a_farm_run(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    _release(monkeypatch, tmp_path)
+    published = export_features.bundle_paths(UNDECLARED, tmp_path / "published")
+    # A farm run's out/features/<stem>/: the STEP and its inventory, copied by hand.
+    out = tmp_path / "restored"
+    manifest, step = export_features.bundle_paths(UNDECLARED, out)
+    step.parent.mkdir(parents=True)
+    step.write_bytes(published[1].read_bytes())
+    inventory_path(step).write_bytes(inventory_path(published[1]).read_bytes())
+    assert fetch_features.main(["--check", UNDECLARED, "--out", str(out)]) == 2
+    capsys.readouterr()
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 0
+    assert f"{UNDECLARED}: TRUSTING the STEP" in capsys.readouterr().err
+    assert (
+        manifest.read_bytes() == published[0].read_bytes() + _stamp(UNDECLARED).encode()
+    )
+    assert fetch_features.main(["--check", UNDECLARED, "--out", str(out)]) == 0
+    # A stamped bundle is bound and stamped afresh, not refused as stamped.
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 0
+    assert (
+        manifest.read_bytes() == published[0].read_bytes() + _stamp(UNDECLARED).encode()
+    )
+    stamped = manifest.read_bytes()
+    capsys.readouterr()
+    # The checkout's geometry moves on: the manifest binds this very STEP to
+    # other geometry inputs, so the STEP is provably stale and left as it is.
+    monkeypatch.setattr(
+        _features_provenance,
+        "geometry_inputs",
+        lambda selected: {f"cad/scripts/build_{selected}.py": "d2"},
+    )
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 2
+    err = capsys.readouterr().err
+    assert "binds this STEP to other geometry inputs" in err
+    assert "TRUSTING" not in err
+    assert manifest.read_bytes() == stamped
+    # A STEP restored over it with an inventory that is not its own: refused.
+    original = step.read_bytes()
+    step.write_bytes(original + b"/* drift */")
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 1
+    assert manifest.read_bytes() == stamped
+    step.write_bytes(original)
+    # A manifest that no longer binds the STEP says nothing about it: trusted.
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace(
+            tomllib.loads(stamped.decode())["step_sha256"], "0" * 64
+        ),
+        encoding="utf-8",
+    )
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 0
+    assert manifest.read_text(encoding="utf-8").endswith(
+        f'"cad/scripts/build_{UNDECLARED}.py" = "d2"\n'
+    )
+    # No inventory beside the STEP: named as such, not written.
+    inventory_path(step).unlink()
+    restamped = manifest.read_bytes()
+    capsys.readouterr()
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 1
+    err = capsys.readouterr().err
+    assert f"{UNDECLARED}: no face inventory for ['{step.name}']" in err
+    assert manifest.read_bytes() == restamped
+    # Nothing restored: refused, nothing written.
+    assert fetch_features.main(["--trust-step", DECLARED, "--out", str(out)]) == 1
+    assert not (out / "features" / DECLARED).exists()
+    with pytest.raises(SystemExit):
+        fetch_features.main(["--trust-step", "--check", UNDECLARED, "--out", str(out)])
+
+
 def test_a_bundle_that_does_not_bind_its_step_is_refused(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:

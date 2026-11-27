@@ -386,7 +386,25 @@ input) a bundle without them or built from other geometry, such as one copied
 from another worktree; `fetch_features.py --check <stem>` reports the same
 without fetching. After editing declarations on top of a local bundle,
 `uv run --frozen python cad/scripts/fetch_features.py --rebind <stem>` rebinds
-it (`export_features.py <stem>` alone writes no geometry inputs). Only exit 0
+it (`export_features.py <stem>` alone writes no geometry inputs).
+
+How a bundle gets its stamp depends on where it came from:
+
+- **A release asset:** `fetch_features.py <stem>` stamps it, or reports it STALE.
+- **A doit or farm build** of a commit with #3668 or later: `package:manifest:<stem>` stamps it.
+- **Restored by hand** (the labelled STEPs and `.faces.json` inventories copied
+  from a farm run's `out/features/<stem>/`, or a bundle bound before #3668):
+  `uv run --frozen python cad/scripts/fetch_features.py --trust-step <stem> [--out cad/out]`
+  binds `features.toml` from this checkout's declarations and stamps this
+  checkout's geometry inputs. It cannot see what the STEP was built from and
+  says so per part (`TRUSTING the STEP`). Use it only on a STEP built from this
+  checkout's geometry inputs: a farm run of this commit, or of one whose
+  `--check` findings would be empty. It refuses (exit 2, unchanged) a bundle
+  whose `features.toml` already binds that very STEP to other geometry inputs.
+  Exit 1 means a part has no STEP or inventory, or does not bind or validate;
+  that part is not written.
+
+Only exit 0
 from both profiles and a printed PDF is success. Exit 2 from either profile is
 a prechips refusal (bad input or a failed enforced check) and leaves no
 traveler file; exit 1 means uv itself failed (no `uv`, no PyPI, or a `uv tool
