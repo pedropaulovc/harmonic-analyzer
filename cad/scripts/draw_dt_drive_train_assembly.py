@@ -1735,7 +1735,7 @@ CONE_CRANK_STEPS = _note_text(
         # comes out (MHA-DT-29, flush both sides, by a punch; MHA-DT-VN-67
         # from its blind hole by hand, as it moves).
         f"4S. IF 4R BONDED {pinion.PIN_NUMBER}, LEAVE IT UNDISTURBED 24 H TO CURE.",
-        "4T. CHECK A PIN BONDED AT 4B OR 4R DOES NOT TURN OR PULL OUT BY HAND.",
+        "4T. CHECK A PIN BONDED AT 4B OR 4R DOES NOT TURN OR SLIDE BY HAND.",
         "4U. IF ONE DOES, TAKE IT OUT OF ITS HOLE.",
         "4V. IF 4T FAILED, REDO 4B OR 4R AND 4S-4V ON BARE METAL FOR THAT PIN.",
         "4W. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
