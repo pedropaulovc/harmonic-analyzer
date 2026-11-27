@@ -526,7 +526,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Put on the chemical-resistant gloves and the safety glasses. Degrease the plates' B ends and the strap's front where each plate sits (from the foot end to 1.25 in up, and from 4.55 to 4.95 in below the top end) with the Birchwood Casey Cleaner-Degreaser, both faces of every joint, and let them dry; from here on touch none of them."
+instruction = "Bond only in a shop at room temperature, and keep it so for the whole 24 h cure (a cold shop cures Loctite 638 far slower: its TDS). Put on the chemical-resistant gloves and the safety glasses. Degrease the plates' B ends and the strap's front where each plate sits (from the foot end to 1.25 in up, and from 4.55 to 4.95 in below the top end) with the Birchwood Casey Cleaner-Degreaser, both faces of every joint, and let them dry; from here on touch none of them."
 feed = "hand"
 
 [[setups.operations]]
@@ -548,7 +548,7 @@ inspection = "Before the stack comes out: the lower plate flush with the foot en
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "After 1 h: slide the 1.000 block out gently, without disturbing the plates or the strap, and peel its paper off; paper held at the joint line: tear it away and scrape the residue off the foot end and the lower plate's outer face with the deburring tool, keeping them flush. Wipe the gauge stack and the block with the degreaser, then oil them. Leave the vise closed and untouched for the rest of the 24 h cure, the shop at room temperature (a cold shop cures far slower: Loctite 638 TDS)."
+instruction = "After 1 h: slide the 1.000 block out gently, without disturbing the plates or the strap, and peel its paper off; paper held at the joint line: tear it away and scrape the residue off the foot end and the lower plate's outer face with the deburring tool, keeping them flush. Wipe the gauge stack and the block with the degreaser, then oil them. Leave the vise closed and untouched for the rest of the 24 h cure."
 feed = "hand"
 
 [[setups.operations]]
@@ -631,9 +631,13 @@ gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.guide_plates_upper_overhang_band_mm}}" },
 ]
 
+# Delegated ruling 2026-11-26 (Main), no precedent; owner review #2144 (D54;
+# #3646): a plate that moves after the cure is not held; cured 638 comes
+# apart only hot and #2435 bars the torch, and the in-line slots cannot be
+# recut on re-bonded plates, so the hanger is scrapped (Main, 2026-11-27).
 [[setups.operations]]
 instruction = "Drawing note 1: the bond, by hand."
-inspection = "The lower plate flush with the strap's foot end and both corners (a fingernail drawn across each feels no step); neither plate moves when pushed hard by hand each way along and across the strap. A plate moves or a step is felt: scrap the hanger, strap and plates, and make a new one from Setup 1 (cured 638 parts only hot, at about 250 °C, and the slots, cut in line through both plates, cannot be cut again on re-bonded plates)."
+inspection = "The lower plate flush with the strap's foot end and both corners (a fingernail drawn across each feels no step); neither plate moves when pushed hard by hand each way along and across the strap. A plate moves or a step is felt: scrap the hanger, strap and plates, and make a new one from Setup 1, keeping the spoil plate (cured 638 parts only hot, at about 250 °C, and the slots, cut in line through both plates, cannot be cut again on re-bonded plates)."
 gauge_checks = "other"
 
 [[setups.operations]]
