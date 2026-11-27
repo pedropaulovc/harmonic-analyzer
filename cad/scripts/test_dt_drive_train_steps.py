@@ -205,11 +205,11 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
         "DRILL 1/16 UP THRU MHA-DT-20 INTO MHA-DT-21",
         "PUSH IT UP TO THE MHA-DT-21 FLOOR",
         "WIPE THE MHA-DT-20 HOLE CLEAN",
-        "CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND",
+        "CHECK MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND",
         "THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING",
         "BACK MHA-DT-39 OFF 1/8 TURN",
         "TIGHTEN MHA-DT-VN-56",
-        "IF IT READ OVER, REDO 3H-3J WITH MHA-DT-39 IN MORE, IF UNDER LESS",
+        "IF IT READ OVER, REDO 3N-3P WITH MHA-DT-39 IN MORE, IF UNDER LESS",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance comes once the end play is final.
         "CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND",
@@ -317,9 +317,9 @@ def test_crank_fit_looks_at_t120_before_the_full_turn_and_retention_drilling() -
         "4K. IF THE TEETH BIND, RECUT MHA-DT-10",
         "4L. AFTER A RECUT, REPEAT FROM 4D",
         "4M. MATCH-DRILL THE MHA-DT-10",
-        "4S. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING",
-        "4T. CHECK MHA-DT-11'S END IS NOT BELOW MHA-DT-10",
-        "4U. DO NOT FACE THAT END",
+        "4W. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING",
+        "4X. CHECK MHA-DT-11'S END IS NOT BELOW MHA-DT-10",
+        "4Y. DO NOT FACE THAT END",
     )
     positions = [fitup.index(phrase) for phrase in order]
     assert positions == sorted(positions)
@@ -327,7 +327,7 @@ def test_crank_fit_looks_at_t120_before_the_full_turn_and_retention_drilling() -
     assert "BACKLASH" not in fitup
     assert "WORST-CASE" not in fitup
     assert "FEELER PASSES" not in fitup and "PUSH MHA-DT-10" not in fitup
-    assert "4V." not in fitup
+    assert "4Z." not in fitup
 
 
 def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform() -> None:

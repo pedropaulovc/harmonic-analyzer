@@ -1,6 +1,11 @@
 # Placeholder process plan (owner 2026-11-19): the tools this part needs, from
 # quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
 # _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Pivot running clearance in MHA-DT-39's drilled #52 hole (#3688): not measured
+# as a pair. The pivot's printed .0612-.0622 is read with the 0-1 in micrometer
+# (D50); the hole is MHA-DT-39's #52 drill band, .0635-.0675; the two print
+# bands bound the clearance at .0013-.0063 (delegated ruling 2026-11-26 (Main),
+# no precedent; owner review #2144 (D54)).
 title = "Cone Tip Gear"
 part = "MHA-DT-37 Cone Tip Gear"
 revision = "placeholder"

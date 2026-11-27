@@ -914,10 +914,10 @@ def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
     def redone(first: str, last: str) -> str:
         return " ".join(bodies[key] for key in keys[keys.index(first) : keys.index(last) + 1])
 
-    # 5G names the remedy step 3N, which follows the end-play steps.
-    assert redo.group(1) == f"{end_play}N"
+    # 5G names the remedy step 3T, which follows the end-play steps.
+    assert redo.group(1) == f"{end_play}T"
     step = re.fullmatch(
-        rf"{end_play}N\. IF A MHA-DT-VN-61 IS EVER LOOSENED, REDO (\d+[A-Z]), (\d+[A-Z])-(\d+[A-Z]), "
+        rf"{end_play}T\. IF A MHA-DT-VN-61 IS EVER LOOSENED, REDO (\d+[A-Z]), (\d+[A-Z])-(\d+[A-Z]), "
         r"THEN (\d+[A-Z])-(\d+[A-Z])\.",
         bodies[redo.group(1)],
     )
@@ -930,7 +930,7 @@ def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
     assert "TIGHTEN BOTH MHA-DT-VN-61" in re_set
     # The post can shift along the shaft on the screws' float: the end play
     # is measured again, with its remedy and the pinch lock's check.
-    assert step.group(4) == f"{end_play}J" and step.group(5) == f"{end_play}M"
+    assert step.group(4) == f"{end_play}P" and step.group(5) == f"{end_play}S"
     end_play_redo = redone(step.group(4), step.group(5))
     assert "MEASURE THE MHA-DT-04 END PLAY AT THE SHAFT END" in end_play_redo
     assert "DOES NOT TURN IN MHA-DT-21" in end_play_redo
@@ -1769,14 +1769,14 @@ def test_cone_station_rows_run_front_to_back() -> None:
     end_play = steps_registry.step_number("end-play-set")
     assert (
         "5D. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE (A BONDED GEAR HESITATES: STEP 2H,"
-        f" A KEYED ONE: STEP {end_play}P)."
+        f" A KEYED ONE: STEP {end_play}U)."
     ) in check
     keyed = " ".join(drawing.CONE_CRANK_STEPS.split())
     assert (
-        f"{end_play}P. IF A KEYED GEAR HESITATES IN CHECK 5C, TAKE IT OFF MHA-DT-04 AFTER 2H-2J."
-        f" {end_play}Q. CHECK A GEAR TAKEN OFF: BORE AND TEETH TO ITS MHA-DT-03 SHEET,"
-        f" NO SHAKE ON MHA-DT-04. {end_play}R. IF IT FAILS, REMAKE IT TO THAT SHEET."
-        f" {end_play}S. AFTER {end_play}P, REDO FROM 1B."
+        f"{end_play}U. IF A KEYED GEAR HESITATES IN CHECK 5C, TAKE IT OFF AFTER 2H-2J."
+        f" {end_play}V. CHECK A GEAR TAKEN OFF: BORE AND TEETH TO ITS MHA-DT-03 SHEET,"
+        f" NO SHAKE ON MHA-DT-04. {end_play}W. IF IT FAILS, REMAKE IT TO THAT SHEET."
+        f" {end_play}X. AFTER {end_play}U, REDO FROM 1B."
     ) in keyed
     assert steps[order[8] : order[9]].strip().endswith("FOR A REDO FROM 1L.")
     assert steps[order[9] :].startswith("2K. ALIGN THE MHA-DT-05 COUNTERBORES")

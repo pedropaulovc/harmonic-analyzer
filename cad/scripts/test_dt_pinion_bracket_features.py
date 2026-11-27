@@ -52,8 +52,9 @@ def test_the_strap_is_a_feature_export_part_with_one_owner_per_face() -> None:
     kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
     assert kinds == _FEATURE_KINDS
     assert manifest["construction"] == "one_piece"
-    # The sheet prints no numbered general notes.
-    assert manifest["notes"]["manufacturing"] == spec.DRAWING_NOTES.splitlines() == []
+    # The sheet prints one numbered note, the follower seat's bond (#3693).
+    assert manifest["notes"]["manufacturing"] == spec.DRAWING_NOTES.splitlines()
+    assert len(manifest["notes"]["manufacturing"]) == 2
     selectors = export_features.feature_selectors(STEM)
     r, t, c2c = spec.R_END, spec.THICKNESS, spec.C2C
     z_axis, x_axis = (0.0, 0.0, 1.0), (1.0, 0.0, 0.0)

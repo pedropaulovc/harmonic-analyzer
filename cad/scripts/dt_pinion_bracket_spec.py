@@ -129,10 +129,14 @@ if min(PIN_SEAT_WEB_WORST, PIN_SEAT_NEAR_WEB_WORST) < WALL_TARGET_MM:
 # seat depth's .XX band.  The seat callout prints it.
 PIN_SEAT_FLOOR_CORNER_R_MAX = 0.2032  # .008
 # The seat's size callout: its REF depth and flat floor (rule 26: never
-# deferred to a view; Section B-B's .16 controls the floor), the bonded mate
-# (rule 4), the bond's diametral clearance (rule 23), then the floor-corner
-# allowance.  No cutter is named (tool audit Q8 drops the REAM; MHA-PD-16's
-# pilot precedent: "FLAT BOTTOM END MILL" named a tool, not a requirement).
+# deferred to a view; Section B-B's .16 controls the floor), its flag to note
+# 1, then the floor-corner allowance.  No cutter is named (tool audit Q8
+# drops the REAM; MHA-PD-16's pilot precedent: "FLAT BOTTOM END MILL" named a
+# tool, not a requirement).  #3693 (#3681 P2-7, Codjiflo on #3675): the
+# bonded mate (rule 4), the compound's grade (rule 23) and the bond's
+# diametral clearance printed three word lines under the process line,
+# where rule 7 allows two, and folding them onto one row ran across both
+# views; so they move to note 1, the callout keeping SEE NOTE 1.
 # The clearance is the MHA-DT-25 5/32 drill rod's catalogue band in this
 # seat's +.003/0 (dt_pinion_cam_pin_spec.BOND_CLEARANCE_MIN/MAX, inside
 # LOCTITE 638's gap there); the seat band is the requirement, so the range
@@ -142,11 +146,11 @@ _BOND_CLEARANCE_TEXT = "-".join(
     f"{value / 25.4:.4f}".lstrip("0")
     for value in (_cam_pin.BOND_CLEARANCE_MIN, _cam_pin.BOND_CLEARANCE_MAX)
 )
+SEAT_NOTE = 1
 PIN_SEAT_CALLOUT = "\n".join(
     (
         f"<HOLE-DEPTH> ({PIN_SEAT / 25.4:.2f}) FLAT BOTTOM".replace("(0.", "(."),
-        "BONDED FIT ON MHA-DT-25",
-        f"(CLEARANCE {_BOND_CLEARANCE_TEXT})",
+        f"SEE NOTE {SEAT_NOTE}",
         f"FLOOR CORNERS R{PIN_SEAT_FLOOR_CORNER_R_MAX / 25.4:.3f} MAX".replace(
             "R0.", "R."
         ),
@@ -242,11 +246,17 @@ SURFACE_FINISHES = (
     ),
 )
 
-# No manufacturing-note block.  Everything this strap needs is a dimension, a
-# hole callout, a roughness symbol or a title-block field (drawing-simplicity
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); the retired block restated geometry the native dimensions
-# and outline already define and prescribed an unnecessary fixturing method.
-DRAWING_NOTES = ""
+# One flagged note (rule 7): the follower seat's bonded fit, its mate, the
+# compound's grade and its clearance as REF (#3693).  Its degrease, cure and
+# acceptance are MHA-DT-00 step 14's and its sheet 1 note's, where the stud
+# is bonded.  Everything else this strap needs is a dimension, a hole
+# callout, a roughness symbol or a title-block field.
+DRAWING_NOTES = "\n".join(
+    (
+        f"{SEAT_NOTE}. FOLLOWER SEAT: BONDED FIT ON MHA-DT-25, {_cam_pin.RETAINING_COMPOUND}",
+        f"   (CLEARANCE {_BOND_CLEARANCE_TEXT}).",
+    )
+)
 
 # Brackets carry no datums and no feature-control frames (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the
 # end-arc profile frames this sheet used to print were form control on a

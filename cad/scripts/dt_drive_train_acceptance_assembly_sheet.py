@@ -141,25 +141,25 @@ ACCEPTANCES = (
     ),
     (
         "shaft-end-play",
-        _step_ref("end-play-set", "J"),
+        _step_ref("end-play-set", "P"),
         # Fit audit 2026-11-23 part 2, B10; Codjiflo round 1 of #3550,
         # delegated ruling 2026-11-24 (Main), no precedent; owner review
         # #2144: the window, which the end screw's embed and the
-        # bushing air book (step 3J's comment), is read on the dial, not felt.
+        # bushing air book (step 3P's comment), is read on the dial, not felt.
         "MHA-DT-04 END PLAY AT THE SHAFT END",
         inch_window(SHAFT_END_PLAY, 3),
         "DIAL INDICATOR",
     ),
     (
         "ring-butt-gap",
-        _step_ref("crank-hub-fitted", "P"),
+        _step_ref("crank-hub-fitted", "R"),
         "MHA-DT-27 BUTT GAP, CLOSED",
         "0-" + f"{RING_BUTT_GAP_BAND[1] / 25.4:.3f}".removeprefix("0"),
         "FEELERS",
     ),
     (
         "handle-end-play",
-        _step_ref("crank-handle-fitted", "H"),
+        _step_ref("crank-handle-fitted", "K"),
         "MHA-DT-08 END PLAY ON MHA-DT-32",
         inch_window(handle_screw.END_PLAY_RANGE, 3),
         "FEELERS",
