@@ -30,7 +30,6 @@ _FEATURE_KINDS = {
     "lever_tap": "threaded_hole",
     "mounting_hole_1": "hole",
     "mounting_hole_2": "hole",
-    "inside_corner": "fillet",
 }
 
 
@@ -96,20 +95,6 @@ def test_the_bracket_is_a_feature_export_part_with_one_owner_per_face() -> None:
             ]
             for index, (x, y, _z) in enumerate(joint.BRACKET_HOLE_POINTS, 1)
         },
-        "inside_corner": [
-            _cylinder(
-                2 * spec.INSIDE_ROOT_R_MAX,
-                (0.0, 1.0, 0.0),
-                (
-                    -half - spec.INSIDE_ROOT_R_MAX,
-                    y0,
-                    z0 - spec.INSIDE_ROOT_R_MAX,
-                    -half,
-                    y1,
-                    z0,
-                ),
-            )
-        ],
     }
     assert set(expected) == set(_FEATURE_KINDS)
     for name, faces in expected.items():
@@ -166,12 +151,6 @@ def test_bracket_feature_bands_are_the_printed_ones() -> None:
         assert hole["note"] == spec.MOUNTING_HOLE_PROCESS
         assert hole["station"] == pytest.approx([_in(station - 0.005), _in(station + 0.005)])
         assert hole["lateral"] == pytest.approx([_in(0.221), _in(0.231)])
-
-    corner = features["inside_corner"]
-    assert corner["radius"] == pytest.approx([0.0, _in(0.02)])
-    assert corner["radius_nominal"] == pytest.approx(spec.INSIDE_ROOT_R_MAX)
-    assert corner["axis"] == [0.0, 1.0, 0.0]
-    assert corner["at"] == [-thread.NECK_HALF_X, 0.0, joint.SIDE_PLATE_Z[0]]
 
 
 def _coordinate(feature: dict, axis: int) -> float:

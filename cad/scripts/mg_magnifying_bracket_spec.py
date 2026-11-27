@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import _config
 from _package_units import drawing_unit
-from _printed_tolerance import edge_break_radius_mm, printed_band_mm
+from _printed_tolerance import edge_break_radius_mm, inside_corner_radius_mm, printed_band_mm
 
 UNIT = drawing_unit(
     "parts/mg-magnifying-bracket", _config.parts("mg-magnifying-bracket")
@@ -20,32 +20,28 @@ UNIT = drawing_unit(
 # The matched-width foot has no lateral ledge or axial bridge fillet.
 # Outside free-foot rounds stay at the title block's .010 edge break; the
 # unloaded inside X-root (-X neck face to -Z foot underside, opposite the
-# flat +Z MHA-SM-03 seat; #3742) permits R.02 MAX so .015 corner-radius 3/8
-# and 1/2 in carbide end mills cover every steel pass. Modeled at the limit;
-# swTolMAX prints "R.02 MAX".
+# flat +Z MHA-SM-03 seat; #3742) stays governed on the sheet by the title
+# block's INSIDE CORNERS R.040 MAX and is modeled unmarked at .020 in (2x the
+# edge break, half of inside_corner_radius_mm) so .015-.020 in corner-radius
+# 3/8 and 1/2 in carbide end mills cover every steel pass.
 FOOT_CORNER_R = edge_break_radius_mm(unit=UNIT)
-INSIDE_ROOT_R_PLACES = 2
-INSIDE_ROOT_R_MAX = 0.02 * 25.4
-INSIDE_ROOT_R_BAND = (0.0, -INSIDE_ROOT_R_MAX)  # (upper, lower)
-INSIDE_ROOT_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.02 MAX"
+INSIDE_ROOT_R = 2.0 * FOOT_CORNER_R
 DRAWING_DIMENSIONS = {
     "NeckProfile": {"NoseR", "SeatToAxis"},
     "Neck": {"NeckThickness"},
     "FlangeProfile": {"FlangeWidth", "FlangeDepth"},
     "Flange": {"FlangeHeight"},
-    "RootAndFootRounds": {"InsideRootRadius"},
     "MountingCoordinates": {"MountingX0", "MountingX1", "MountingY0"},
     "TapCoordinates": {"TapFromTip", "TapFromSide"},
 }
 # Inch places. Three on the +/-.002 head and mounting controls and the foot
 # grip; two on the neck (thread engagement), the foot length and width
-# (mounting walls), the seat-to-axis reach and the R.02 MAX inside X-root.
+# (mounting walls) and the seat-to-axis reach.
 DRAWING_PRECISION = {
     "NeckProfile": {"NoseR": 3, "SeatToAxis": 2},
     "Neck": {"NeckThickness": 2},
     "FlangeProfile": {"FlangeWidth": 2, "FlangeDepth": 3},
     "Flange": {"FlangeHeight": 2},
-    "RootAndFootRounds": {"InsideRootRadius": INSIDE_ROOT_R_PLACES},
     "MountingCoordinates": {"MountingX0": 3, "MountingX1": 3, "MountingY0": 3},
     "TapCoordinates": {"TapFromTip": 3, "TapFromSide": 3},
 }

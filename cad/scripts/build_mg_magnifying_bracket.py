@@ -35,12 +35,11 @@ from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _single_limit_tolerance import set_single_limit
 from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_point_to_point, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
 from _sketch_chains import define_rectilinear_chain
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, SIDE_PLATE_X as FLANGE_X, SIDE_PLATE_Y as FLANGE_Y, SIDE_PLATE_Z as FLANGE_Z, SIDE_PLATE_THICKNESS
 from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC
-from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, INSIDE_ROOT_R_BAND, INSIDE_ROOT_R_MAX, INSIDE_ROOT_R_TOL_TYPE, ISOMETRIC_VIEW_NOTE, UNIT
+from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, INSIDE_ROOT_R, ISOMETRIC_VIEW_NOTE, UNIT
 from mg_magnifying_bracket_finish_spec import SURFACE_FINISHES
 import _telemetry
 
@@ -147,8 +146,34 @@ def _coordinates(adapter, jobs) -> None:
 
 
 
+def _apply_fillet_item_radii(
+    fillet_data, expected_count: int, root_probe_m: tuple[float, float, float]
+) -> None:
+    item_count = int(fillet_data.FilletItemsCount)
+    if item_count != expected_count:
+        raise RuntimeError(
+            f"RootAndFootRounds: expected {expected_count} fillet items, found {item_count}"
+        )
+    root_hits = 0
+    for index in range(item_count):
+        item = fillet_data.GetFilletItemAtIndex(index)
+        if item is None:
+            raise RuntimeError(f"RootAndFootRounds: missing fillet item {index}")
+        closest = _early_bound(item, "IEdge").GetClosestPointOn(*root_probe_m)
+        if closest is None or len(closest) < 3:
+            raise RuntimeError(f"RootAndFootRounds: fillet item {index} has no closest point")
+        is_root = math.dist(tuple(float(v) for v in closest[:3]), root_probe_m) < 1e-6
+        target_m = (INSIDE_ROOT_R if is_root else FOOT_CORNER_R) / 1000.0
+        fillet_data.SetRadius(item, target_m)
+        root_hits += int(is_root)
+    if root_hits != 1:
+        raise RuntimeError(
+            f"RootAndFootRounds: expected 1 inside-root item, matched {root_hits} of {item_count}"
+        )
+
+
 def _round_foot_root(adapter, jobs) -> None:
-    """Solve the R.02 MAX inside X-root and .010 outside foot rounds together."""
+    """Solve the .020 inside X-root and .010 outside foot rounds together."""
     from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 
     # Matched Y sides make these a single interacting corner treatment.
@@ -156,9 +181,9 @@ def _round_foot_root(adapter, jobs) -> None:
     # two new side rounds against its tangent boundary. Select only the raw
     # root and free-foot front edges, never the upright's long sharp edges.
     targets = (
-        ((-NECK_HALF_X, 0.0, FLANGE_Z[0]), INSIDE_ROOT_R_MAX / 1000.0),
-        (((FLANGE_X[0] - NECK_HALF_X) / 2.0, FLANGE_Y[0], FLANGE_Z[0]), FOOT_CORNER_R / 1000.0),
-        (((FLANGE_X[0] - NECK_HALF_X) / 2.0, FLANGE_Y[1], FLANGE_Z[0]), FOOT_CORNER_R / 1000.0),
+        (-NECK_HALF_X, 0.0, FLANGE_Z[0]),
+        ((FLANGE_X[0] - NECK_HALF_X) / 2.0, FLANGE_Y[0], FLANGE_Z[0]),
+        ((FLANGE_X[0] - NECK_HALF_X) / 2.0, FLANGE_Y[1], FLANGE_Z[0]),
     )
     part = _early_bound(adapter.currentModel, "IPartDoc")
     bodies = tuple(part.GetBodies2(0, True) or ())
@@ -168,7 +193,7 @@ def _round_foot_root(adapter, jobs) -> None:
     if not body_edges:
         raise RuntimeError("RootAndFootRounds: solid body has no edges")
     selected = []
-    for point_mm, radius_m in targets:
+    for point_mm in targets:
         point_m = tuple(coord / 1000.0 for coord in point_mm)
         best_edge = None
         best_gap = 0.0005
@@ -183,10 +208,9 @@ def _round_foot_root(adapter, jobs) -> None:
                 best_edge = raw_edge
         if best_edge is None:
             raise RuntimeError(f"RootAndFootRounds: no body edge near {point_mm} mm")
-        selected.append((best_edge, radius_m))
+        selected.append(best_edge)
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     fm = _early_bound(model.FeatureManager, "IFeatureManager")
-    sel_mgr = _early_bound(model.SelectionManager, "ISelectionMgr")
     model.ClearSelection2(True)
     sw_fm_fillet = _sw_type_info.constant("swFmFillet")
     raw_defn = fm.CreateDefinition(sw_fm_fillet)
@@ -199,36 +223,16 @@ def _round_foot_root(adapter, jobs) -> None:
     defn.OverflowType = _sw_type_info.constant("swFilletOverFlowType_Default")
     defn.PropagateToTangentFaces = False
     defn.DefaultRadius = FOOT_CORNER_R / 1000.0
-    sel_items = []
-    for index, (raw_edge, radius_m) in enumerate(selected):
+    for index, raw_edge in enumerate(selected):
         if not _early_bound(raw_edge, "IEntity").Select2(index > 0, 1):
             raise RuntimeError(f"RootAndFootRounds: Select2(Mark=1) failed for edge {index}")
-        sel_item = sel_mgr.GetSelectedObject6(index + 1, -1)
-        if sel_item is None:
-            raise RuntimeError(f"RootAndFootRounds: GetSelectedObject6({index + 1}) returned None")
-        sel_items.append((sel_item, radius_m))
     defn.IsMultipleRadius = True
     root_probe_m = (-NECK_HALF_X / 1000.0, 0.0, FLANGE_Z[0] / 1000.0)
     pre_count = int(defn.FilletItemsCount)
     if pre_count == len(selected):
-        pre_items = []
-        for index in range(pre_count):
-            item = defn.GetFilletItemAtIndex(index)
-            if item is None:
-                raise RuntimeError(f"RootAndFootRounds: GetFilletItemAtIndex({index}) returned None")
-            closest = _early_bound(item, "IEdge").GetClosestPointOn(*root_probe_m)
-            is_root = closest is not None and len(closest) >= 3 and math.dist(tuple(float(v) for v in closest[:3]), root_probe_m) < 1e-6
-            target_m = (INSIDE_ROOT_R_MAX if is_root else FOOT_CORNER_R) / 1000.0
-            defn.SetRadius(item, target_m)
-            pre_items.append(item)
-    else:
-        pre_items = []
-        for sel_item, radius_m in sel_items:
-            defn.SetRadius(sel_item, radius_m)
-            pre_items.append(sel_item)
-    pre_radii = [round(float(defn.GetRadius(item)) * 1000.0, 6) for item in pre_items]
+        _apply_fillet_item_radii(defn, len(selected), root_probe_m)
     _telemetry.info(
-        f"RootAndFootRounds pre-create: swFmFillet={sw_fm_fillet} items={int(defn.FilletItemsCount)} radii_mm={pre_radii}"
+        f"RootAndFootRounds pre-create: swFmFillet={sw_fm_fillet} items={pre_count}"
     )
     raw_created = fm.CreateFeature(defn)
     model.ClearSelection2(True)
@@ -243,7 +247,7 @@ def _round_foot_root(adapter, jobs) -> None:
     dims = list(_display_dimensions(feature, "RootAndFootRounds"))
     root_dims = [
         idim for idim in dims
-        if math.isclose(_dim_value_mm(idim), INSIDE_ROOT_R_MAX, abs_tol=1e-6)
+        if math.isclose(_dim_value_mm(idim), INSIDE_ROOT_R, abs_tol=1e-6)
     ]
     if len(root_dims) != 1:
         committed = _early_bound(feature.GetDefinition(), "ISimpleFilletFeatureData2")
@@ -251,23 +255,10 @@ def _round_foot_root(adapter, jobs) -> None:
             raise RuntimeError("RootAndFootRounds: post-create AccessSelections failed")
         try:
             committed.IsMultipleRadius = True
-            item_count = int(committed.FilletItemsCount)
-            _telemetry.info(f"RootAndFootRounds post-create modify: items={item_count} dims_before={len(dims)}")
-            root_hits = 0
-            for index in range(item_count):
-                item = committed.GetFilletItemAtIndex(index)
-                if item is None:
-                    raise RuntimeError(f"RootAndFootRounds: missing committed fillet item {index}")
-                edge = _early_bound(item, "IEdge")
-                closest = edge.GetClosestPointOn(*root_probe_m)
-                if closest is None or len(closest) < 3:
-                    raise RuntimeError(f"RootAndFootRounds: committed item {index} has no closest point")
-                is_root = math.dist(tuple(float(v) for v in closest[:3]), root_probe_m) < 1e-6
-                target_m = (INSIDE_ROOT_R_MAX if is_root else FOOT_CORNER_R) / 1000.0
-                committed.SetRadius(item, target_m)
-                root_hits += int(is_root)
-            if root_hits != 1:
-                raise RuntimeError(f"RootAndFootRounds: expected 1 committed inside-root item, matched {root_hits} of {item_count}")
+            _telemetry.info(
+                f"RootAndFootRounds post-create modify: items={int(committed.FilletItemsCount)} dims_before={len(dims)}"
+            )
+            _apply_fillet_item_radii(committed, len(selected), root_probe_m)
             if not feature.ModifyDefinition(committed, model, None):
                 raise RuntimeError("RootAndFootRounds: post-create ModifyDefinition failed")
         except BaseException:
@@ -277,14 +268,14 @@ def _round_foot_root(adapter, jobs) -> None:
         dims = list(_display_dimensions(feature, "RootAndFootRounds"))
         root_dims = [
             idim for idim in dims
-            if math.isclose(_dim_value_mm(idim), INSIDE_ROOT_R_MAX, abs_tol=1e-6)
+            if math.isclose(_dim_value_mm(idim), INSIDE_ROOT_R, abs_tol=1e-6)
         ]
     _telemetry.info(
         f"RootAndFootRounds dimensions_mm={[round(_dim_value_mm(d), 6) for d in dims]}"
     )
     if len(root_dims) != 1:
         raise RuntimeError(
-            f"RootAndFootRounds: expected one {INSIDE_ROOT_R_MAX:g} mm dimension, found {len(root_dims)} of {len(dims)}"
+            f"RootAndFootRounds: expected one {INSIDE_ROOT_R:g} mm dimension, found {len(root_dims)} of {len(dims)}"
         )
     _bind(root_dims[0], "IDimension").Name = "InsideRootRadius"
     jobs.append(("InsideRootRadius@RootAndFootRounds", '"InsideRootR"'))
@@ -296,7 +287,7 @@ def _assert_matched_width_topology(adapter) -> None:
     foot_z = sum(FLANGE_Z) / 2.0
     foot_x = (FLANGE_X[0] - NECK_HALF_X) / 2.0
     requests = {"nose": CylinderFace(2.0 * NOSE_R, contains_z_mm=-NOSE_R / 2.0)}
-    root_radius = INSIDE_ROOT_R_MAX
+    root_radius = INSIDE_ROOT_R
     root_center = (-NECK_HALF_X - root_radius, 0.0, FLANGE_Z[0] - root_radius)
     root_point = (
         root_center[0] + root_radius / math.sqrt(2.0), 0.0,
@@ -392,7 +383,7 @@ def build(adapter) -> dict[str, str]:
         ("NoseR", NOSE_R),
         ("SeatToAxis", FLANGE_Z[1]),
         ("NeckThickness", NECK_THICKNESS),
-        ("InsideRootR", INSIDE_ROOT_R_MAX),
+        ("InsideRootR", INSIDE_ROOT_R),
     ):
         set_global(adapter, name, f"{value}mm")
     jobs = []
@@ -476,14 +467,6 @@ def build(adapter) -> dict[str, str]:
     volume_check(adapter, "simple L with through tap and rounded corners", expected, 10.0)
     name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "threaded lever axis")
     set_dimension_symmetric_tolerance(adapter, "NeckProfile", "NoseR", NOSE_R_TOL, display_unit=UNIT)
-    set_single_limit(
-        adapter,
-        "RootAndFootRounds",
-        "InsideRootRadius",
-        limit=INSIDE_ROOT_R_MAX,
-        band=INSIDE_ROOT_R_BAND,
-        tol_type=INSIDE_ROOT_R_TOL_TYPE,
-    )
     _author_dimension_callouts(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

@@ -20,7 +20,7 @@
   <text class="label" x="120" y="92">#37 holes: a {{cad.mounting_hole_1_dia_min_in:.3dot}} pin enters; from F, calipers over the pin</text>
   <line class="leader" x1="67.9" y1="204.35" x2="140" y2="130"/>
   <circle class="leader-dot" cx="67.9" cy="204.35" r="2"/>
-  <text class="label" x="140" y="126">inside corner under the foot as cut: R{{cad.inside_corner_radius_max_in:.2dot}} max</text>
+  <text class="label" x="140" y="126">inside corner under the foot as cut: R.040 max</text>
   <line class="leader" x1="200" y1="204.35" x2="240" y2="166"/>
   <circle class="leader-dot" cx="200" cy="204.35" r="2"/>
   <text class="label" x="240" y="162">neck {{cad.neck_inner_face_thickness_min_in:.2dot}}–{{cad.neck_inner_face_thickness_max_in:.2dot}}: miked in Setup 7</text>

@@ -19,8 +19,8 @@
 # so no thin skin is ever cut (MB04); saw the nose waste off (the offcut is the spacer
 # of the next two setups); Setup 7 on edge on the stacks, the foot past the
 # jaws' left side: face the neck to its thickness and cut the inside
-# corner under the foot (MB05: the drawing's R.02 MAX, clearing a .015
-# corner-radius cutter; MB03's cutter left its R.25 there); Setup 8 on edge on the 1 in parallels,
+# corner under the foot (MB05: the title block's INSIDE CORNERS R.040 MAX;
+# MB03's cutter left its R.25 there); Setup 8 on edge on the 1 in parallels,
 # the nose past the jaws' right side: profile the nose R.217 and drill #7
 # through (MB06), tap 1/4-20 by hand under the spring tap guide (MB07);
 # bench deburr and inspect; blue with Oxpho-Blue.
@@ -166,6 +166,11 @@ part_length_max_mm = 104.14
 # from beside the part over the fixed jaw.
 neck_level_max_mm = 3.81
 neck_level_mm = 3.425
+# The unloaded inside X-root under the foot: governed by the title block's
+# INSIDE CORNERS R.040 MAX and modelled at 2x edge_break_r (.020 in = 0.508 mm,
+# mg_magnifying_bracket_spec.py INSIDE_ROOT_R) so .015-.020 in corner-radius
+# cutters cover every steel pass (#3742).
+inside_root_model_r_mm = 0.508
 # The nose (MB06): profiled round the R.217 with the end mill's side, climb
 # (G2), through the neck and nose_past_mm below O: two rough levels .020 off
 # the radius, then one finish pass at full depth. The rough pass's widest cut
@@ -623,7 +628,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Run MB05_neck (M6 T1; set 2650): face the neck down to Z {{cad.neck_inner_face_thickness_mm:in.4dot}} in {{process.neck_level_mm:in.3dot}} levels, each in passes from the nose end to the foot's underside; the end mill's corner takes off MB03's R.25 there. Unclamp; mic the neck."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
-inspection = "Neck {{cad.neck_inner_face_thickness_min_in:.3dot}}–{{cad.neck_inner_face_thickness_max_in:.3dot}} thick (O to the inner face), miked by the nose and by the foot. The inside corner R{{cad.inside_corner_radius_max_in:.2dot}} max (no MB03 R.25 left)."
+inspection = "Neck {{cad.neck_inner_face_thickness_min_in:.3dot}}–{{cad.neck_inner_face_thickness_max_in:.3dot}} thick (O to the inner face), miked by the nose and by the foot. The inside corner R.040 max (no MB03 R.25 left)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.neck_inner_face_thickness_band_mm}}" }]
 milling_cuts = [
   { name = "neck", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.neck_level_mm}}", radial_woc_mm = 3.833, traverse_mm = ["{{cad.foot_underside_thickness_mm}}", "{{process.part_length_max_mm}}"] },
@@ -770,7 +775,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "Break every edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max: smooth file on the outside edges, the scraper from the deburring set on the holes' mouths (no countersink). Leave the inside corner under the foot as cut (R{{cad.inside_corner_radius_max_in:.2dot}} max: the end mill's corner; do not file a radius into it). Stone the seat lightly on a flat stone. Wash off the oil."
+instruction = "Break every edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max: smooth file on the outside edges, the scraper from the deburring set on the holes' mouths (no countersink). Leave the inside corner under the foot as cut (R.040 max: the end mill's corner; do not file a radius into it). Stone the seat lightly on a flat stone. Wash off the oil."
 feed = "hand"
 inspection = "The seat on the surface plate: it does not rock. No burr stands proud, none in the thread's mouth."
 gauge_checks = "other"
