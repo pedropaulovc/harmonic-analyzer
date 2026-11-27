@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 700" font-family="sans-serif" font-size="14">
+  <!-- Hand picture. The plan to scale at 4 px/mm: the spoil plate 152.4 x 127 mm (plate_length_mm, plate_width_mm), the vise jaws 158.67 mm long (shop vise-pm-6 jaw_width_mm; their depth schematic), the blank 114.3 x 50.8 mm (blank_length_mm, blank_width_mm) on two strips of the 1.41 in tape from X0 to 5 in, and the hook's flat pattern and the trial strip from HL01_sheet's checked outline (cam:pd_latch_hook context). HL01's first cut drawn: the 1/16 in downcut end mill, Ø1.5748 mm (sheet_cutter_dia_mm), at its first plunge X3.023 Y-17.839 (posted NC), beside the hook's top bar, its first move down -Y arrowed; the detail at 20 px/mm. The section across the jaws at 2 px/mm, seen from the plate's right end, the fixed jaw on the right: the 1 in parallels (parallel_height_mm 25.4, 1/8 in thick), the 1/2 in plate, the jaw tops 6.845 mm above it (jaw_top_over_plate_mm), the tape stack 0.28 mm (tape_stack_mm), the blank .032; the end mill at the same plunge, its tip at the first level Z0.546, 19.05 mm out of the collet at the least (em_sixteenth_projection_min_mm), drawn short to a break line. -->
+  <rect class="paper" x="0" y="0" width="1180" height="700"/>
+  <text class="title" x="20" y="24">Setup 2: spoil plate in the vise, the blank taped on, HL01_sheet (plan to scale, 4 px/mm; section 2 px/mm)</text>
+  <rect class="clamp" x="57.45" y="70.0" width="634.7" height="40.0"/>
+  <rect class="clamp" x="57.45" y="618.0" width="634.7" height="40.0"/>
+  <text class="label-on-clamp" x="77.45" y="95.0">fixed jaw</text>
+  <text class="label-on-clamp" x="77.45" y="643.0">moving jaw</text>
+  <rect class="fixture-plate" x="70.0" y="110.0" width="609.6" height="508.0"/>
+  <rect class="bond" x="70.0" y="110.0" width="508.0" height="286.51"/>
+  <rect class="part-waste" x="70.0" y="110.0" width="457.2" height="203.2"/>
+  <path class="part-kept" d="M85.24,120.16 L85.24,242.55 L476.75,242.55 A22.86,22.86 0 0 0 499.61,219.69 A22.86,22.86 0 0 0 476.75,196.83 L234.73,196.83 L194.53,202.93 L125.88,202.93 A8.13,8.13 0 0 1 117.75,194.8 L117.75,120.16 L85.24,120.16 Z"/>
+  <path class="part-kept" d="M125.88,142.98 L125.88,188.7 L484.88,188.7 A22.86,22.86 0 0 0 507.74,165.84 A22.86,22.86 0 0 0 484.88,142.98 L125.88,142.98 Z"/>
+  <circle class="cutter" cx="82.09" cy="181.36" r="3.15"/>
+  <line class="arrow" x1="82.09" y1="188.0" x2="82.09" y2="218.0"/>
+  <line class="datum" x1="70.0" y1="54.0" x2="70.0" y2="650.0"/>
+  <text class="datum-label" x="70.0" y="50.0">X0: plate's left end</text>
+  <line class="datum" x1="38.0" y1="110.0" x2="710.0" y2="110.0"/>
+  <text class="datum-label" x="714.0" y="106.0">Y0: fixed jaw face</text>
+  <text class="label-halo" x="310.0" y="231.0" text-anchor="middle">hook</text>
+  <text class="label-halo" x="318.0" y="286.0" text-anchor="middle">blank</text>
+  <text class="label-halo" x="310.0" y="171.0" text-anchor="middle">trial strip</text>
+  <text class="label" x="86.0" y="550.0">spoil plate on 1 in parallels; blue tape, CA glue, blue tape under the blank</text>
+  <text class="label" x="530.0" y="344.0">first plunge: X3.023 Y-17.839</text>
+  <line class="leader" x1="84.4" y1="184.0" x2="526.0" y2="338.0"/>
+  <rect class="part-kept" x="915.74" y="120.0" width="70.0" height="160.0"/>
+  <circle class="cutter" cx="900.0" cy="200.0" r="15.75"/>
+  <line class="arrow" x1="900.0" y1="224.0" x2="900.0" y2="272.0"/>
+  <text class="label" x="840.0" y="102.0">detail, 20 px/mm: cutting down -Y</text>
+  <text class="label" x="991.74" y="205.0">hook's top bar</text>
+  <rect class="fixture-support" x="1123.65" y="495.4" width="6.35" height="50.8"/>
+  <rect class="fixture-support" x="876.0" y="495.4" width="6.35" height="50.8"/>
+  <rect class="fixture-plate" x="876.0" y="470.0" width="254.0" height="25.4"/>
+  <rect class="clamp" x="1130.0" y="456.31" width="20.0" height="89.89"/>
+  <rect class="clamp" x="856.0" y="456.31" width="20.0" height="89.89"/>
+  <rect class="fixture-vise" x="856.0" y="546.2" width="294.0" height="10.0"/>
+  <rect class="bond" x="1028.4" y="469.44" width="101.6" height="0.56"/>
+  <rect class="part-waste" x="1028.4" y="467.81" width="101.6" height="1.63"/>
+  <path class="cutter" d="M1092.75,430.81 L1092.75,468.53 A3.47,3.47 0 0 0 1095.9,468.53 L1095.9,430.81 Z"/>
+  <path class="leader" d="M1090.32,430.81 L1091.66,424.81 L1092.99,430.81 L1094.32,424.81 L1095.66,430.81 L1096.99,424.81 L1098.32,430.81"/>
+  <text class="label" x="856.0" y="578.2">Section across the jaws, 2 px/mm,</text>
+  <text class="label" x="856.0" y="596.2">from the plate's right end; fixed jaw at right</text>
+</svg>

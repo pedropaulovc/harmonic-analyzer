@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" font-family="sans-serif" font-size="14">
+  <!-- Hand picture, to scale at 9 px/mm, looking along the bend line. The PM vise's jaws (jaw_height_mm 44.95, drawn short to a break line), the flat hook .032 thick (strip thickness) between them, its top bar's bend line at the jaw tops: below it 14.66 mm of the ear (ear_bend flat_centreline) with the arm lying along the jaws behind it; above, the base standing up. The 3/32 drill's shank, Ø2.381 mm (tools.drill-3-32), between the hook and the moving jaw, its centre on the bend line. The base pressed over toward the moving jaw to 91° (ear_press_deg), drawn dashed with its arrow; the flat block that pushes it is not on record: schematic. -->
+  <rect class="paper" x="0" y="0" width="900" height="560"/>
+  <text class="title" x="20" y="24">Setup 6: the ear bent over the 3/32 drill's shank in the vise (end view along the bend line, to scale, 9 px/mm)</text>
+  <rect class="clamp" x="195.0" y="330.0" width="225.0" height="198.0"/>
+  <rect class="clamp" x="448.75" y="330.0" width="225.0" height="198.0"/>
+  <path class="leader" d="M195.0,528.0 L232.5,522.0 L270.0,528.0 L307.5,522.0 L345.0,528.0 L382.5,522.0 L420.0,528.0"/>
+  <path class="leader" d="M448.75,528.0 L486.25,522.0 L523.75,528.0 L561.25,522.0 L598.75,528.0 L636.25,522.0 L673.75,528.0"/>
+  <text class="label-on-clamp" x="307.5" y="402.0" text-anchor="middle">fixed jaw</text>
+  <text class="label-on-clamp" x="561.25" y="402.0" text-anchor="middle">moving jaw</text>
+  <rect class="part-kept" x="420.0" y="186.59" width="7.32" height="275.38"/>
+  <circle class="fixture-support" cx="438.03" cy="330.0" r="10.72"/>
+  <path class="hidden" d="M420.0,186.59 L420.0,330.0 L420.0,330.0 L420.23,327.15 L420.9,324.37 L422.01,321.73 L423.52,319.3 L425.39,317.14 L427.59,315.3 L430.04,313.84 L432.7,312.78 L435.49,312.15 L438.35,311.97 L563.75,314.16"/>
+  <line class="arrow" x1="402.0" y1="195.59" x2="498.87" y2="215.28"/>
+  <rect class="fixture-support" x="366.0" y="168.59" width="40.5" height="54.0"/>
+  <text class="label" x="366.0" y="162.59" text-anchor="end">flat block (schematic)</text>
+  <text class="label" x="435.32" y="196.59">base, standing up</text>
+  <text class="label" x="189.0" y="466.98" text-anchor="end">ear (the arm behind it)</text>
+  <line class="leader" x1="195.0" y1="461.98" x2="420.0" y2="461.98"/>
+  <text class="label" x="478.0" y="249.0">3/32 drill shank on the bend line</text>
+  <line class="leader" x1="446.13" y1="321.9" x2="474.0" y2="252.6"/>
+  <text class="label" x="503.75" y="302.16">pressed to {{process.ear_press_deg:.0f}}°</text>
+</svg>

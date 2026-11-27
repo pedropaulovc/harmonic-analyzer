@@ -459,7 +459,7 @@ note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-DT-37 holder fo
 kind = "fixture"
 status = "to_make"
 supply = "shop_made"
-note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-14 R3.13 ±.02, R.38 ±.02. Formed in H02 C26000 as supplied (#2527), the roll springs back: elastic-plastic springback (Ri/Rf = 4x^3 - 3x + 1, x = Ri Y/(E t); E 16,000 ksi, Y 290-359 MPa, t .032) puts the roll face near R1.63-R1.79 and the tab face near R.34-R.35 for the printed inside R3.13 and R.38; trial-roll an offcut of the same strip and correct the former to the gauge."
+note = "Not made: shop-made in the hook's traveler (cad/process/pd_latch_hook/plan.toml, HL02_former): two die halves cut from one 3.75 in length of the 1/2 x 6 in 6061 bar (stock.6061-flat-1-2x6-54in), their faces facing across a channel; stood on edge on 1/2 in parallels in the vise, they press the strip's roll and tab. Drawing cross-check 2026-11-19: MHA-PD-14 R3.13 ±.02, R.38 ±.02. Formed in H02 C26000 as supplied (#2527), the strip springs back (Ri/Rf = 4x^3 - 3x + 1, x = Ri Y/(E t)): the die faces are bent tighter, for the design yield 324.5 MPa at which every printed formed value lands. A trial strip off the same sheet, pressed first and read with calipers, gates the hook."
 
 [fixtures.pd-platen-clip-bow-former]
 kind = "fixture"

@@ -114,7 +114,10 @@ description = ".001 in dial indicator on its magnetic base"
 [tools.knurl-straight-25tpi]  # MHA-PD-13 STRAIGHT KNURL 25 TPI
 description = "Lathe knurling holder with straight 25 TPI wheel"
 [tools.pd-latch-hook-former]  # MHA-PD-14 R3.13 ±.02, R.38 ±.02
-description = "Shop-made latch-hook former: R3.13 roll and R.38 tab form"
+description = "Latch-hook former: two 6061 die halves cut from one length of the 1/2 x 6 bar by HL02_former, faces springback-corrected for the R3.13 roll and the R.38 tab"
+[tools.drill-3-32]  # 115-piece index; MHA-PD-14 ear-bend mandrel (shank)
+description = "3/32 (.0938 in) drill, 115-piece index"
+diameter_mm = 2.38125
 [tools.pd-platen-clip-bow-former]  # MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE
 description = "Platen-clip bow former: four laminations of the .032 strip, each split into a male and a female die half (cut by PC01_sheet)"
 [tools.pd-rack-pinion-cutting-arbor]  # inventory fixtures.pd-rack-pinion-cutting-arbor
@@ -299,6 +302,18 @@ tool = "endmill-kyocera-1800-1-16"
 material = "lathe-c360"
 rpm = 2800
 feed = "1.4 in/min"
+# MHA-PD-14 latch hook (cad/process/pd_latch_hook): the 2X #30 screw holes
+# through the formed hook's .032 C26000 base, on the spoil plate. C26000 is
+# not a LittleMachineShop "Cutting Speeds" row (read live 2026-11-22, lathe.toml
+# header); its Brass drilling row is 160-175 ft/min, 4760 rpm on the #30, so
+# the spindle's 2800 (94 ft/min, under the row: conservative for the tougher
+# alloy); AutoDrill's .001 in/rev, the 1/16-1/8 in columns' lower row, as
+# pn.toml settings.pn-drill-30-c360 takes it: 2.8 in/min.
+[settings.pd-drill-30-c260]
+tool = "riser-drill-30"
+material = "c260-h02"
+rpm = 2800
+feed = "2.8 in/min"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
@@ -317,6 +332,8 @@ description = "AISI 1018 cold-finished steel, precision ground, flat bar, 3/8 x 
 description = "AISI 1018 cold-drawn low-carbon steel, flat bar, 1/16 x 5/8 in"
 [stock.c260-h02-strip-032x2]
 description = "C26000 cartridge brass, H02 half hard, strip, .032 x 2 x 12 in"
+[stock.c260-sheet-032-6x6]
+description = "260 brass, ultra-formable, sheet, .032 x 6 x 6 in (McMaster-Carr 8956K425)"
 [stock.c360-flat-1-4x6]
 description = "C360 brass, flat bar, 1/4 x 6 in"
 [stock.c360-flat-1-8x4]

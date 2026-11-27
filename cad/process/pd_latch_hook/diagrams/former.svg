@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 700" font-family="sans-serif" font-size="14">
+  <!-- Hand picture. The plan to scale at 4 px/mm: the spoil plate 152.4 x 127 mm, the vise jaws 158.67 mm long (their depth schematic), the tape over the plate, the die blank 152.4 x 95.25 mm (die_blank_width_mm, die_blank_length_mm) flush with the plate's left end, its back edge 10 mm off the fixed jaw (die_blank_back_y_mm); the two die halves from HL02_former's checked outline (cam:pd_latch_hook context), the outer toward the fixed jaw, the channel between their faces and the skims hatched as waste. HL02's first cut drawn: the 1/4 in end mill, Ø6.35 mm (die_cutter_dia_mm), on its first slot along the inner half's face, at X140 Y-66.220 (posted NC: the slot runs from X156.575 to X93.884 at Y-66.220, then along the face), moving -X, arrowed. The section across the jaws at 2 px/mm, from the plate's right end, the fixed jaw on the right: the parallels, the plate, the tape, the blank 12.7 mm, the halves as they will be, the end mill at the same place, its tip at the first level Z10.607, 31.75 mm out of the collet at the least (em_quarter_projection_min_mm), drawn short to a break line. -->
+  <rect class="paper" x="0" y="0" width="1180" height="700"/>
+  <text class="title" x="20" y="24">Setup 4: the die blank taped on, HL02_former's first slot (plan to scale, 4 px/mm; section 2 px/mm)</text>
+  <rect class="clamp" x="57.45" y="70.0" width="634.7" height="40.0"/>
+  <rect class="clamp" x="57.45" y="618.0" width="634.7" height="40.0"/>
+  <text class="label-on-clamp" x="77.45" y="95.0">fixed jaw</text>
+  <text class="label-on-clamp" x="77.45" y="643.0">moving jaw</text>
+  <rect class="fixture-plate" x="70.0" y="110.0" width="609.6" height="508.0"/>
+  <rect class="bond" x="70.0" y="110.0" width="609.6" height="492.0"/>
+  <rect class="part-waste" x="70.0" y="150.0" width="609.6" height="381.0"/>
+  <path class="part-kept" d="M667.6,154.0 L82.0,154.0 L82.0,354.63 L138.75,317.29 A176.69,176.69 0 0 1 313.82,306.33 L410.74,353.98 A34.78,34.78 0 0 0 433.13,356.82 L445.54,354.26 L667.6,354.26 L667.6,154.0 Z"/>
+  <path class="part-kept" d="M82.0,527.0 L667.6,527.0 L667.6,389.58 L445.54,389.58 L433.79,392.01 A38.03,38.03 0 0 1 409.31,388.89 L312.39,341.25 A173.44,173.44 0 0 0 140.54,352.01 L82.0,390.52 L82.0,527.0 Z"/>
+  <circle class="cutter" cx="630.0" cy="374.88" r="12.7"/>
+  <line class="arrow" x1="606.0" y1="374.88" x2="558.0" y2="374.88"/>
+  <line class="datum" x1="70.0" y1="54.0" x2="70.0" y2="650.0"/>
+  <text class="datum-label" x="70.0" y="50.0">X0: plate's left end</text>
+  <line class="datum" x1="38.0" y1="110.0" x2="710.0" y2="110.0"/>
+  <text class="datum-label" x="714.0" y="106.0">Y0: fixed jaw face</text>
+  <text class="label-halo" x="510.0" y="250.0" text-anchor="middle">OUT (outer half)</text>
+  <text class="label-halo" x="510.0" y="462.0" text-anchor="middle">IN (inner half)</text>
+  <text class="label" x="86.0" y="582.0">spoil plate on 1 in parallels; blue tape, CA glue, blue tape under the die blank</text>
+  <text class="label" x="550.0" y="412.0">first slot, X140 Y-66.220</text>
+  <text class="label" x="310.0" y="372.0" text-anchor="middle">channel</text>
+  <rect class="fixture-support" x="1123.65" y="495.4" width="6.35" height="50.8"/>
+  <rect class="fixture-support" x="876.0" y="495.4" width="6.35" height="50.8"/>
+  <rect class="fixture-plate" x="876.0" y="470.0" width="254.0" height="25.4"/>
+  <rect class="clamp" x="1130.0" y="456.31" width="20.0" height="89.89"/>
+  <rect class="clamp" x="856.0" y="456.31" width="20.0" height="89.89"/>
+  <rect class="fixture-vise" x="856.0" y="546.2" width="294.0" height="10.0"/>
+  <rect class="bond" x="919.5" y="469.44" width="190.5" height="0.56"/>
+  <rect class="part-waste" x="919.5" y="444.04" width="190.5" height="25.4"/>
+  <rect class="part-kept" x="1007.86" y="444.04" width="100.14" height="25.4"/>
+  <rect class="part-kept" x="921.5" y="444.04" width="68.7" height="25.4"/>
+  <path class="cutter" d="M991.21,385.29 L991.21,447.26 A13.99,13.99 0 0 0 1003.91,447.26 L1003.91,385.29 Z"/>
+  <path class="leader" d="M987.56,385.29 L990.89,379.29 L994.23,385.29 L997.56,379.29 L1000.89,385.29 L1004.23,379.29 L1007.56,385.29"/>
+  <text class="label" x="856.0" y="578.2">Section across the jaws at X140, 2 px/mm,</text>
+  <text class="label" x="856.0" y="596.2">from the plate's right end; fixed jaw at right</text>
+</svg>

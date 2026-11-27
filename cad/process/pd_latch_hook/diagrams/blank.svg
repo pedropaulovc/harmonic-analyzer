@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 570" font-family="sans-serif" font-size="14">
+  <!-- Hand picture, to scale at 40 px/in (1.575 px/mm). Top left: the .032 x 6 x 6 in sheet (stock c260-sheet-032-6x6) laid out, a strip 2.00 in (blank_width_in) off one edge and the blank 4.50 in (blank_length_in) off the strip's end; the rest is the platen clips'. Top right: the 1/2 x 6 in 6061 bar (stock 6061-flat-1-2x6-54in) seen from above, the 3.75 in die blank (die_blank_length_in) marked off its end, the rest of the bar cut short to a break line. Below, from above: the sheet between the two scrap wood blocks in the bench vise at saw cut 1, the line 2.00 in from the sheet's edge and 1/2 in out past the vise jaws; the blocks' size and the bench vise jaws are not on record: schematic; the hacksaw blade's kerf is schematic. -->
+  <rect class="paper" x="0" y="0" width="900" height="570"/>
+  <text class="title" x="20" y="24">Setup 1: the sheet blank and the die blank marked off; the sheet at its first saw cut (to scale, 40 px/in)</text>
+  <rect class="part-rest" x="40.0" y="170.0" width="240.0" height="160.0"/>
+  <rect class="part-kept" x="40.0" y="90.0" width="180.0" height="80.0"/>
+  <rect class="part-rest" x="220.0" y="90.0" width="60.0" height="80.0"/>
+  <text class="label-halo" x="130.0" y="135.0" text-anchor="middle">blank</text>
+  <text class="label-halo" x="160.0" y="250.0" text-anchor="middle">rest: the platen clips'</text>
+  <text class="label" x="40.0" y="82.0">.032 x 6 x 6 in sheet, laid out</text>
+  <text class="label" x="130.0" y="186.0" text-anchor="middle">{{process.blank_width_in:.2dot}} x {{process.blank_length_in:.2dot}} in</text>
+  <rect class="part-kept" x="344.0" y="90.0" width="150.0" height="240.0"/>
+  <rect class="part-rest" x="494.0" y="90.0" width="58.0" height="240.0"/>
+  <path class="leader" d="M552.0,90.0 L544.0,171.6 L560.0,250.8 L552.0,330.0"/>
+  <text class="label-halo" x="419.0" y="215.0" text-anchor="middle">die blank</text>
+  <text class="label" x="344.0" y="82.0">1/2 x 6 in 6061 bar, from above</text>
+  <text class="label" x="419.0" y="348.0" text-anchor="middle">{{process.die_blank_length_in:.2dot}} in off the end</text>
+  <text class="label" x="523.0" y="368.0" text-anchor="middle">rest of the bar</text>
+  <rect class="fixture-support" x="60.0" y="440.0" width="300.0" height="30.0"/>
+  <rect class="part-kept" x="60.0" y="470.0" width="240.0" height="2.56"/>
+  <rect class="fixture-support" x="60.0" y="472.56" width="300.0" height="30.0"/>
+  <rect class="clamp" x="100.0" y="418.0" width="140.0" height="22.0"/>
+  <rect class="clamp" x="100.0" y="502.56" width="140.0" height="22.0"/>
+  <text class="label-on-clamp" x="170.0" y="434.2" text-anchor="middle">vise jaw</text>
+  <rect class="cutter" x="260.0" y="426.0" width="1.2" height="90.56"/>
+  <text class="label" x="264.0" y="424.0">hacksaw blade on the line (kerf schematic)</text>
+  <text class="label" x="364.0" y="475.0">wood blocks (schematic)</text>
+  <text class="label" x="364.0" y="491.0">sheet between them</text>
+  <text class="label" x="60.0" y="546.56">From above: the line {{process.blank_width_in:.2dot}} in from the sheet's edge, 1/2 in out past the jaws</text>
+</svg>

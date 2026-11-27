@@ -121,6 +121,11 @@ kind = "drill"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Drills #30: owned in 115-pc index (quality unverified); not on the buy list."
 
+[tools.drill-3-32]
+kind = "drill"
+status = "on_hand"
+note = "The 3/32 of the owned 115-piece index (1/16-1/2 by 64ths); its shank is the ear-bend mandrel of MHA-PD-14 pd-latch-hook (cad/process/pd_latch_hook/plan.toml), never cut with."
+
 [tools.jig-drill-29]
 kind = "drill"
 status = "on_hand"

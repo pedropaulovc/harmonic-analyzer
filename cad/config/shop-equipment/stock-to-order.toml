@@ -208,7 +208,7 @@ cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2359", "cad/co
 [stock.c260-h02-strip-032x2]
 form = "strip"
 material = "C26000 cartridge brass, H02 half hard, ASTM B36"
-note = "To order: McMaster-Carr 8859K86, 260 brass strip .032 x 2 x 12 in, H02 (1/2 hard), thickness -.002 to +.002, $12.97 each; buy two. Allocation: pd-platen-clip (MHA-PD-03), two 3.60 in blanks off one strip's end (both clips and the four laminations of their bow former, PC01_sheet); pd-latch-hook (MHA-PD-14), one blank about 1.21 x 4.08 in (pd_latch_hook_geometry FLAT_LENGTH across the bend; WIDTH + DEV_TIP, the base's width and the arm's developed length below it, along the strip), used as supplied with no heat treatment; the rest of the two strips is spare for trial bends and the former's trial roll. H01 quarter hard and annealed brass are not acceptable (pd_latch_hook_spec release check). Not owned."
+note = "To order: McMaster-Carr 8859K86, 260 brass strip .032 x 2 x 12 in, H02 (1/2 hard), thickness -.002 to +.002, $12.97 each; buy two. Allocation: pd-platen-clip (MHA-PD-03), two 3.60 in blanks off one strip's end (both clips and the four laminations of their bow former, PC01_sheet); pd-latch-hook (MHA-PD-14), only if the on-hand sheet's hook takes a set (owner ruling 2026-11-24): then one 2.00 x 4.50 in blank, the hook and its trial strip (cad/process/pd_latch_hook/plan.toml Setup 1), used as supplied with no heat treatment; the rest of the two strips is spare for trial bends. H01 quarter hard and annealed brass are not acceptable (pd_latch_hook_spec release check). Not owned."
 section_mm = [50.8, 0.8128]
 length_mm = 304.8
 pieces = 2

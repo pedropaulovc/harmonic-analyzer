@@ -46,7 +46,7 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [stock.6061-flat-1-2x6-54in]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Bought (Online Metals order 1021704672, 2026-10-23): part 1173, 1/2 x 6 in rectangle 6061-T6511, 1 x 72 in, $201.74; no item notes on that order. Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02). It was allocated to the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30); both are deleted with the oblique jig (owner 2026-11-17). Now allocated to MHA-CH-13-TL-01 ch-rocker-strap-tl-sub-plate, one 13 in length (its registry process), and to the MHA-SM-01 bend form (fixtures.sm-gooseneck-bend-form), two 9 in lengths (cad/process/sm_gooseneck/plan.toml Setup 2); the rest is free. Purchased nominal dimensions are not receipt measurements."
+note = "Bought (Online Metals order 1021704672, 2026-10-23): part 1173, 1/2 x 6 in rectangle 6061-T6511, 1 x 72 in, $201.74; no item notes on that order. Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02). It was allocated to the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30); both are deleted with the oblique jig (owner 2026-11-17). Now allocated to MHA-CH-13-TL-01 ch-rocker-strap-tl-sub-plate, one 13 in length (its registry process), to the MHA-SM-01 bend form (fixtures.sm-gooseneck-bend-form), two 9 in lengths (cad/process/sm_gooseneck/plan.toml Setup 2), and to the MHA-PD-14 latch hook's former (fixtures.pd-latch-hook-former), one 3.75 in length (cad/process/pd_latch_hook/plan.toml Setup 1); the rest is free. Purchased nominal dimensions are not receipt measurements."
 section_mm = [152.4, 12.7]
 # length_mm: the 54 in left (owner-reported 2026-11-02); 72 in was bought.
 length_mm = 1371.6
@@ -561,7 +561,7 @@ cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), li
 [stock.c260-sheet-032-6x6]
 form = "sheet"
 material = "260 brass, ultra-formable"
-note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 78): 8956K425 ultra-formable 260 brass sheet, 6 x 6 in, .0320 in thick, 1 each. The packing list names MHA-PD-03 pd-platen-clip. Owner ruling 2026-11-24: \"Use the sheet; buy strip only if the hook takes a set.\": this sheet makes the MHA-PD-14 latch hook first (the temper trial) and the MHA-PD-03 platen clips, in place of the H02 strip (stock.c260-h02-strip-032x2), whose temper this sheet's packing list does not state. The plans' stock lines are not yet changed."
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 78): 8956K425 ultra-formable 260 brass sheet, 6 x 6 in, .0320 in thick, 1 each. The packing list names MHA-PD-03 pd-platen-clip. Owner ruling 2026-11-24: \"Use the sheet; buy strip only if the hook takes a set.\": this sheet makes the MHA-PD-14 latch hook first (the temper trial) and the MHA-PD-03 platen clips, in place of the H02 strip (stock.c260-h02-strip-032x2), whose temper this sheet's packing list does not state. The latch hook's plan names this sheet: one 2.00 x 4.50 in blank off a corner for the hook and its trial strip (cad/process/pd_latch_hook/plan.toml Setup 1), the rest the platen clips'. The platen clip's stock line is not yet changed."
 section_mm = [152.4, 0.8128]
 length_mm = 152.4
 status = "on_hand"
