@@ -384,19 +384,29 @@ def test_a_caption_pushed_into_the_title_block_is_refused() -> None:
 
 def test_the_shoulder_screw_goes_in_after_the_end_plug_bond() -> None:
     # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the end plug per
-    # bond note B, so the shoulder screw goes in at 8A-8B.
+    # bond note B, so the shoulder screw goes in at 8A-8B; the cured plug is
+    # accepted at 8C, with its remedy at 8D-8G, one action each (#3646, D54).
     steps = {step.split(". ", 1)[0]: step for step in notes.ASSEMBLY_STEPS}
     assert steps["8"].startswith("8. BOND MHA-SM-05 INTO MHA-SM-01 PER BOND NOTE B")
     assert steps["8A"].startswith("8A. PASS MHA-SM-VN-56")
     assert steps["8B"].startswith("8B. TURN MHA-SM-VN-56 INTO MHA-SM-05")
+    assert steps["8C"] == (
+        "8C. CHECK THAT MHA-SM-05 DOES NOT TURN OR PULL OUT OF MHA-SM-01 BY HAND."
+    )
+    assert steps["8D"] == (
+        "8D. IF IT DOES, PULL MHA-SM-05 OUT OF MHA-SM-01 BY MHA-SM-VN-56."
+    )
+    assert steps["8E"] == "8E. IF PULLED AT 8D, TURN MHA-SM-VN-56 OUT OF MHA-SM-05."
+    assert "TO BARE METAL" in steps["8F"]
+    assert steps["8G"] == "8G. IF PULLED AT 8D, REDO FROM STEP 8."
     assert steps["10A"].startswith("10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52")
     assert "SNUG, 9 IN-LB MAX" in steps["10A"]
     bond_note = notes.BOND_NOTE_B
     assert bond_note in notes.ASSEMBLY_CHECKS
-    assert "CURE 24 H BEFORE STEP 8A" in bond_note
+    assert "CURE 24 H AT ROOM TEMPERATURE BEFORE STEP 8A" in bond_note
     # Bench acceptance, as bond note A's dowel bond (machinist review, run
-    # 20261109T142156827Z, rule 23).
-    assert bond_note.endswith("ACCEPT: IT DOES NOT TURN OR PULL OUT BY HAND.")
+    # 20261109T142156827Z, rule 23), made a step with its remedy (#3646).
+    assert bond_note.endswith("ACCEPT AT STEP 8C.")
 
 
 def test_a_bonded_loose_dowel_is_held_at_its_proud_and_re_read_after_cure() -> None:
@@ -419,15 +429,27 @@ def test_a_bonded_loose_dowel_is_held_at_its_proud_and_re_read_after_cure() -> N
     assert "LOWER THE TOP FRAME BACK OVER IT ONTO THE PARALLELS" in steps["1G"]
     assert "DOES NOT TURN OR SLIDE BY HAND" in steps["1H"]
     assert f"DOWEL PROUD SET ON {notes.DETAIL_TITLE}" in steps["1H"]
-    assert steps["1J"].startswith("1J. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54")
-    for label in ("1B", "1C", "1D", "1E", "1F", "1G", "1H", "1J"):
+    # D54 item 4 (Main, 2026-11-27): a dowel that moves pulls out and is
+    # bonded again; a held one standing high is stoned down, one standing
+    # low goes back with the top frame (no acceptance number is printed).
+    assert steps["1J"] == "1J. IF A DOWEL TURNS OR SLIDES, PULL IT OUT OF ITS HOLE."
+    assert steps["1L"] == "1L. IF PULLED AT 1J, REDO FROM 1B."
+    assert steps["1M"].endswith("STONE ITS END DOWN TO IT.")
+    assert steps["1N"].startswith(
+        "1N. IF A HELD DOWEL STANDS BELOW THE DOWEL PROUD, RETURN THE TOP FRAME"
+    )
+    assert steps["1P"].startswith("1P. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54")
+    labels = "1B 1C 1D 1E 1F 1G 1H 1J 1K 1L 1M 1N 1P".split()
+    for label in labels:
         assert steps[label].count(". ") == 1, steps[label]
     bond_note = notes.BOND_NOTE_A
     assert bond_note in notes.ASSEMBLY_CHECKS
     assert "(STEPS 1E-1G)" in bond_note
     for action in ("PRESS", "LIFT", "STAND", "LOWER", "GAUGE BLOCKS", "PARALLELS"):
         assert action not in bond_note, action
-    assert bond_note.endswith("CURE 24 H BEFORE STEP 5. ACCEPT AT STEP 1H.")
+    assert bond_note.endswith(
+        "CURE 24 H AT ROOM TEMPERATURE BEFORE STEP 5. ACCEPT AT STEP 1H."
+    )
 
 
 def _step_group(number: str) -> list[str]:
