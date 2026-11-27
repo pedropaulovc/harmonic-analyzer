@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 658" font-family="sans-serif" font-size="14">
-  <!-- Hand picture. The plan to scale at 4 px/mm (main's drawing: the spoil plate 152.4 x 127 mm, plate_length_mm and plate_width_mm, the blanks 91.44 x 50.8 mm and the part outlines from the feature bundle). PC01_sheet's first cut drawn: the 1/32 in downcut end mill Ø0.7874 mm (sheet_cutter_dia_mm) at its first plunge, X11.606 Y-10.795 (posted NC), in clip 1's left hole (centre X11.252), which it then opens by two clockwise circles; the detail at 20 px/mm. The section across the jaws at 2 px/mm, seen from the plate's right end, the fixed jaw on the right: the 1 in parallels (parallel_height_mm 25.4, 1/8 in thick, parallel_thickness 3.175), the 1/2 in plate (plate_thickness_mm 12.7), the jaw tops 6.845 mm above it (jaw_top_over_plate_mm); the tape stack .23-.33 mm and the .81 mm blanks are under 1 px apart at this scale, drawn as one line and named. The vise jaws' thickness is not on record: schematic. In the section the same end mill at the same plunge, Y-10.795, its end at the first level, Z0.870 (posted NC; Z0 the plate's top): its Ø0.7874 cutting end and its 1/8 in (3.175 mm) shank; the flute length is not on record, drawn 3 mm (schematic), and the shank broken off. -->
+  <!-- Hand picture. The plan to scale at 4 px/mm (main's drawing: the spoil plate 152.4 x 127 mm, plate_length_mm and plate_width_mm, the blanks 91.44 x 50.8 mm and the part outlines from the feature bundle). PC01_sheet's first cut drawn: the 1/16 in downcut end mill Ø1.5748 mm (sheet_cutter_dia_mm) at its first plunge, X11.608 Y-11.811 (posted NC), in clip 1's left hole (centre X11.252), which it then opens by one clockwise circle; the detail at 20 px/mm. The section across the jaws at 2 px/mm, seen from the plate's right end, the fixed jaw on the right: the 1 in parallels (parallel_height_mm 25.4, 1/8 in thick, parallel_thickness 3.175), the 1/2 in plate (plate_thickness_mm 12.7), the jaw tops 6.845 mm above it (jaw_top_over_plate_mm); the tape stack .23-.33 mm and the .81 mm blanks are under 1 px apart at this scale, drawn as one line and named. The vise jaws' thickness is not on record: schematic. In the section the same end mill at the same plunge, Y-11.811, its end at the first level, Z0.546 (posted NC; Z0 the plate's top): its Ø1.5748 cutting end (.186 in flutes, 4.724 mm) and its 1/8 in (3.175 mm) shank broken off. -->
   <rect class="paper" x="0" y="0" width="1180" height="658"/>
   <text class="title" x="20" y="24">Setup 2: spoil plate in the vise, blanks A and B taped on, PC01_sheet (plan to scale, 4 px/mm; section 2 px/mm)</text>
   <rect class="clamp" x="50" y="30" width="630" height="40"/>
@@ -14,20 +14,20 @@
   <rect class="part-waste" x="60.0" y="273.2" width="365.8" height="203.2"/>
   <text class="label" x="433.8" y="267.2">blank A</text>
   <text class="label" x="433.8" y="470.4">blank B</text>
-  <path class="part-kept" d="M76.3,100.5 L76.3,117.8 A10.2,10.2 0 0 0 86.4,127.9 L400.4,127.9 A10.2,10.2 0 0 0 410.5,117.8 L410.5,100.5 A3.0,3.0 0 0 0 407.5,97.4 L266.2,97.4 A2.0,2.0 0 0 1 264.2,95.4 A2.0,2.0 0 0 1 266.2,93.4 L404.8,93.4 A6.6,6.6 0 0 0 411.4,86.8 A6.6,6.6 0 0 0 404.8,80.2 L82.0,80.2 A6.6,6.6 0 0 0 75.4,86.8 A6.6,6.6 0 0 0 82.0,93.4 L220.5,93.4 A2.0,2.0 0 0 1 222.6,95.4 A2.0,2.0 0 0 1 220.5,97.4 L79.3,97.4 A3.0,3.0 0 0 0 76.3,100.5 Z"/>
-  <circle class="holes" cx="105.0" cy="113.2" r="6.0"/>
-  <circle class="holes" cx="381.8" cy="113.2" r="6.0"/>
-  <path class="part-kept" d="M76.3,156.4 L76.3,173.6 A10.2,10.2 0 0 0 86.4,183.8 L400.4,183.8 A10.2,10.2 0 0 0 410.5,173.6 L410.5,156.4 A3.0,3.0 0 0 0 407.5,153.3 L266.2,153.3 A2.0,2.0 0 0 1 264.2,151.3 A2.0,2.0 0 0 1 266.2,149.2 L404.8,149.2 A6.6,6.6 0 0 0 411.4,142.6 A6.6,6.6 0 0 0 404.8,136.0 L82.0,136.0 A6.6,6.6 0 0 0 75.4,142.6 A6.6,6.6 0 0 0 82.0,149.2 L220.5,149.2 A2.0,2.0 0 0 1 222.6,151.3 A2.0,2.0 0 0 1 220.5,153.3 L79.3,153.3 A3.0,3.0 0 0 0 76.3,156.4 Z"/>
-  <circle class="holes" cx="105.0" cy="169.1" r="6.0"/>
-  <circle class="holes" cx="381.8" cy="169.1" r="6.0"/>
-  <path class="part-kept" d="M76.3,242.7 L410.5,242.7 L410.5,222.4 L381.8,222.4 A104.2,104.2 0 0 1 352.4,218.2 A100.9,100.9 0 0 0 324.0,214.1 A100.9,100.9 0 0 0 295.6,218.2 A104.2,104.2 0 0 1 266.2,222.4 L220.5,222.4 A104.2,104.2 0 0 1 191.2,218.2 A100.9,100.9 0 0 0 162.8,214.1 A100.9,100.9 0 0 0 134.3,218.2 A104.2,104.2 0 0 1 105.0,222.4 L76.3,222.4 L76.3,242.7 Z"/>
-  <path class="part-kept" d="M76.3,219.1 L105.0,219.1 A100.9,100.9 0 0 0 133.4,215.1 A104.2,104.2 0 0 1 162.8,210.8 A104.2,104.2 0 0 1 192.1,215.1 A100.9,100.9 0 0 0 220.5,219.1 L266.2,219.1 A100.9,100.9 0 0 0 294.7,215.1 A104.2,104.2 0 0 1 324.0,210.8 A104.2,104.2 0 0 1 353.3,215.1 A100.9,100.9 0 0 0 381.8,219.1 L410.5,219.1 L410.5,191.9 L76.3,191.9 L76.3,219.1 Z"/>
+  <path class="part-kept" d="M76.3,104.6 L76.3,121.8 A10.2,10.2 0 0 0 86.4,132.0 L400.4,132.0 A10.2,10.2 0 0 0 410.5,121.8 L410.5,104.6 A3.0,3.0 0 0 0 407.5,101.5 L266.2,101.5 A4.1,4.1 0 0 1 262.1,97.5 A4.1,4.1 0 0 1 266.2,93.4 L404.8,93.4 A6.6,6.6 0 0 0 411.4,86.8 A6.6,6.6 0 0 0 404.8,80.2 L82.0,80.2 A6.6,6.6 0 0 0 75.4,86.8 A6.6,6.6 0 0 0 82.0,93.4 L220.5,93.4 A4.1,4.1 0 0 1 224.6,97.5 A4.1,4.1 0 0 1 220.5,101.5 L79.3,101.5 A3.0,3.0 0 0 0 76.3,104.6 Z"/>
+  <circle class="holes" cx="105.0" cy="117.2" r="6.0"/>
+  <circle class="holes" cx="381.8" cy="117.2" r="6.0"/>
+  <path class="part-kept" d="M76.3,164.5 L76.3,181.7 A10.2,10.2 0 0 0 86.4,191.9 L400.4,191.9 A10.2,10.2 0 0 0 410.5,181.7 L410.5,164.5 A3.0,3.0 0 0 0 407.5,161.5 L266.2,161.5 A4.1,4.1 0 0 1 262.1,157.4 A4.1,4.1 0 0 1 266.2,153.3 L404.8,153.3 A6.6,6.6 0 0 0 411.4,146.7 A6.6,6.6 0 0 0 404.8,140.1 L82.0,140.1 A6.6,6.6 0 0 0 75.4,146.7 A6.6,6.6 0 0 0 82.0,153.3 L220.5,153.3 A4.1,4.1 0 0 1 224.6,157.4 A4.1,4.1 0 0 1 220.5,161.5 L79.3,161.5 A3.0,3.0 0 0 0 76.3,164.5 Z"/>
+  <circle class="holes" cx="105.0" cy="177.2" r="6.0"/>
+  <circle class="holes" cx="381.8" cy="177.2" r="6.0"/>
+  <path class="part-kept" d="M76.3,250.8 L410.5,250.8 L410.5,230.5 L381.8,230.5 A104.2,104.2 0 0 1 352.4,226.3 A100.9,100.9 0 0 0 324.0,222.2 A100.9,100.9 0 0 0 295.6,226.3 A104.2,104.2 0 0 1 266.2,230.5 L220.5,230.5 A104.2,104.2 0 0 1 191.2,226.3 A100.9,100.9 0 0 0 162.8,222.2 A100.9,100.9 0 0 0 134.3,226.3 A104.2,104.2 0 0 1 105.0,230.5 L76.3,230.5 L76.3,250.8 Z"/>
+  <path class="part-kept" d="M76.3,223.2 L105.0,223.2 A100.9,100.9 0 0 0 133.4,219.1 A104.2,104.2 0 0 1 162.8,214.9 A104.2,104.2 0 0 1 192.1,219.1 A100.9,100.9 0 0 0 220.5,223.2 L266.2,223.2 A100.9,100.9 0 0 0 294.7,219.1 A104.2,104.2 0 0 1 324.0,214.9 A104.2,104.2 0 0 1 353.3,219.1 A100.9,100.9 0 0 0 381.8,223.2 L410.5,223.2 L410.5,200.0 L76.3,200.0 L76.3,223.2 Z"/>
   <path class="part-kept" d="M76.3,334.2 L410.5,334.2 L410.5,313.8 L381.8,313.8 A104.2,104.2 0 0 1 352.4,309.6 A100.9,100.9 0 0 0 324.0,305.5 A100.9,100.9 0 0 0 295.6,309.6 A104.2,104.2 0 0 1 266.2,313.8 L220.5,313.8 A104.2,104.2 0 0 1 191.2,309.6 A100.9,100.9 0 0 0 162.8,305.5 A100.9,100.9 0 0 0 134.3,309.6 A104.2,104.2 0 0 1 105.0,313.8 L76.3,313.8 L76.3,334.2 Z"/>
-  <path class="part-kept" d="M76.3,310.6 L105.0,310.6 A100.9,100.9 0 0 0 133.4,306.5 A104.2,104.2 0 0 1 162.8,302.3 A104.2,104.2 0 0 1 192.1,306.5 A100.9,100.9 0 0 0 220.5,310.6 L266.2,310.6 A100.9,100.9 0 0 0 294.7,306.5 A104.2,104.2 0 0 1 324.0,302.3 A104.2,104.2 0 0 1 353.3,306.5 A100.9,100.9 0 0 0 381.8,310.6 L410.5,310.6 L410.5,283.4 L76.3,283.4 L76.3,310.6 Z"/>
+  <path class="part-kept" d="M76.3,306.6 L105.0,306.6 A100.9,100.9 0 0 0 133.4,302.5 A104.2,104.2 0 0 1 162.8,298.3 A104.2,104.2 0 0 1 192.1,302.5 A100.9,100.9 0 0 0 220.5,306.6 L266.2,306.6 A100.9,100.9 0 0 0 294.7,302.5 A104.2,104.2 0 0 1 324.0,298.3 A104.2,104.2 0 0 1 353.3,302.5 A100.9,100.9 0 0 0 381.8,306.6 L410.5,306.6 L410.5,283.4 L76.3,283.4 L76.3,306.6 Z"/>
   <path class="part-kept" d="M76.3,393.1 L410.5,393.1 L410.5,372.8 L381.8,372.8 A104.2,104.2 0 0 1 352.4,368.6 A100.9,100.9 0 0 0 324.0,364.5 A100.9,100.9 0 0 0 295.6,368.6 A104.2,104.2 0 0 1 266.2,372.8 L220.5,372.8 A104.2,104.2 0 0 1 191.2,368.6 A100.9,100.9 0 0 0 162.8,364.5 A100.9,100.9 0 0 0 134.3,368.6 A104.2,104.2 0 0 1 105.0,372.8 L76.3,372.8 L76.3,393.1 Z"/>
-  <path class="part-kept" d="M76.3,369.5 L105.0,369.5 A100.9,100.9 0 0 0 133.4,365.4 A104.2,104.2 0 0 1 162.8,361.2 A104.2,104.2 0 0 1 192.1,365.4 A100.9,100.9 0 0 0 220.5,369.5 L266.2,369.5 A100.9,100.9 0 0 0 294.7,365.4 A104.2,104.2 0 0 1 324.0,361.2 A104.2,104.2 0 0 1 353.3,365.4 A100.9,100.9 0 0 0 381.8,369.5 L410.5,369.5 L410.5,342.3 L76.3,342.3 L76.3,369.5 Z"/>
+  <path class="part-kept" d="M76.3,365.5 L105.0,365.5 A100.9,100.9 0 0 0 133.4,361.4 A104.2,104.2 0 0 1 162.8,357.2 A104.2,104.2 0 0 1 192.1,361.4 A100.9,100.9 0 0 0 220.5,365.5 L266.2,365.5 A100.9,100.9 0 0 0 294.7,361.4 A104.2,104.2 0 0 1 324.0,357.2 A104.2,104.2 0 0 1 353.3,361.4 A100.9,100.9 0 0 0 381.8,365.5 L410.5,365.5 L410.5,342.3 L76.3,342.3 L76.3,365.5 Z"/>
   <path class="part-kept" d="M76.3,452.0 L410.5,452.0 L410.5,431.7 L381.8,431.7 A104.2,104.2 0 0 1 352.4,427.5 A100.9,100.9 0 0 0 324.0,423.4 A100.9,100.9 0 0 0 295.6,427.5 A104.2,104.2 0 0 1 266.2,431.7 L220.5,431.7 A104.2,104.2 0 0 1 191.2,427.5 A100.9,100.9 0 0 0 162.8,423.4 A100.9,100.9 0 0 0 134.3,427.5 A104.2,104.2 0 0 1 105.0,431.7 L76.3,431.7 L76.3,452.0 Z"/>
-  <path class="part-kept" d="M76.3,428.4 L105.0,428.4 A100.9,100.9 0 0 0 133.4,424.4 A104.2,104.2 0 0 1 162.8,420.1 A104.2,104.2 0 0 1 192.1,424.4 A100.9,100.9 0 0 0 220.5,428.4 L266.2,428.4 A100.9,100.9 0 0 0 294.7,424.4 A104.2,104.2 0 0 1 324.0,420.1 A104.2,104.2 0 0 1 353.3,424.4 A100.9,100.9 0 0 0 381.8,428.4 L410.5,428.4 L410.5,401.2 L76.3,401.2 L76.3,428.4 Z"/>
+  <path class="part-kept" d="M76.3,424.4 L105.0,424.4 A100.9,100.9 0 0 0 133.4,420.4 A104.2,104.2 0 0 1 162.8,416.1 A104.2,104.2 0 0 1 192.1,420.4 A100.9,100.9 0 0 0 220.5,424.4 L266.2,424.4 A100.9,100.9 0 0 0 294.7,420.4 A104.2,104.2 0 0 1 324.0,416.1 A104.2,104.2 0 0 1 353.3,420.4 A100.9,100.9 0 0 0 381.8,424.4 L410.5,424.4 L410.5,401.2 L76.3,401.2 L76.3,424.4 Z"/>
   <line class="hidden" x1="60" y1="213.3" x2="466.4" y2="213.3"/>
   <line class="hidden" x1="60" y1="356.5" x2="466.4" y2="356.5"/>
   <line class="hidden" x1="60" y1="499.8" x2="466.4" y2="499.8"/>
@@ -41,29 +41,29 @@
   <text class="datum-label" x="64.0" y="640.0">X0 plate left end</text>
   <line class="datum" x1="20" y1="70" x2="690" y2="70"/>
   <text class="datum-label" x="480.0" y="88.0">Y0 fixed jaw face</text>
-  <line class="leader" x1="412.0" y1="127.9" x2="460.0" y2="158.0"/>
+  <line class="leader" x1="412.0" y1="132.0" x2="460.0" y2="158.0"/>
   <text class="label" x="464.0" y="162.0">clips 1 and 2: spring edges toward</text>
   <text class="label" x="464.0" y="180.0">the fixed jaw, rails toward the moving jaw</text>
-  <line class="leader" x1="412.0" y1="217.3" x2="460.0" y2="310.0"/>
-  <text class="label" x="464.0" y="314.0">laminations 1-4: kerf along the bow profile,</text>
+  <line class="leader" x1="412.0" y1="310.0" x2="460.0" y2="310.0"/>
+  <text class="label" x="464.0" y="314.0">laminations 1-4: split along the bow profile,</text>
   <text class="label" x="464.0" y="332.0">male half toward the moving jaw</text>
-  <circle class="cutter" cx="106.42" cy="113.18" r="1.57"/>
+  <circle class="cutter" cx="106.43" cy="117.24" r="3.15"/>
   <text class="title" x="790" y="52">Detail at 20 px/mm: the first plunge</text>
   <rect class="part-kept" x="800" y="70" width="160" height="160"/>
-  <circle class="part-removed" cx="880" cy="150" r="29.98"/>
-  <circle class="centre-line" cx="880" cy="150" r="22.1"/>
-  <circle class="cutter" cx="887.08" cy="150" r="7.87"/>
+  <circle class="part-removed" cx="880" cy="150" r="29.97"/>
+  <circle class="centre-line" cx="880" cy="150" r="14.22"/>
+  <circle class="cutter" cx="887.11" cy="150" r="15.75"/>
   <path class="arrow" d="M895.47 122.53 A34.1 34.1 0 0 1 914.1 156"/>
-  <text class="label" x="970" y="90">1/32 in end mill (Ø.031), PC01's</text>
+  <text class="label" x="970" y="90">1/16 in end mill (Ø.062), PC01's</text>
   <text class="label" x="970" y="106">first plunge, at a quarter feed,</text>
   <text class="label" x="970" y="122">near clip 1's left hole's centre;</text>
-  <text class="label" x="970" y="138">two circles clockwise open it</text>
-  <text class="label" x="970" y="154">(hatched); 4 levels, the last</text>
+  <text class="label" x="970" y="138">one clockwise circle opens it</text>
+  <text class="label" x="970" y="154">(hatched); 2 levels, the last</text>
   <text class="label" x="970" y="170">{{process.sheet_tip_into_plate_mm:in.3dot}} into the plate</text>
-  <line class="leader" x1="968" y1="94" x2="895.08" y2="146"/>
-  <circle class="leader-dot" cx="895.08" cy="146" r="2"/>
-  <line class="leader" x1="786" y1="130" x2="108.42" y2="112.18"/>
-  <circle class="leader-dot" cx="108.42" cy="112.18" r="2"/>
+  <line class="leader" x1="968" y1="94" x2="902.0" y2="142.0"/>
+  <circle class="leader-dot" cx="902.0" cy="142.0" r="2"/>
+  <line class="leader" x1="786" y1="130" x2="109.58" y2="116.24"/>
+  <circle class="leader-dot" cx="109.58" cy="116.24" r="2"/>
   <text class="label" x="786" y="126" text-anchor="end">here</text>
   <text class="title" x="790" y="300">Across the jaws, from the plate's right end (2 px/mm)</text>
   <rect class="fixture-vise" x="806" y="600" width="354" height="10"/>
@@ -73,15 +73,15 @@
   <rect class="fixture-support" x="1103.65" y="549.2" width="6.35" height="50.8"/>
   <rect class="fixture-plate" x="856" y="523.8" width="254" height="25.4"/>
   <rect class="part-kept" x="906.55" y="521.8" width="203.45" height="2"/>
-  <path class="cutter" d="M1089.2 521.87L1089.2 516.06L1087.62 516.06L1087.62 521.87A0.79 0.19 0 0 0 1089.2 521.87Z"/>
-  <path class="cutter" d="M1091.59 515.3L1091.59 452.06L1090 455.06L1088.41 452.06L1086.82 455.06L1085.24 452.06L1085.24 515.3A3.17 0.76 0 0 0 1091.59 515.3Z"/>
-  <line class="arrow" x1="1076.41" y1="456.06" x2="1076.41" y2="482.06"/>
-  <text class="label" x="1112" y="372">1/32 in</text>
+  <path class="cutter" d="M1087.95 522.71L1087.95 513.26L1084.80 513.26L1084.80 522.71A1.57 0.38 0 0 0 1087.95 522.71Z"/>
+  <path class="cutter" d="M1089.55 512.5L1089.55 452.06L1087.96 455.06L1086.38 452.06L1084.79 455.06L1083.20 452.06L1083.20 512.5A3.17 0.76 0 0 0 1089.55 512.5Z"/>
+  <line class="arrow" x1="1074.4" y1="456.06" x2="1074.4" y2="482.06"/>
+  <text class="label" x="1112" y="372">1/16 in</text>
   <text class="label" x="1112" y="388">end mill,</text>
   <text class="label" x="1112" y="404">its first</text>
   <text class="label" x="1112" y="420">plunge</text>
-  <line class="leader" x1="1110" y1="428" x2="1091.59" y2="476.06"/>
-  <circle class="leader-dot" cx="1091.59" cy="476.06" r="2"/>
+  <line class="leader" x1="1110" y1="428" x2="1089.55" y2="476.06"/>
+  <circle class="leader-dot" cx="1089.55" cy="476.06" r="2"/>
   <text class="label-on-clamp" x="831" y="590" text-anchor="middle">moving</text>
   <text class="label-on-clamp" x="1135" y="590" text-anchor="middle">fixed</text>
   <text class="label" x="962" y="410">blanks A and B, .032,</text>

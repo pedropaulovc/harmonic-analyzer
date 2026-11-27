@@ -17,15 +17,15 @@ kind = "threading_tool_bit"
 status = "on_hand"
 note = "owner confirmed on hand 2026-11-19: LMS 6685, 5/16 in HSS threading tool bit, set of two; single-points MHA-MG-03 1/4-20, MHA-PD-08 #8-32 and MHA-DT-03-TL-03 1/4-28."
 
-[tools.endmill-carbide-3fl-1-32-downcut]
-name = "Harvey Tool 896231 carbide downcut square end mill, 1/32 in (.0310), .093 length of cut, 3 flutes, 1/8 shank, 1-1/2 in overall"
+[tools.endmill-carbide-3fl-1-16-downcut]
+name = "Harvey Tool 896262 carbide downcut square end mill, 1/16 in (.0620), .186 length of cut, 3 flutes, 1/8 shank, 1-1/2 in overall"
 kind = "endmill"
 make = "Harvey Tool"
-sku = "896231"
-source = "https://www.harveytool.com/products/tool-details-896231"
-purchase = "Harvey Tool 896231, $55.10 each (listing read live 2026-11-22); buy two (one spare: a 1/32 cutter breaks)"
+sku = "896262"
+source = "https://www.harveytool.com/products/tool-details-896262"
+purchase = "One Harvey Tool 896262, $51.40 (listing read live 2026-11-26, 1 in stock)"
 status = "to_order"
-note = "Not owned: to buy. Variable Helix End Mills for Aluminum Alloys - Square - Downcut: 3 left-hand spiral, right-hand cut flutes, centre cutting, uncoated; the family page states it prevents lifting of the workpiece and performs in brass. Cuts the MHA-PD-03 platen clip out of .032 brass strip bonded on tape (PC01_sheet): its .031 fits the clip's .04 slits (drawing cross-check 2026-11-19, 2X .04 SLIT, FULL R END; it replaces the 3/64 end mill that list named, too wide to cut the slit's two sides), and a downcut pushes the narrow finger onto the tape instead of lifting it."
+note = "Not owned: to buy. Owner direction 2026-11-26 (#3740): replaces the 1/32 in Harvey Tool 896231 (16x higher D^4 bending stiffness) after widening MHA-PD-03's slits from .04 to .08 in. Variable Helix End Mills for Aluminum Alloys - Square - Downcut: 3 left-hand spiral, right-hand cut flutes, centre cutting, uncoated; the family page states it prevents lifting of the workpiece and performs in brass. Cuts the MHA-PD-03 platen clips and bow-former laminations out of .032 brass strip (PC01_sheet) and the MHA-DT-03-TL-02 phasing comb out of .020 brass sheet (CB01_outline), both bonded on painter's tape and CA glue: its .0620 fits the clip's .08 slits and both sheets' R.040 MAX inside corners, and a downcut pushes the narrow fingers and arms onto the tape instead of lifting them."
 flutes = 3
 
 [tools.endmill-carbide-3-32]

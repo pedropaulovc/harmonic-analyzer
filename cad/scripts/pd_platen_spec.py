@@ -57,7 +57,8 @@ SOCKET_SPEC = HoleSpec("tapped", "#2-56")
 # Each socket's distance in from its side edge, on both sides: the clip's
 # hole row (.145 from its outer edge, build_pd_platen_clip) plus .025, so the
 # clip's outer edge stays on the plate at the printed worst case and its
-# inboard edge stays 2.0 off the recording paper's 14.6 left inset
+# inboard edge (.51 clip width, #3740) stays 1.0 off the recording paper's 14.6
+# left inset and clear of the swept paper at the printed worst case
 # (test_pd_platen_refit asserts both and the tap's edge ligament).
 SOCKET_X = 4.318  # .170
 # The two rows are the clip's hole stations with its top end flush with the

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 600" width="760" height="600" font-family="sans-serif" font-size="13">
-  <!-- Plan, fixed jaw at the top, 3 px/mm: X0 the plate's left end, Y0 the fixed jaw's face, +Y up. Plate 6 x 5 x 1/2 (plate_length_mm 152.4, plate_width_mm 127), blank 107.95 x 38.1 at blank_left_x_mm / blank_back_y_mm 12.7. The vise's jaw width 158.67 is on record; the jaws' thickness is not (drawn 24 px, schematic). The 1 in parallels lie under the plate's front and back edges against the jaws, hidden: 1/8 in thick (as dt_arbor_pedestal's parallel_thickness_mm states for the same set); their length is not on record (drawn the jaws' length, schematic). The cutter: 1/32 end mill, outline_cutter_dia_mm 0.7874 = 2.4 px here, at the end of its entry move (X66.675 Y-43.574, Z0.525, level 1 of 3). -->
+  <!-- Plan, fixed jaw at the top, 3 px/mm: X0 the plate's left end, Y0 the fixed jaw's face, +Y up. Plate 6 x 5 x 1/2 (plate_length_mm 152.4, plate_width_mm 127), blank 107.95 x 38.1 at blank_left_x_mm / blank_back_y_mm 12.7. The vise's jaw width 158.67 is on record; the jaws' thickness is not (drawn 24 px, schematic). The 1 in parallels lie under the plate's front and back edges against the jaws, hidden: 1/8 in thick (as dt_arbor_pedestal's parallel_thickness_mm states for the same set); their length is not on record (drawn the jaws' length, schematic). The cutter: 1/16 end mill, outline_cutter_dia_mm 1.5748 = 4.72 px here, at the end of its entry move (X66.675 Y-43.967, Z0.368, level 1 of 2). -->
   <rect class="paper" x="0" y="0" width="760" height="600"/>
   <text class="title" x="20" y="22">Setup 2: CB01_outline's first level reaches the comb (plan 3 px/mm; detail 20 px/mm)</text>
   <rect class="fixture-vise" x="30.59" y="68" width="476.02" height="24"/>
@@ -14,29 +14,30 @@
   <path class="part-kept" d="M100.98,221.52 L379.08,221.52 L379.08,152.98 L100.98,152.98 L100.98,172.25 L129.18,172.25 L129.18,175.7 L152.05,175.7 L152.05,180.43 L174.1,180.43 L174.1,185.15 L196.98,185.15 L196.98,189.57 L212.2,189.57 L212.2,172.25 L338.73,172.25 A21.23,21.23 0 0 1 338.73,214.7 L100.98,214.7 Z"/>
   <line class="hidden" x1="40" y1="199.44" x2="421" y2="199.44"/>
   <line class="hidden" x1="78.1" y1="136.96" x2="401.95" y2="136.96"/>
-  <circle class="cutter" cx="240.02" cy="222.72" r="1.18"/>
-  <line class="arrow" x1="240.02" y1="248.58" x2="240.02" y2="227.72"/>
-  <line class="arrow" x1="246.02" y1="228.72" x2="286.02" y2="228.72"/>
+  <circle class="cutter" cx="240.02" cy="223.90" r="2.36"/>
+  <line class="arrow" x1="240.02" y1="249.76" x2="240.02" y2="229.72"/>
+  <line class="arrow" x1="246.02" y1="229.90" x2="286.02" y2="229.90"/>
   <line class="datum" x1="40" y1="62" x2="40" y2="507"/>
   <text class="datum-label" x="44" y="523">X0 plate left end</text>
   <line class="datum" x1="18" y1="92" x2="511.2" y2="92"/>
   <text class="datum-label" x="356.61" y="60">Y0 fixed jaw face</text>
-  <line class="leader" x1="250" y1="330" x2="241.02" y2="224.72"/>
-  <circle class="leader-dot" cx="241.02" cy="224.72" r="2"/>
-  <text class="label" x="254" y="334">1/32 end mill, to scale</text>
-  <text class="label" x="254" y="350">(Ø{{process.outline_cutter_dia_mm:in.3dot}}): in from in front of</text>
-  <text class="label" x="254" y="366">the blank (+Y) to the spring arm's</text>
-  <text class="label" x="254" y="382">front edge, then round the U</text>
-  <text class="label" x="254" y="398">anticlockwise, {{process.level_count:g}} levels</text>
+  <line class="leader" x1="286" y1="330" x2="242.5" y2="226.0"/>
+  <circle class="leader-dot" cx="242.5" cy="226.0" r="2"/>
+  <text class="label" x="290" y="334">1/16 end mill, to scale</text>
+  <text class="label" x="290" y="350">(Ø{{process.outline_cutter_dia_mm:in.3dot}}): in from in front of</text>
+  <text class="label" x="290" y="366">the blank (+Y) to the spring arm's</text>
+  <text class="label" x="290" y="382">front edge, then round the U</text>
+  <text class="label" x="290" y="398">anticlockwise, {{process.level_count:g}} levels</text>
   <text class="label-halo" x="130" y="150">stepped arm toward the fixed jaw</text>
   <text class="label" x="4" y="189">open</text>
   <line class="leader" x1="32" y1="185" x2="99.7" y2="185"/>
   <circle class="leader-dot" cx="99.7" cy="185" r="2"/>
-  <line class="leader" x1="150" y1="427" x2="90.59" y2="471.5"/>
-  <circle class="leader-dot" cx="90.59" cy="471.5" r="2"/>
+  <line class="leader" x1="140" y1="441" x2="90.59" y2="467.5"/>
+  <circle class="leader-dot" cx="90.59" cy="467.5" r="2"/>
   <text class="label" x="52" y="419">1 in parallels under the front and back</text>
   <text class="label" x="52" y="435">edges, against the jaws (hidden)</text>
-  <text class="label-halo" x="52" y="296">plate tape: 2 strips along X, X0 to 5 in</text>
+  <text class="label-halo" x="48" y="282">plate tape: 2 strips along X,</text>
+  <text class="label-halo" x="48" y="298">X0 to 5 in</text>
   <text class="label" x="250" y="452">spoil plate 6 x 5 x 1/2</text>
   <text class="label" x="20" y="545">blank on blue tape, CA glue, blue tape, its left end and back edge {{process.blank_left_x_mm:in.2dot}} in from</text>
   <text class="label" x="20" y="561">the plate's left end and back edge; dashed: the tape seams, the plate's 1.41 in from the fixed</text>
@@ -47,22 +48,22 @@
   <rect class="bond" x="544" y="244.4" width="186" height="5.6"/>
   <rect class="bond" x="530" y="247.2" width="14" height="2.8"/>
   <rect class="part-kept" x="544" y="234.24" width="186" height="10.16"/>
-  <rect class="part-removed" x="544" y="234.24" width="144.52" height="5.26"/>
-  <path class="cutter" d="M696.39 237.61L696.39 150L688.52 148L680.65 150L680.65 237.61A7.87 1.89 0 0 0 696.39 237.61Z"/>
-  <line class="arrow" x1="618.52" y1="168" x2="672.52" y2="168"/>
-  <text class="label" x="614.52" y="172" text-anchor="end">+Y</text>
-  <line class="datum" x1="524" y1="250" x2="550" y2="250"/>
-  <text class="datum-label" x="522" y="296">Z0 plate top</text>
-  <text class="label" x="674.52" y="217.5" text-anchor="end">tip Z 0.525 mm (level 1)</text>
-  <line class="leader" x1="560" y1="318" x2="538" y2="249.2"/>
+  <rect class="part-removed" x="544" y="234.24" width="152.39" height="8.40"/>
+  <path class="cutter" d="M696.39 242.64L696.39 150L680.64 148L664.89 150L664.89 242.64A15.75 3.78 0 0 0 696.39 242.64Z"/>
+  <line class="arrow" x1="604" y1="168" x2="656" y2="168"/>
+  <text class="label" x="600" y="172" text-anchor="end">+Y</text>
+  <line class="datum" x1="726" y1="250" x2="752" y2="250"/>
+  <text class="datum-label" x="655" y="296">Z0 plate top</text>
+  <text class="label" x="659" y="217.5" text-anchor="end">tip Z 0.368 mm (level 1)</text>
+  <line class="leader" x1="560" y1="312" x2="538" y2="249.2"/>
   <circle class="leader-dot" cx="538" cy="249.2" r="2"/>
   <text class="label" x="564" y="322">tape, CA, tape: stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}};</text>
   <text class="label" x="564" y="338">in front, the plate's tape alone</text>
-  <line class="leader" x1="640" y1="360" x2="620" y2="240.24"/>
-  <circle class="leader-dot" cx="620" cy="240.24" r="2"/>
-  <text class="label" x="644" y="364">blank {{cad.top_stock_thickness_mm:in.3dot}}</text>
-  <text class="label" x="520" y="396">the 1/32 end mill to scale; its</text>
-  <text class="label" x="520" y="412">collet stand-out {{process.em_thirtysecond_projection_min_mm:in.2dot}}–{{process.em_thirtysecond_projection_max_mm:in.2dot}}</text>
+  <line class="leader" x1="712" y1="224" x2="716" y2="236"/>
+  <circle class="leader-dot" cx="716" cy="236" r="2"/>
+  <text class="label" x="702" y="218">blank {{cad.top_stock_thickness_mm:in.3dot}}</text>
+  <text class="label" x="520" y="396">the 1/16 end mill to scale; its</text>
+  <text class="label" x="520" y="412">collet stand-out {{process.em_sixteenth_projection_min_mm:in.2dot}}–{{process.em_sixteenth_projection_max_mm:in.2dot}}</text>
   <text class="label" x="520" y="428">drawn short (break). Each level</text>
   <text class="label" x="520" y="444">{{process.level_depth_mm:in.4dot}} deeper; the last</text>
   <text class="label" x="520" y="460">{{process.outline_tip_into_plate_mm:in.3dot}} into the plate</text>

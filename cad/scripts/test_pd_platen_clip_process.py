@@ -83,7 +83,7 @@ def _outline(ctx: dict) -> dict:
 
 
 def test_context_accepts_the_plan_and_cuts_every_piece(context) -> None:
-    assert context["numbers"] == {"em-thirty-second": 1}
+    assert context["numbers"] == {"em-sixteenth": 1}
     assert RECIPE.LOAD_FIRST_TOOL == ("PC01_sheet",)
     names = {
         e["name"].split(" ", 2)[0] + " " + e["name"].split(" ", 2)[1]
@@ -137,7 +137,7 @@ def test_the_recipes_program_passes_every_check_it_declares(context, tmp_path) -
         ("tape_stack_min_mm", 0.3, "over the tape stack"),
         ("tape_stack_max_mm", 0.25, "under the tape stack"),
         ("sheet_depth_mm", 0.9, "sheet_depth_mm"),
-        ("level_count", 2, "level_count"),
+        ("level_count", 3, "level_count"),
         ("level_depth_max_fraction", 0.25, "level_count"),
         ("strip_thickness_min_mm", 0.82, "outside the strip's thickness band"),
         ("formed_rise_min_mm", 1.3, "formed_rise_min_mm"),
@@ -151,7 +151,7 @@ def test_the_recipes_program_passes_every_check_it_declares(context, tmp_path) -
         ("jaw_top_over_plate_mm", 6.0, "jaw_top_over_plate_mm"),
         ("em_projection_min_mm", 5.0, "collet would not clear"),
         ("inside_corner_max_mm", 0.3, "inside-corner"),
-        ("sheet_cutter_dia_mm", 1.5875, "cutter_dia_mm"),
+        ("sheet_cutter_dia_mm", 0.7874, "cutter_dia_mm"),
         ("plunge_feed_mm_min", 100.0, "plunge_feed_mm_min"),
         ("entry_overhang_mm", 1.0, "entry_overhang_mm"),
         ("collet_over_jaw_mm", 10.0, "collet_over_jaw_mm"),
@@ -166,7 +166,7 @@ def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> N
 
 def test_an_upcut_end_mill_is_refused() -> None:
     plan = copy.deepcopy(PLAN)
-    tool = next(t for t in plan["tools"] if t["id"] == "em-thirty-second")
+    tool = next(t for t in plan["tools"] if t["id"] == "em-sixteenth")
     del tool["axial_direction"]
     with pytest.raises(ValueError, match="downcut"):
         _context(plan)
@@ -210,7 +210,7 @@ def _nudge_y(line: str) -> str:
         ),
         # The feed in through the blank's margin rapided at cutting depth.
         (
-            lambda line: line.startswith("G1 X3.670"),
+            lambda line: line.startswith("G1 X3.277"),
             lambda line: line.replace("G1", "G0", 1).replace(" F{feed}", ""),
             "rapid",
         ),

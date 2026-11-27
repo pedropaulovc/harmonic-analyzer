@@ -30,15 +30,6 @@ findings = [
   "LEADER | Op 40, from the front: the sawn piece filed end down in the soft jaws, its sawn end 1/32 above the jaw tops; the smooth file across it files it toward the cut length, .14–.16 across both ends. | soft jaw",
 ]
 
-[plans.dt_cone_gear_tl_phasing_comb]
-findings = [
-  "LEADER | Plan of the spoil plate in the vise, fixed jaw at the top, 3 px/mm: the 1 in parallels hidden under the plate's front and back edges; the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams; the comb's U inside the blank, its open end left and its stepped arm toward the fixed jaw. The 1/32 end mill, to scale, where CB01_outline's first level reaches the middle of the spring arm's front edge, in from in front of the blank (+Y), then anticlockwise round the U. Detail, section from the right end at 20 px/mm: the plate, the tape stack, the blank and the end mill's tip at Z 0.525 mm on level 1. | Z0 plate top",
-  "LEADER | Plan of the spoil plate in the vise, fixed jaw at the top, 3 px/mm: the 1 in parallels hidden under the plate's front and back edges; the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams; the comb's U inside the blank, its open end left and its stepped arm toward the fixed jaw. The 1/32 end mill, to scale, where CB01_outline's first level reaches the middle of the spring arm's front edge, in from in front of the blank (+Y), then anticlockwise round the U. Detail, section from the right end at 20 px/mm: the plate, the tape stack, the blank and the end mill's tip at Z 0.525 mm on level 1. | edges, against the jaws (hidden)",
-  "LEADER | Plan of the spoil plate in the vise, fixed jaw at the top, 3 px/mm: the 1 in parallels hidden under the plate's front and back edges; the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams; the comb's U inside the blank, its open end left and its stepped arm toward the fixed jaw. The 1/32 end mill, to scale, where CB01_outline's first level reaches the middle of the spring arm's front edge, in from in front of the blank (+Y), then anticlockwise round the U. Detail, section from the right end at 20 px/mm: the plate, the tape stack, the blank and the end mill's tip at Z 0.525 mm on level 1. | in front, the plate's tape alone",
-  "LEADER | Plan of the spoil plate in the vise, fixed jaw at the top, 3 px/mm: the 1 in parallels hidden under the plate's front and back edges; the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams; the comb's U inside the blank, its open end left and its stepped arm toward the fixed jaw. The 1/32 end mill, to scale, where CB01_outline's first level reaches the middle of the spring arm's front edge, in from in front of the blank (+Y), then anticlockwise round the U. Detail, section from the right end at 20 px/mm: the plate, the tape stack, the blank and the end mill's tip at Z 0.525 mm on level 1. | plate tape: 2 strips along X, X0 to 5 in",
-  "LEADER | Plan of the spoil plate in the vise, fixed jaw at the top, 3 px/mm: the 1 in parallels hidden under the plate's front and back edges; the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams; the comb's U inside the blank, its open end left and its stepped arm toward the fixed jaw. The 1/32 end mill, to scale, where CB01_outline's first level reaches the middle of the spring arm's front edge, in from in front of the blank (+Y), then anticlockwise round the U. Detail, section from the right end at 20 px/mm: the plate, the tape stack, the blank and the end mill's tip at Z 0.525 mm on level 1. | tape, CA, tape: stack .009–.013;",
-]
-
 [plans.dt_cone_swing_platform]
 findings = [
   "LEADER | Plan and front, 1.5 px/mm: the spoil plate on five 1-2-3 blocks, four step clamps over the corner blocks; the L drill in the first post screw hole, its point 2.7 mm below the plate in the space over the table, clear of every block. | 1-2-3 blocks under the plate (dashed)",
@@ -102,11 +93,6 @@ findings = [
 [plans.mg_output_fixture]
 findings = [
   "LEADER | To scale across: the 4-40 bottoming tap in the hole, its mark at the spigot face, its point .46 in; the T-handle wrench and the MT3 dead centre following it. | bottoming tap's point .46 in, the chuck turned",
-]
-
-[plans.pd_platen_clip]
-findings = [
-  "LEADER | Plan of the spoil plate in the vise, to scale: the plate's blue tape, four strips along X from its left end to 4 in, and blank A against the fixed jaw and blank B in front of it on it, both flush with the plate's left end; dashed, the tape seams along X; on A the two clips, rails toward the moving jaw, and the first lamination; on B the other three; each lamination split along its bow profile into a male half and a female half. The 1/32 in end mill at PC01's first plunge, in clip 1's left hole, with a detail of the two clockwise circles that open it. A section across the jaws: the plate on a 1 in parallel at each jaw, its back edge on the fixed jaw, the blanks on their tape stack on top, the jaw tops .270 above the plate. | blank A",
 ]
 
 [plans.pd_support_bar]

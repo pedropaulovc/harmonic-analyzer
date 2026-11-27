@@ -20,12 +20,12 @@ are bonded to the spoil plate on blue painter's tape on both faces with CA
 glue between (owner 2026-11-23; ``fixtures.sheet-spoil-
 plate``) gripped in the vise on parallels: blank A's back edge on the fixed
 jaw, blank B's against blank A's front edge, both left ends flush with the
-plate's left end. One file, PC01_sheet, with the 1/32 in carbide downcut end
-mill: the four Ø.116 holes, each plunged near its centre and opened by two
-circles; the two clips' flat outlines (rail, slits, finger) at their
+plate's left end. One file, PC01_sheet, with the 1/16 in carbide downcut end
+mill: the four Ø.116 holes, each plunged near its centre and opened by one
+circle; the two clips' flat outlines (rail, slits, finger) at their
 developed length; then the bow former's four die laminations, each cut out
-round its rectangle and split along its die profile by one pass (the kerf
-between its male and female halves). Every outline and hole runs four
+round its rectangle and split along its die profile (a pass along the male
+face and a return pass along the female face). Every outline and hole runs two
 equal depth levels from the thickest strip on the thickest tape stack, the
 last with its tip a few thousandths into the spoil plate, so each piece
 comes free of its blank on its own island of tape.
@@ -59,7 +59,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (("PC01_sheet", ("sheet",)),
 LOAD_FIRST_TOOL = ("PC01_sheet",)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these.
-CAM_TOOLS = ("em-thirty-second",)
+CAM_TOOLS = ("em-sixteenth",)
 IN = 25.4
 # Each outline is entered from the air beyond the plate's left end: the
 # cutter comes down this far (beyond its radius) left of X0, then feeds in
@@ -76,20 +76,20 @@ JAW_DEPTH_MM = IN
 # the tightest printed band locating that edge; the rest is the machine's.
 BAND_FRACTION = 0.1
 # The die laminations are tooling with no printed band: their profile path
-# may stray this far. It also covers the female face, which stands the
-# strip's thickness off the male face where the kerf is the cutter's width
-# (.025 farther than the cutter's radius), with the posted path's sampling.
+# may stray this far, and their split leaves this much clearance between the
+# male-face and female-face cutter paths so each pass cuts only its own half.
 DIE_TOL_MM = 0.05
+DIE_SPLIT_CLEAR_MM = 0.25
 # The finish circle is posted as this many equal clockwise arcs: each 30°,
 # so the checker's samples of the posted path (every .25 mm) fall on the
 # wall's own (every 30° round a quarter) and the hole's .01 share of its
 # band is held point for point.
 HOLE_ARCS = 12
-# A hole is opened by a clearing circle whose centre runs this share of the
-# cutter's radius from the hole's centre (under one radius, so it clears the
-# centre; far enough out that the finish circle's cut overlaps it), then by
-# the finish circle.
-HOLE_CLEAR_FRACTION = 0.9
+# A hole is plunged at this share of its finish cutter-centre radius off the
+# hole's centre (inside one cutter radius so the plunge clears the centre, and
+# strictly off zero so the clockwise lead arc encloses the centre and turns
+# the hole's way at every sample), then opened by the single finish circle.
+HOLE_ENTRY_FRACTION = 0.5
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 # Bow features' end stations agree with the slits' and holes' to this (mm).
@@ -613,28 +613,43 @@ def _die_profile(
 
 
 def _lamination(
-    length: float, height: float, flat: float, t: float, mid: list[dict[str, Any]]
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    """A die lamination's male (below the kerf) and female (above) halves in
-    its own X/Y, each anticlockwise round itself: the male face is the
-    platen face's bow (the mid surface t/2 below), the female the outer
-    face's (t/2 above)."""
+    length: float,
+    height: float,
+    flat: float,
+    t: float,
+    kerf: float,
+    mid: list[dict[str, Any]],
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
+    """A die lamination's male (below the split) and female (above) halves in
+    its own X/Y, each anticlockwise round itself: the male face is the platen
+    face's bow (the mid surface ``t/2`` below), the female the outer face's
+    (``t/2`` above, shifted up so the split between their flats is ``kerf``)."""
+    shift_y = kerf - t
     male_face = _offset_chain(mid, t / 2)
-    female_face = _offset_chain(mid, -t / 2)
-    top = flat + t
+    female_face = [_shifted(e, 0.0, shift_y) for e in _offset_chain(mid, -t / 2)]
+    top = flat + kerf
+    male_curve = [
+        _reversed(e) | {"name": f"male {e['name']}"} for e in reversed(male_face)
+    ]
+    female_curve = [e | {"name": f"female {e['name']}"} for e in female_face]
     male = [
         _line("male back edge", (0.0, 0.0), (length, 0.0), DIE_TOL_MM),
         _line("male right end", (length, 0.0), (length, flat), DIE_TOL_MM),
-        *[_reversed(e) | {"name": f"male {e['name']}"} for e in reversed(male_face)],
+        *male_curve,
         _line("male left end", (0.0, flat), (0.0, 0.0), DIE_TOL_MM),
     ]
     female = [
-        *[e | {"name": f"female {e['name']}"} for e in female_face],
+        *female_curve,
         _line("female right end", (length, top), (length, height), DIE_TOL_MM),
         _line("female back edge", (length, height), (0.0, height), DIE_TOL_MM),
         _line("female left end", (0.0, height), (0.0, top), DIE_TOL_MM),
     ]
-    return male, female, male[2:-1]
+    return male, female, male_curve, female_curve
 
 
 def context(
@@ -645,7 +660,7 @@ def context(
     clip, d = _clip(f)
     sheet_t = f["sheet"]["thickness"]
 
-    tool = _plan_tool(plan, "em-thirty-second")
+    tool = _plan_tool(plan, "em-sixteenth")
     em = shop["tools"][tool["ref"]]
     dia = em["diameter_mm"]
     r = dia / 2
@@ -654,7 +669,7 @@ def context(
         raise ValueError("'sheet' cutter_dia_mm is not the end mill's diameter")
     # The downcut's helix pushes the taped clip's narrow finger onto the tape.
     if tool.get("axial_direction") != "down":
-        raise ValueError("em-thirty-second: the plan's end mill must be a downcut")
+        raise ValueError("em-sixteenth: the plan's end mill must be a downcut")
 
     # The slit: the cutter runs down one side and back up the other, so it
     # fits inside the slit's nominal width, its radius inside the full R end.
@@ -737,14 +752,17 @@ def context(
             f" outside the drawing's rise {lo:.3f}-{hi:.3f}"
         )
     # The laminations: as long as the rail (their ends square the clip's rail
-    # ends), the male's back edge to its flats, the female above the kerf.
+    # ends), the male's back edge to its flats, the female above the split.
     lam_l = d["far"] - d["near"]
     lam_h = p["lamination_height_mm"]
     lam_flat = p["lamination_flat_mm"]
+    lam_kerf = dia + DIE_SPLIT_CLEAR_MM
     stations = (d["bow_from"], d["bow_to"], lam_l - d["bow_to"], lam_l - d["bow_from"])
     mid = _die_profile(lam_l, stations, rd, lam_flat + sheet_t / 2)
-    male, female, male_face = _lamination(lam_l, lam_h, lam_flat, sheet_t, mid)
-    female_least = lam_h - (lam_flat + sheet_t + die_rise)
+    male, female, male_face, female_face = _lamination(
+        lam_l, lam_h, lam_flat, sheet_t, lam_kerf, mid
+    )
+    female_least = lam_h - (lam_flat + lam_kerf + die_rise)
     if min(lam_flat, female_least) < p["lamination_body_min_mm"]:
         raise ValueError("a die half is thinner than lamination_body_min_mm")
     stack = p["lamination_count"] * t_min
@@ -759,16 +777,21 @@ def context(
             "the die stack must cover most of the finger's width and stay clear of the rail"
         )
 
-    # Holes: the finish circle at the drilled band's middle, entered from the
-    # clearing circle on a clockwise arc round a circle that holds the hole's
-    # centre (so it turns the hole's way all along).
+    # Holes: the 1/16 in cutter's radius exceeds half the hole's finish circle
+    # (hole_r < 2 * r, so ring < r), so one finish circle at the drilled band's
+    # middle clears the whole hole with zero uncut core. Plunge inside the
+    # finish circle and enter tangentially at the bottom on a clockwise arc
+    # round a circle that holds the hole's centre (so it turns the hole's way
+    # all along).
     hole_r = sum(d["hole_dia"]) / 4
     _agree(plan, "hole_dia_target_mm", 2 * hole_r)
     ring = hole_r - r
-    clear_r = HOLE_CLEAR_FRACTION * r
-    if ring - clear_r > 2 * r - 1e-6:
-        raise ValueError("the hole's two circles leave a ring uncut")
-    lead_j = (clear_r**2 - ring**2) / (2 * ring)
+    if ring <= 0:
+        raise ValueError("the cutter does not fit inside the hole")
+    if ring > r - 1e-6:
+        raise ValueError("the hole's finish circle leaves a core uncut")
+    entry_r = HOLE_ENTRY_FRACTION * ring
+    lead_j = (entry_r**2 - ring**2) / (2 * ring)
 
     # Layout. Blank A's back edge on the fixed jaw (Y0), blank B's against
     # blank A's front edge, both left ends at X0. Parts run down from the
@@ -874,14 +897,12 @@ def context(
             )
             cx, cy = _r(c[0]), _r(c[1])
             for z in levels:
-                # Plunged on the clearing circle, round it, out on the lead
-                # to the finish circle's bottom, round that, up.
-                descend(cx + clear_r, cy, z, "plunge")
-                lines += [
-                    f"G2 X{_r(cx - clear_r):.3f} Y{cy:.3f} I{_r(-clear_r):.3f} J0.000 F{{feed}}",
-                    f"G2 X{_r(cx + clear_r):.3f} Y{cy:.3f} I{_r(clear_r):.3f} J0.000 F{{feed}}",
-                    f"G2 X{cx:.3f} Y{_r(cy - ring):.3f} I{_r(-clear_r):.3f} J{_r(lead_j):.3f} F{{feed}}",
-                ]
+                # Plunged inside the finish circle, out on the tangent lead to
+                # the finish circle's bottom, round that once, up.
+                descend(cx + entry_r, cy, z, "plunge")
+                lines.append(
+                    f"G2 X{cx:.3f} Y{_r(cy - ring):.3f} I{_r(-entry_r):.3f} J{_r(lead_j):.3f} F{{feed}}"
+                )
                 start = (cx, _r(cy - ring))
                 for n in range(1, HOLE_ARCS + 1):
                     a = -math.pi / 2 - 2 * math.pi * n / HOLE_ARCS
@@ -929,11 +950,19 @@ def context(
         _line("top edge", (lam_l, lam_h), (0.0, lam_h), DIE_TOL_MM),
     ]
     rect_segs = _offset_loop(rect, r, inside_max)
-    kerf = _offset_chain(male_face, r)
-    kerf_segs = [
-        ("line", [lam_l + r, lam_flat + r], kerf[0]["start"]),
-        *_segments(kerf),
-        ("line", kerf[-1]["end"], [-r, lam_flat + r]),
+    male_kerf = _offset_chain(male_face, r)
+    female_kerf = _offset_chain(female_face, r)
+    lam_top_flat = lam_flat + lam_kerf
+    male_kerf_segs = [
+        ("line", [lam_l + r, lam_flat + r], male_kerf[0]["start"]),
+        *_segments(male_kerf),
+        ("line", male_kerf[-1]["end"], [-r, lam_flat + r]),
+    ]
+    female_kerf_segs = [
+        ("line", [-r, lam_flat + r], [-r, lam_top_flat - r]),
+        ("line", [-r, lam_top_flat - r], female_kerf[0]["start"]),
+        *_segments(female_kerf),
+        ("line", female_kerf[-1]["end"], [lam_l + r, lam_top_flat - r]),
     ]
     for k, top_y in enumerate(lam_tops, 1):
         shift = (left, top_y - lam_h)
@@ -942,15 +971,23 @@ def context(
             for e in (*male, *female)
         ]
         loop(rect_segs, shift)
-        mx, my = _r(kerf_segs[0][1][0] + shift[0]), _r(kerf_segs[0][1][1] + shift[1])
+        mx, my = (
+            _r(male_kerf_segs[0][1][0] + shift[0]),
+            _r(male_kerf_segs[0][1][1] + shift[1]),
+        )
+        descend(mx, my, levels[0], "feed")
         for n, z in enumerate(levels):
-            descend(mx, my, z, "feed")
-            lines.extend(_moves(kerf_segs, shift))
-            lines.append(f"G0 Z{_r(top + clear):.3f}")
-        # The kerf's mouths: the cutter crosses the gap between the halves'
+            if n:
+                lines.append(f"G1 X{mx:.3f} Y{my:.3f} F{{feed}}")
+                lines.append(f"G1 Z{z:.3f} F{{feed}}")
+            lines.extend(_moves(male_kerf_segs, shift))
+            lines.extend(_moves(female_kerf_segs, shift))
+        lines.append(f"G0 Z{_r(top + clear):.3f}")
+        # The split's mouths: the cutter crosses the gap between the halves'
         # ends there, in the rectangle's own cut.
+        mouth_y = _r((lam_flat + lam_top_flat) / 2 + shift[1])
         for x in (left + lam_l + r, left - r):
-            leads.append({"centre": [_r(x), my], "radius": 2 * r, "levels": levels})
+            leads.append({"centre": [_r(x), mouth_y], "radius": 2 * r, "levels": levels})
 
     numbers = {
         t["id"]: n
@@ -964,7 +1001,7 @@ def context(
     _agree(plan, "plunge_feed_mm_min", plunge)
     jobs = [
         {
-            "tool": "em-thirty-second",
+            "tool": "em-sixteenth",
             "dia": dia,
             "shape": "endmill",
             "flutes": flutes,
@@ -983,7 +1020,7 @@ def context(
             "axes": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         }
     }
-    t = numbers["em-thirty-second"]
+    t = numbers["em-sixteenth"]
     name = PROGRAMS[0][0]
     expect = [
         [name, "tool_changes", {"z_top": top, "tools": [t], "loads_first": True}],

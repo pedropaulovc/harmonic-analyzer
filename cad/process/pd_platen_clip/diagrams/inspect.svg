@@ -1,19 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 305" font-family="sans-serif" font-size="14">
   <rect class="paper" x="0" y="0" width="800" height="305"/>
   <text class="title" x="20" y="24">Setup 3: the first clip, flat, what the calipers and pins read (to scale)</text>
-  <path class="part-kept" d="M81.7,130.6 L81.7,165.2 A20.3,20.3 0 0 0 102.0,185.5 L729.9,185.5 A20.3,20.3 0 0 0 750.2,165.2 L750.2,130.6 A6.1,6.1 0 0 0 744.1,124.5 L461.7,124.5 A4.1,4.1 0 0 1 457.6,120.5 A4.1,4.1 0 0 1 461.7,116.4 L738.7,116.4 A13.2,13.2 0 0 0 752.0,103.2 A13.2,13.2 0 0 0 738.7,90.0 L93.2,90.0 A13.2,13.2 0 0 0 80.0,103.2 A13.2,13.2 0 0 0 93.2,116.4 L370.3,116.4 A4.1,4.1 0 0 1 374.3,120.5 A4.1,4.1 0 0 1 370.3,124.5 L87.8,124.5 A6.1,6.1 0 0 0 81.7,130.6 Z"/>
-  <circle class="holes" cx="139.2" cy="156.0" r="12.0"/>
-  <circle class="holes" cx="692.7" cy="156.0" r="12.0"/>
-  <line class="dims" x1="81.7" y1="189.5" x2="81.7" y2="219.5"/>
-  <line class="dims" x1="750.2" y1="189.5" x2="750.2" y2="219.5"/>
-  <line class="dims" x1="81.7" y1="215.5" x2="750.2" y2="215.5"/>
-  <text class="label" x="266.0" y="235.5">length over the rail ends 3.29 (jaws on the rail)</text>
-  <line class="dims" x1="764.2" y1="185.5" x2="764.2" y2="90.0"/>
-  <text class="label" x="710.2" y="80.0">overall .47</text>
-  <line class="dims" x1="75.7" y1="185.5" x2="75.7" y2="124.5"/>
-  <text class="label" x="11.7" y="160.0">rail .30</text>
+  <path class="part-kept" d="M81.7,138.7 L81.7,173.3 A20.3,20.3 0 0 0 102.0,193.6 L729.9,193.6 A20.3,20.3 0 0 0 750.2,173.3 L750.2,138.7 A6.1,6.1 0 0 0 744.1,132.6 L461.7,132.6 A8.1,8.1 0 0 1 453.6,124.5 A8.1,8.1 0 0 1 461.7,116.4 L738.7,116.4 A13.2,13.2 0 0 0 752.0,103.2 A13.2,13.2 0 0 0 738.7,90.0 L93.2,90.0 A13.2,13.2 0 0 0 80.0,103.2 A13.2,13.2 0 0 0 93.2,116.4 L370.3,116.4 A8.1,8.1 0 0 1 378.4,124.5 A8.1,8.1 0 0 1 370.3,132.6 L87.8,132.6 A6.1,6.1 0 0 0 81.7,138.7 Z"/>
+  <circle class="holes" cx="139.2" cy="164.1" r="12.0"/>
+  <circle class="holes" cx="692.7" cy="164.1" r="12.0"/>
+  <line class="dims" x1="81.7" y1="197.6" x2="81.7" y2="223.6"/>
+  <line class="dims" x1="750.2" y1="197.6" x2="750.2" y2="223.6"/>
+  <line class="dims" x1="81.7" y1="219.6" x2="750.2" y2="219.6"/>
+  <text class="label" x="266.0" y="239.6">length over the rail ends 3.29 (jaws on the rail)</text>
+  <line class="dims" x1="764.2" y1="193.6" x2="764.2" y2="90.0"/>
+  <text class="label" x="710.2" y="80.0">overall .51</text>
+  <line class="dims" x1="75.7" y1="193.6" x2="75.7" y2="132.6"/>
+  <text class="label" x="11.7" y="166.0">rail .30</text>
   <line class="leader" x1="141.7" y1="76.0" x2="171.7" y2="90.0"/>
   <text class="label" x="71.7" y="72.0">spring edge (the finger)</text>
-  <text class="label" x="40.0" y="265.5">Holes: the .116 pin goes in, the .120 pin does not (first clip only).</text>
-  <text class="label" x="40.0" y="283.5">Slits, bridges, corners and hole stations: held by the program, not gauged.</text>
+  <text class="label" x="40.0" y="268.0">Holes: the .116 pin goes in, the .120 pin does not (first clip only).</text>
+  <text class="label" x="40.0" y="286.0">Slits, bridges, corners and hole stations: held by the program, not gauged.</text>
 </svg>

@@ -77,8 +77,8 @@ def test_platen_furniture_cascades_with_resized_envelope() -> None:
         min(platen.SOCKET_XY[0][0], platen.PLATE_WIDTH - platen.SOCKET_XY[2][0])
         > clip.HOLE_Y
     )
-    assert left - clip_inner_edges[0] > 2.0
-    assert right - clip_inner_edges[1] > 2.0
+    assert left - clip_inner_edges[0] > 1.0
+    assert right - clip_inner_edges[1] > 1.0
     assert math.isclose(
         platen.PLATE_HEIGHT - paper_geometry.RECORDING_PAPER_HEIGHT_MM - 3.0,
         51.32,
@@ -94,13 +94,15 @@ def test_platen_clip_is_one_center_bridged_sheet() -> None:
     )
     # ch22 img03: a 32-px spring rail beside a 4-px slit, of the photographed
     # width.  The screw rail is widened for its holes' ligaments (user ruling
-    # 2026-10-14; Main 2026-10-31, option B, for the .080 target), the
-    # overall width keeps the 2.0 paper gap, the slit's .XX worst case keeps
-    # the photographed gap, and the spring rail is what is left.
-    assert clip.CLIP_WIDTH == pytest.approx(0.47 * 25.4)
+    # 2026-10-14; Main 2026-10-31, option B, for the .080 target), the slit is
+    # widened from .04 to .08 for a 1/16 in downcut end mill (#3740), and the
+    # overall width grows from .47 to .51 inward over the paper margin so the
+    # .130 spring rail is unchanged while keeping >1.0 nominal paper gap and
+    # inboard_edge_max < paper_inset_min.
+    assert clip.CLIP_WIDTH == pytest.approx(0.51 * 25.4)
     assert clip.SCREW_RAIL_WIDTH == pytest.approx(0.30 * 25.4)
-    assert _clip_paper_gap(platen.SOCKET_X) > 2.0
-    assert clip.NOTCH_WIDTH == pytest.approx(0.04 * 25.4)
+    assert _clip_paper_gap(platen.SOCKET_X) > 1.0
+    assert clip.NOTCH_WIDTH == pytest.approx(0.08 * 25.4)
     assert (
         clip.NOTCH_WIDTH - printed_band_mm(2, unit=clip.UNIT)
         >= clip.PHOTO_CLIP_WIDTH * 4.0 / 68.0
@@ -303,11 +305,11 @@ def _clip_paper_gap(socket_x: float) -> float:
 
 
 def test_clip_socket_station_holds_the_paper_gap() -> None:
-    # The photographed station no longer holds the 2.0 nominal gap beside the
-    # widened clip screw rail and the 14.6 paper inset; the .170 station does,
-    # on both sides.
-    assert _clip_paper_gap(5.3928) < 2.0
-    assert _clip_paper_gap(platen.SOCKET_X) > 2.0
+    # With the .30 screw rail and #3740's .08 slit (.51 overall clip width),
+    # the photographed station overlaps the 14.6 paper inset; the .170 station
+    # holds >1.0 nominal gap on both sides (and inboard_edge_max < paper_inset_min above).
+    assert _clip_paper_gap(5.3928) < 1.0
+    assert _clip_paper_gap(platen.SOCKET_X) > 1.0
     assert platen.SOCKET_X == pytest.approx(0.170 * 25.4)
     assert {x for x, _ in platen.SOCKET_XY} == {
         platen.SOCKET_X,

@@ -15,7 +15,7 @@ printed band the posted path may use.
 Route (plan text in ``plan.toml``): the blank, snipped from the .020 sheet,
 is bonded to the spoil plate (``fixtures.sheet-spoil-plate``), gripped in
 the vise on parallels, on blue painter's tape on both faces with CA glue
-between (owner 2026-11-23). One file, CB01_outline: the 1/32
+between (owner 2026-11-23). One file, CB01_outline: the 1/16
 in carbide downcut end mill comes down in front of the blank, feeds in
 through the blank's margin and runs round the whole U at the finished size
 once per level, in the fewest equal levels each within the maker's slotting
@@ -47,7 +47,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (("CB01_outline", ("outline"
 LOAD_FIRST_TOOL = ("CB01_outline",)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these.
-CAM_TOOLS = ("em-thirtysecond",)
+CAM_TOOLS = ("em-sixteenth",)
 # Blade features south to north (the staircase's order along X).
 BLADES = ("blade_t024", "blade_t018", "blade_t012", "blade_t006")
 IN = 25.4
@@ -445,7 +445,7 @@ def context(
     if not math.isclose(_plane(f, "underside", "z"), 0.0, abs_tol=1e-9):
         raise ValueError("underside: expected the model's Z0")
 
-    em = _shop_tool(plan, shop, "em-thirtysecond")
+    em = _shop_tool(plan, shop, "em-sixteenth")
     dia = em["diameter_mm"]
     r = dia / 2
     rpm, feed, flutes = _setting(plan, shop, "outline")
@@ -561,9 +561,9 @@ def context(
         p["vise_jaw_height_mm"] - p["parallel_height_mm"] - p["plate_thickness_mm"]
     )
     _agree(plan, "jaw_top_over_plate_mm", jaw_top)
-    if p["em_thirtysecond_projection_min_mm"] < jaw_top - tip + CLEAR_MM:
+    if p["em_sixteenth_projection_min_mm"] < jaw_top - tip + CLEAR_MM:
         raise ValueError(
-            "em_thirtysecond_projection_min_mm: the collet would not clear the"
+            "em_sixteenth_projection_min_mm: the collet would not clear the"
             " jaw tops with the tip at the cut"
         )
     clear = max(CLEAR_MM, jaw_top - top + CLEAR_MM)
@@ -607,7 +607,7 @@ def context(
     ]
     jobs = [
         {
-            "tool": "em-thirtysecond",
+            "tool": "em-sixteenth",
             "dia": dia,
             "shape": "endmill",
             "flutes": flutes,
@@ -630,7 +630,7 @@ def context(
             "axes": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         }
     }
-    t = numbers["em-thirtysecond"]
+    t = numbers["em-sixteenth"]
     name = PROGRAMS[0][0]
     expect = [
         [name, "tool_changes", {"z_top": top_hi, "tools": [t], "loads_first": True}],
@@ -747,7 +747,7 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
     xs = [_plane(f, "south_end", "x"), _plane(f, "north_end", "x")]
     ys = [_plane(f, "far_edge", "y"), _plane(f, "back", "y")]
     reason = (
-        "the staircase's inside corners are drawn sharp and cut at the 1/32 in"
+        "the staircase's inside corners are drawn sharp and cut at the 1/16 in"
         " end mill's radius, under the title block's inside-corner max"
         " (plan inside_corner_max_mm)"
     )

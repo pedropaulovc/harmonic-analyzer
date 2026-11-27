@@ -204,9 +204,9 @@ sfm = 50
 feed = "cross slide by hand, one firm plunge, then the carriage along by hand; oiled"
 
 # --- MHA-PD-03 platen clip (cad/process/pd_platen_clip/plan.toml) ---
-# The clip's 1/32 downcut end mill and its C26000 setting are in common.toml
-# (tools.endmill-carbide-3fl-1-32-downcut, settings.endmill-carbide-3fl-1-32-
-# downcut-c260): the MHA-DT-03-TL-02 comb cuts with them too.
+# The clip's 1/16 downcut end mill and its C26000 setting are in common.toml
+# (tools.endmill-carbide-3fl-1-16-downcut, settings.endmill-carbide-3fl-1-16-
+# downcut-c260): the MHA-DT-03-TL-02 comb cuts with them too (#3740).
 
 # --- MHA-PD-22 drive collar (cad/process/pd_transgear_drive_collar/plan.toml) -
 # Lathe: facing, turning, the centre drill and parting take shop/lathe.toml's
