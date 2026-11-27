@@ -52,36 +52,61 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
+from _printed_tolerance import angular_band_deg
 from _session import run_build
 import _telemetry
 from dt_pinion_spring_geometry import (
     BEND_CX,
+    BEND_CY,
+    BLADE_LEAN_DEG,
+    FLAT_LEN,
     FLAT_TIP,
     FOOT_END,
+    FOOT_FROM_HOLE,
     FOOT_TAN,
     FREE_FLAT_TIP,
     FREE_KINK_EXIT,
+    FREE_KINK_H,
     FREE_KINK_INCLUDED_BISECTOR,
     FREE_KINK_START,
+    FREE_KINK_V,
     FREE_KINK_VERTEX,
     HOLE_DIA,
     HOLE_FROM_END,
+    HOLE_PLACES,
+    HOLE_X,
     KINK_C,
+    KINK_DEG,
     KINK_EXIT,
     KINK_INCLUDED_DEG,
+    PAD_HOLE_WEB_MIN,
+    PAD_RELIEF_R,
     PAD_WIDTH,
+    PAD_WING_FROM_HOLE,
     PAD_WING_LEN,
     PAD_Z,
+    PATH_LEN,
+    PRESET_DEG,
+    R_BEND,
     R_KINK,
     THICK,
+    UNIT,
     WIDTH,
+    WIDTH_PLACES,
 )
+from dt_pinion_spring_notes import THICK_BAND
 from dt_pinion_spring_spec import (
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
+    FORMED_TOLERANCE_MM,
     FREE_KINK_ANGLE,
     HOLE_CALLOUT_PRECISION,
     PAD_LEN_CALLOUT,
@@ -365,6 +390,319 @@ FRONT_HOLE_AXIS_ENDS = (
 TOP_HOLE_AXIS_ENDS = (
     HOLE_CENTER,
     (HOLE_CENTER[0], THICK, PAD_Z + PAD_WIDTH / 2.0 + HOLE_AXIS_OVERSHOOT),
+)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (dt_pinion_spring_geometry: the foot along +x to its free end, the strip's
+# thickness along +y up from the base top, its width across z, the pad
+# widening toward +z). The leaf is one strip blank, drilled, cut to its
+# outline and formed. The solid is the INSTALLED shape; the maker forms and
+# checks the FREE one, everything past the bend turned PRESET_DEG further
+# toward the strap about the bend's centre, so the foot bend's formed angle
+# is the installed 90 - BLADE_LEAN_DEG less the preset, and the kink's is the
+# same on either form. The developed length is the mid-surface's: the
+# model's wall lies outside its inside-surface path, so each arc adds its
+# angle times half the thickness. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_pinion_spring"
+_GEOM = "dt_pinion_spring_geometry"
+_SPEC = "dt_pinion_spring_spec"
+_SECTION = "dt_pinion_spring_section"
+_UNIT = (_SECTION, "UNIT")
+_FORMED = (FORMED_TOLERANCE_MM, -FORMED_TOLERANCE_MM)
+_NOTE_LINES = DRAWING_NOTES.split("\n")
+_INSTALLED_BEND_DEG = 90.0 - BLADE_LEAN_DEG
+_FREE_BEND_DEG = _INSTALLED_BEND_DEG - PRESET_DEG
+_FLICK = tuple((FLAT_TIP[i] - KINK_EXIT[i]) / FLAT_LEN for i in (0, 1))
+_ANGULAR = angular_band_deg(unit=UNIT)
+
+
+def _g(*names: str) -> tuple[tuple[str, str], ...]:
+    return tuple((_GEOM, name) for name in names)
+
+
+def _general(value: float, places: int) -> list[float]:
+    return limits(value, places, unit=UNIT)
+
+
+part_metadata(
+    model_sources=(
+        *_g("FOOT_END", "R_BEND", "KINK_C", "PAD_Z"),
+        (_SECTION, "THICK"),
+        (_SECTION, "WIDTH"),
+        (_SECTION, "PAD_WIDTH"),
+    ),
+    precision_sources=(
+        (_SPEC, "DRAWING_PRECISION"),
+        (_SPEC, "DRAWING_PRECISION_BY_NAME"),
+        (_SPEC, "HOLE_CALLOUT_PRECISION"),
+        (_GEOM, "HOLE_PLACES"),
+        (_SECTION, "WIDTH_PLACES"),
+    ),
+)
+requirement(
+    "strip",
+    kind="blank",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0), PlanarFace((0.0, 1.0, 0.0), THICK)),
+    requirements=("thickness",),
+    fields={
+        "section": ("strip", ((_SECTION, "THICK"), (_SECTION, "WIDTH"))),
+        "width": (WIDTH, ((_SECTION, "WIDTH"),)),
+        "thickness": (
+            limits(THICK, 5, THICK_BAND),
+            ((_SECTION, "THICK"), (_SECTION, "THICK_BAND")),
+        ),
+        "thickness_nominal": (THICK, ((_SECTION, "THICK"),)),
+        "developed_length": (
+            PATH_LEN + math.radians(_INSTALLED_BEND_DEG + KINK_DEG) * THICK / 2.0,
+            (*_g("PATH_LEN", "BLADE_LEAN_DEG", "KINK_DEG"), (_SECTION, "THICK")),
+        ),
+        "note": (_NOTE_LINES[0], ((_SPEC, "DRAWING_NOTES"),)),
+    },
+)
+requirement(
+    "aft_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), WIDTH / 2.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": -WIDTH / 2.0},
+            ((_SECTION, "WIDTH"),),
+        ),
+    },
+)
+requirement(
+    "strip_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), WIDTH / 2.0),),
+    requirements=("width",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": WIDTH / 2.0},
+            ((_SECTION, "WIDTH"),),
+        ),
+        "width": (
+            _general(WIDTH, WIDTH_PLACES),
+            (
+                (_SECTION, "WIDTH"),
+                (_SECTION, "WIDTH_PLACES"),
+                _UNIT,
+                (_SELF, "STRIP_WIDTH_TEXT_XY"),
+            ),
+        ),
+        "width_nominal": (WIDTH, ((_SECTION, "WIDTH"),)),
+        "width_from": ("aft_edge", ((_SELF, "_blank_dimensions"),)),
+    },
+    precision={"width": WIDTH_PLACES},
+)
+requirement(
+    "pad_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), PAD_Z + PAD_WIDTH / 2.0),),
+    requirements=("width",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": PAD_Z + PAD_WIDTH / 2.0},
+            (*_g("PAD_Z"), (_SECTION, "PAD_WIDTH")),
+        ),
+        "width": (
+            _general(PAD_WIDTH, _P["PadWidth"]),
+            ((_SECTION, "PAD_WIDTH"), _UNIT, (_SELF, "TOP_KEEP")),
+        ),
+        "width_nominal": (PAD_WIDTH, ((_SECTION, "PAD_WIDTH"),)),
+        "width_from": ("aft_edge", ((_SELF, "TOP_KEEP"),)),
+    },
+    precision={"width": _P["PadWidth"]},
+)
+requirement(
+    "free_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), FOOT_END[0]),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": FOOT_END[0]},
+            _g("FOOT_END"),
+        ),
+    },
+)
+requirement(
+    "pad_wing",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -(HOLE_X - PAD_WING_FROM_HOLE)),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": HOLE_X - PAD_WING_FROM_HOLE},
+            _g("HOLE_X", "PAD_WING_FROM_HOLE"),
+        ),
+        "length": (
+            _general(PAD_WING_FROM_HOLE, _P["PadLen"]),
+            (*_g("PAD_WING_FROM_HOLE"), _UNIT, (_SELF, "TOP_KEEP")),
+        ),
+        "length_nominal": (PAD_WING_FROM_HOLE, _g("PAD_WING_FROM_HOLE")),
+        "length_from": ("hole", ((_SELF, "TOP_KEEP"),)),
+        "callout": (DIMENSION_CALLOUTS["PadLen"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "hole_web_min": (PAD_HOLE_WEB_MIN, _g("PAD_HOLE_WEB_MIN")),
+    },
+    precision={"length": _P["PadLen"]},
+)
+requirement(
+    "pad_relief",
+    kind="profile",
+    faces=(CylinderFace(2.0 * PAD_RELIEF_R),),
+    requirements=("radius_max",),
+    fields={
+        "radius_max": (
+            PAD_RELIEF_R,
+            (
+                *_g("PAD_RELIEF_R"),
+                (_SPEC, "PAD_RELIEF_TOL_TYPE"),
+                (_SELF, "TOP_KEEP"),
+            ),
+        ),
+    },
+    precision={"radius_max": _P["PadReliefR"]},
+)
+requirement(
+    "hole",
+    kind="hole",
+    faces=(CylinderFace(HOLE_DIA),),
+    requirements=("dia", "x", "z", "thru"),
+    fields={
+        "at": ([HOLE_X, THICK, PAD_Z], (*_g("HOLE_X", "PAD_Z"), (_SECTION, "THICK"))),
+        "axis": ([0.0, -1.0, 0.0], ((_SECTION, "THICK"),)),
+        "dia": (
+            drilled_limits(HOLE_DIA, HOLE_CALLOUT_PRECISION, unit=UNIT),
+            (*_g("HOLE_DIA"), _UNIT, (_SPEC, "HOLE_CALLOUT_PRECISION")),
+        ),
+        "dia_nominal": (HOLE_DIA, _g("HOLE_DIA")),
+        "x": (
+            _general(HOLE_FROM_END, HOLE_PLACES),
+            (*_g("HOLE_FROM_END", "HOLE_PLACES"), _UNIT, (_SELF, "HOLE_END_TEXT_XY")),
+        ),
+        "x_nominal": (HOLE_FROM_END, _g("HOLE_FROM_END")),
+        "x_from": ("free_end", ((_SELF, "_blank_dimensions"),)),
+        "z": (
+            _general(PAD_WIDTH / 2.0, HOLE_PLACES),
+            (
+                (_SECTION, "PAD_WIDTH"),
+                *_g("HOLE_PLACES"),
+                _UNIT,
+                (_SELF, "HOLE_EDGE_TEXT_XY"),
+            ),
+        ),
+        "z_nominal": (PAD_WIDTH / 2.0, ((_SECTION, "PAD_WIDTH"),)),
+        "z_from": ("pad_edge", ((_SELF, "_blank_dimensions"),)),
+        "thru": (True, ((_SELF, "HOLE_PROCESS"),)),
+        "process": ("drill", ((_SELF, "HOLE_PROCESS"),)),
+        "drill": (HOLE_PROCESS, ((_SELF, "HOLE_PROCESS"),)),
+    },
+    precision={"dia": HOLE_CALLOUT_PRECISION, "x": HOLE_PLACES, "z": HOLE_PLACES},
+)
+requirement(
+    "bend",
+    kind="bend",
+    faces=(
+        CylinderFace(2.0 * R_BEND, contains_y_mm=BEND_CY / 2.0),
+        CylinderFace(2.0 * (R_BEND + THICK), contains_y_mm=BEND_CY / 2.0),
+    ),
+    requirements=("radius", "foot_len"),
+    fields={
+        "radius": (
+            limits(R_BEND, _P["BendR"], _FORMED),
+            (*_g("R_BEND"), (_SPEC, "FORMED_TOLERANCE_MM"), (_SELF, "FRONT_KEEP")),
+        ),
+        "radius_nominal": (R_BEND, _g("R_BEND")),
+        "angle": (_FREE_BEND_DEG, _g("BLADE_LEAN_DEG", "PRESET_DEG")),
+        "installed_angle_deg": (_INSTALLED_BEND_DEG, _g("BLADE_LEAN_DEG")),
+        "foot_len": (
+            limits(FOOT_FROM_HOLE, _P["FootLen"], _FORMED),
+            (
+                *_g("FOOT_FROM_HOLE"),
+                (_SPEC, "FORMED_TOLERANCE_MM"),
+                (_SELF, "FRONT_KEEP"),
+            ),
+        ),
+        "foot_len_nominal": (FOOT_FROM_HOLE, _g("FOOT_FROM_HOLE")),
+        "foot_len_from": ("hole", ((_SELF, "FRONT_ROW_EXTENSION_X"),)),
+        "note": (_NOTE_LINES[1], ((_SPEC, "DRAWING_NOTES"),)),
+    },
+    precision={"radius": _P["BendR"], "foot_len": _P["FootLen"]},
+)
+requirement(
+    "kink",
+    kind="bend",
+    faces=(
+        CylinderFace(2.0 * R_KINK, contains_y_mm=KINK_C[1]),
+        CylinderFace(2.0 * (R_KINK + THICK), contains_y_mm=KINK_C[1]),
+    ),
+    requirements=("radius", "free_h", "free_v", "included_angle_deg"),
+    fields={
+        "radius": (
+            limits(R_KINK, _P["KinkR"], _FORMED),
+            (*_g("R_KINK"), (_SPEC, "FORMED_TOLERANCE_MM"), (_SELF, "DETAIL_KEEP")),
+        ),
+        "radius_nominal": (R_KINK, _g("R_KINK")),
+        "angle": (KINK_DEG, _g("KINK_DEG")),
+        "included_angle_deg": (
+            [KINK_INCLUDED_DEG - _ANGULAR, KINK_INCLUDED_DEG + _ANGULAR],
+            (
+                *_g("KINK_INCLUDED_DEG"),
+                _UNIT,
+                ("_printed_tolerance", "angular_band_deg"),
+                (_SELF, "DETAIL_KEEP"),
+            ),
+        ),
+        "nominal_included_angle_deg": (KINK_INCLUDED_DEG, _g("KINK_INCLUDED_DEG")),
+        "free_h": (
+            limits(FREE_KINK_H, _P["FreeKinkH"], _FORMED),
+            (
+                *_g("FREE_KINK_H"),
+                (_SPEC, "FORMED_TOLERANCE_MM"),
+                (_SELF, "FRONT_KEEP"),
+            ),
+        ),
+        "free_h_nominal": (FREE_KINK_H, _g("FREE_KINK_H")),
+        "free_h_from": ("hole", ((_SELF, "FRONT_ROW_EXTENSION_X"),)),
+        "free_v": (
+            limits(FREE_KINK_V, _P["FreeKinkV"], _FORMED),
+            (
+                *_g("FREE_KINK_V"),
+                (_SPEC, "FORMED_TOLERANCE_MM"),
+                (_SELF, "FRONT_KEEP"),
+            ),
+        ),
+        "free_v_nominal": (FREE_KINK_V, _g("FREE_KINK_V")),
+        "free_v_from": ("strip", ((_SELF, "FRONT_KEEP"),)),
+        "callout": (DIMENSION_CALLOUTS["FreeKinkH"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "note": (_NOTE_LINES[2], ((_SPEC, "DRAWING_NOTES"),)),
+    },
+    precision={
+        "radius": _P["KinkR"],
+        "free_h": _P["FreeKinkH"],
+        "free_v": _P["FreeKinkV"],
+        "included_angle_deg": _P[FREE_KINK_ANGLE],
+    },
+)
+requirement(
+    "flat",
+    kind="profile",
+    faces=(
+        PlanarFace((*_FLICK, 0.0), FLAT_TIP[0] * _FLICK[0] + FLAT_TIP[1] * _FLICK[1]),
+    ),
+    requirements=("length",),
+    fields={
+        "length": (
+            _general(FLAT_LEN, _P["FlatLen"]),
+            (*_g("FLAT_LEN"), _UNIT, (_SELF, "DETAIL_KEEP")),
+        ),
+        "length_nominal": (FLAT_LEN, _g("FLAT_LEN")),
+        "length_from": ("kink", ((_SELF, "DETAIL_KEEP"),)),
+    },
+    precision={"length": _P["FlatLen"]},
 )
 
 

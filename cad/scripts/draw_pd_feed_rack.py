@@ -38,6 +38,10 @@ from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _feature_requirements import part_metadata, requirement
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -48,6 +52,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
+from _printed_limits import drilled_limits, limits
 import pd_feed_rack_callouts as callouts
 from pd_feed_rack_spec import (
     BAR_LENGTH,
@@ -56,13 +61,21 @@ from pd_feed_rack_spec import (
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_DIMENSIONS,
     DRAWING_SYMMETRIC_BANDS_MM,
+    GEAR_DATA,
+    PITCH,
+    PURCHASED_RACK_NOTE,
     RACK_HEIGHT,
+    RACK_THICKNESS,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH,
     TAP_DRILL_DIA,
     TAP_FACE_WALL_STATEMENT,
     TAP_SPEC,
     TAP_THREAD_DEPTH,
+    TAP_TOOTH_OFFSET_MAX,
+    TAP_X,
+    TAP_Z,
+    UNIT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -141,6 +154,213 @@ NOTE_HEIGHT = 0.0025
 # swDisplayMode_e.swSHADED; the getter may read it or swSHADED_EDGES (7).
 _SW_SHADED = 3
 _SHADED_MODES = (3, 7)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (pd_feed_rack_spec: length +X from
+# the left cut end, the flat top at Y=0 with the teeth toward +Y, the front
+# face at Z=0). Bands are the title block's rows at the places the sheet
+# prints (DRAWING_PRECISION_BY_NAME), TapStart its native symmetric band
+# (DRAWING_SYMMETRIC_BANDS_MM), the tap drill the DRILLED HOLES row and both
+# depths the callout's three places (TAP_CALLOUT_PRECISION). The section and
+# the teeth are the purchased strip's, printed (.1875) REF with the gear
+# data. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_feed_rack"
+_CALLOUTS = "pd_feed_rack_callouts"
+_FRAME = "__frame__"
+_CALLOUT = ((_SELF, "build"),)
+_HOLE_PLACES = TAP_CALLOUT_PRECISION["hw-tapdrldia"]
+_DEPTH_PLACES = TAP_CALLOUT_PRECISION["hw-tapdrldepth"]
+_THREAD_PLACES = TAP_CALLOUT_PRECISION["hw-threaddepth"]
+# The drill point the blind tap drills end in (the Hole Wizard's 118°).
+_DRILL_POINT_HALF_ANGLE_DEG = TAP_SPEC.drill_angle_deg / 2.0
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(_FRAME, "BAR_LENGTH", "RACK_HEIGHT", "RACK_THICKNESS"),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        "DRAWING_SYMMETRIC_BANDS_MM",
+        "TAP_CALLOUT_PRECISION",
+        (_SELF, "build"),
+    ),
+)
+requirement(
+    "left_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", 0.0), (_FRAME,))},
+)
+# The cut length 10.62 (FRONT_KEEP "Length"), from the left end.
+requirement(
+    "right_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), BAR_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", BAR_LENGTH), ("BAR_LENGTH",)),
+        "length": (
+            limits(BAR_LENGTH, _P["Length"], unit=UNIT),
+            ("BAR_LENGTH", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "length_nominal": (BAR_LENGTH, ("BAR_LENGTH",)),
+        "length_from": ("left_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["Length"]},
+)
+# The flat top the taps open on (the bottom view's face).
+requirement(
+    "flat_top",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", 0.0), (_FRAME,))},
+)
+# The tooth crests: the strip's (.1875) REF height from the flat top
+# (FRONT_KEEP "RackHeight"), the purchased teeth's gear data and their
+# circular pitch (pi / the printed 32 DP), the tap stations' whole teeth.
+requirement(
+    "teeth",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), RACK_HEIGHT),),
+    requirements=("height_ref", "gear_data", "stock"),
+    fields={
+        "plane": (_plane("y", RACK_HEIGHT), ("RACK_HEIGHT",)),
+        "height_ref": (RACK_HEIGHT, ("RACK_HEIGHT", "DRAWING_REFERENCE_DIMENSIONS")),
+        "height_ref_from": ("flat_top", ((_SELF, "FRONT_KEEP"),)),
+        "gear_data": (GEAR_DATA, ("GEAR_DATA",)),
+        "stock": (PURCHASED_RACK_NOTE, ("PURCHASED_RACK_NOTE",)),
+        "pitch_ref": (PITCH, ("PITCH",)),
+    },
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", 0.0), (_FRAME,))},
+)
+# The strip's (.1875) REF face width from the front face (END_KEEP "RackDepth").
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), RACK_THICKNESS),),
+    requirements=("depth_ref",),
+    fields={
+        "plane": (_plane("z", RACK_THICKNESS), ("RACK_THICKNESS",)),
+        "depth_ref": (
+            RACK_THICKNESS,
+            ("RACK_THICKNESS", "DRAWING_REFERENCE_DIMENSIONS"),
+        ),
+        "depth_ref_from": ("front_face", ((_SELF, "END_KEEP"),)),
+    },
+)
+_THREAD = (f"{TAP_SPEC.size} UNF-2B", ("TAP_SPEC", *_CALLOUT))
+# The four #0-80 taps down from the flat top: one native callout (4X Ø.047
+# ↓.129, #0-80 UNF ↓.110, ON TOOTH CENTRES ±.005 and the engagement under
+# it); the first tap's station from the left end at its own ±.05 window
+# (BOTTOM_KEEP "TapStart"), the other three from the first (TapStation2-4),
+# all across from the front face (TapFromFront); the walls are the sheet
+# note's (NOTES_TEXT).
+for _index, _x in enumerate(TAP_X, 1):
+    _station = (
+        {
+            "station": (
+                limits(
+                    _x,
+                    _P["TapStart"],
+                    (
+                        DRAWING_SYMMETRIC_BANDS_MM["TapStart"],
+                        -DRAWING_SYMMETRIC_BANDS_MM["TapStart"],
+                    ),
+                    unit=UNIT,
+                ),
+                ("TAP_X", "DRAWING_SYMMETRIC_BANDS_MM", (_SELF, "BOTTOM_KEEP")),
+            ),
+            "station_nominal": (_x, ("TAP_X", "DRAWING_NOMINALS_MM")),
+            "station_from": ("left_end", ((_SELF, "BOTTOM_KEEP"),)),
+        }
+        if _index == 1
+        else {
+            "station": (
+                limits(_x - TAP_X[0], _P[f"TapStation{_index}"], unit=UNIT),
+                ("TAP_X", "UNIT", (_SELF, "BOTTOM_KEEP")),
+            ),
+            "station_nominal": (_x - TAP_X[0], ("TAP_X", "DRAWING_NOMINALS_MM")),
+            "station_from": ("tap_1", ((_SELF, "BOTTOM_KEEP"),)),
+            "station_axis": ("x", (_FRAME,)),
+        }
+    )
+    requirement(
+        f"tap_{_index}",
+        kind="threaded_hole",
+        faces=(
+            CylinderFace(TAP_DRILL_DIA, contains_x_mm=_x),
+            ConeFace(_DRILL_POINT_HALF_ANGLE_DEG, contains_x_mm=_x),
+        ),
+        requirements=(
+            "thread",
+            "dia",
+            "drill_depth",
+            "thread_depth",
+            "station",
+            "inset",
+            "tooth_offset_max",
+        ),
+        fields={
+            "at": ([_x, 0.0, TAP_Z], ("TAP_X", "TAP_Z", _FRAME)),
+            "axis": ([0.0, 1.0, 0.0], ("TAP_SPEC", _FRAME)),
+            "thread": _THREAD,
+            "dia": (
+                drilled_limits(TAP_DRILL_DIA, _HOLE_PLACES, unit=UNIT),
+                ("TAP_DRILL_DIA", "UNIT", "TAP_CALLOUT_PRECISION", *_CALLOUT),
+            ),
+            "nominal_dia": (TAP_DRILL_DIA, ("TAP_DRILL_DIA",)),
+            "drill_depth": (
+                limits(TAP_DRILL_DEPTH, _DEPTH_PLACES, unit=UNIT),
+                ("TAP_DRILL_DEPTH", "UNIT", "TAP_CALLOUT_PRECISION", *_CALLOUT),
+            ),
+            "drill_depth_nominal": (TAP_DRILL_DEPTH, ("TAP_DRILL_DEPTH",)),
+            "thread_depth": (
+                limits(TAP_THREAD_DEPTH, _THREAD_PLACES, unit=UNIT),
+                ("TAP_THREAD_DEPTH", "UNIT", "TAP_CALLOUT_PRECISION", *_CALLOUT),
+            ),
+            "thread_depth_nominal": (TAP_THREAD_DEPTH, ("TAP_THREAD_DEPTH",)),
+            **_station,
+            "inset": (
+                limits(TAP_Z, _P["TapFromFront"], unit=UNIT),
+                ("TAP_Z", "UNIT", (_SELF, "BOTTOM_KEEP")),
+            ),
+            "inset_nominal": (TAP_Z, ("TAP_Z",)),
+            "inset_from": ("front_face", ((_SELF, "BOTTOM_KEEP"),)),
+            "tooth_offset_max": (
+                TAP_TOOTH_OFFSET_MAX,
+                ("TAP_TOOTH_OFFSET_MAX", (_CALLOUTS, "TOOTH_CENTRE_STATEMENT")),
+            ),
+            "callout": (
+                TAP_CALLOUT_BELOW,
+                ((_CALLOUTS, "TAP_CALLOUT_BELOW"), *_CALLOUT),
+            ),
+            "walls": (
+                TAP_FACE_WALL_STATEMENT,
+                ("TAP_FACE_WALL_STATEMENT", (_SELF, "NOTES_TEXT")),
+            ),
+        },
+        precision={
+            "dia": _HOLE_PLACES,
+            "drill_depth": _DEPTH_PLACES,
+            "thread_depth": _THREAD_PLACES,
+            "station": _P["TapStart" if _index == 1 else f"TapStation{_index}"],
+            "inset": _P["TapFromFront"],
+        },
+    )
 
 
 def _require_saved_taps(model: Any) -> None:
