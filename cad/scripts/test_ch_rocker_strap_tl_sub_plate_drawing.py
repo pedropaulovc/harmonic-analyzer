@@ -147,7 +147,9 @@ def test_the_hub_tap_states_its_worst_case_engagement() -> None:
     assert spec.HUB_ENGAGEMENT_STATEMENT == "ENGAGEMENT .18 MIN (.97D)"
     assert spec.HUB_THREAD_LENGTH_MIN < spec.HUB_THREAD_REQUIRED
     exception = _config.parts(spec.PART_NAME)["machinist_exceptions"][0]
-    assert exception["id"] == "RV-01" and "(1.01D)" in exception["finding"]
+    assert exception["id"] == "RV-01" and ".97D floored" in exception["finding"]
+    assert exception["finding"].index(".23 in") < exception["finding"].index(".186")
+    assert "precedent: owner RV-01 2026-11-17" in exception["reason"]
     assert "Owner ruling 2026-11-23" in exception["reason"]
     assert "Use a 1/4-20 hub screw." in exception["reason"]
     for word in ("ACCEPT", "RULING", "RULE", "OWNER"):

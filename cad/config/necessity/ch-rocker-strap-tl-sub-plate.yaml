@@ -28,7 +28,9 @@
 # PITBULL-INST-0426, which gives no slot tolerance). The wall's band alone
 # spends .004 of that .0075 at +/-.002; at the title block's +/-.005 it is
 # .010, more than the whole throw, so a plate in print can block the blank
-# or leave the knife short of it. Codjiflo review of #3727 round 1 (P1).
+# or leave the knife short of it. Codjiflo review of #3727 round 1 (P1);
+# kept by delegated ruling 2026-11-26 (Main), D55 amended; owner review
+# #2144. The nominal gap equals C: #3730 (owner, geometry).
 necessity:
   - id: N-01
     feature: "sheet 1, front view, hub hole location 6.000 ±.002 and 1.000 ±.002"
@@ -37,6 +39,6 @@ necessity:
     source: "ch_rocker_strap_tl_vn_hub_washer_spec.WORST_CLEARANCE"
   - id: N-02
     feature: "sheet 1, SECTION A-A, pocket back wall location 4X 1.875 ±.002"
-    kind: gap
+    kind: bought_seat
     reason: "clamp's .0075 throw must take up wall band and blank"
     source: "ch_rocker_strap_tl_vn_edge_clamp_spec catalogue C (.375) and the Pitbull 26000's .0075 total throw: a .004 band at +/-.002, .010 at the title block's +/-.005"

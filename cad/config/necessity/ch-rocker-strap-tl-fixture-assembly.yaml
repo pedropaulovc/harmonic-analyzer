@@ -15,10 +15,11 @@
 # ch_rocker_strap_tl_sub_plate_spec.PLAN_FENCE_NOTCH_DEPTH). At .001 a notch
 # moves .0005 (.0020 left); at the title block's .010 it moves .0049, past
 # the .0025, and the 1/8 in cutter cuts the notch wall. The reading is no
-# narrower than its shop row (lever test indicator, .0005). Precedent: the
-# keyed arbor kit's N-01 (dt-cone-gear-tl-arbor-assembly.yaml, a .001
-# indicator setting kept on its necessity entry). Codjiflo review of #3727
-# round 1 (P1).
+# narrower than its shop row (lever test indicator, .0005). Kept by
+# delegated ruling 2026-11-26 (Main), precedent: the keyed arbor kit's N-01
+# (dt-cone-gear-tl-arbor-assembly.yaml, a .001 indicator setting kept on its
+# necessity entry); owner review #2144 (D55 amended). Codjiflo review of
+# #3727 round 1 (P1).
 necessity:
   - id: N-01
     feature: "sheet 1, fitting step 4: CHECK: THE INDICATOR READS WITHIN .001 (fence along X)"
