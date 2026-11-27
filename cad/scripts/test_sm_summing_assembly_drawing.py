@@ -430,16 +430,13 @@ def test_a_bonded_loose_dowel_is_held_at_its_proud_and_re_read_after_cure() -> N
     assert "DOES NOT TURN OR SLIDE BY HAND" in steps["1H"]
     assert f"DOWEL PROUD SET ON {notes.DETAIL_TITLE}" in steps["1H"]
     # D54 item 4 (Main, 2026-11-27): a dowel that moves pulls out and is
-    # bonded again; a held one standing high is stoned down, one standing
-    # low goes back with the top frame (no acceptance number is printed).
+    # bonded again; a held one standing high is stoned down.  One standing
+    # low has no printed remedy until the owner rules (#3646).
     assert steps["1J"] == "1J. IF A DOWEL TURNS OR SLIDES, PULL IT OUT OF ITS HOLE."
     assert steps["1L"] == "1L. IF PULLED AT 1J, REDO FROM 1B."
     assert steps["1M"].endswith("STONE ITS END DOWN TO IT.")
-    assert steps["1N"].startswith(
-        "1N. IF A HELD DOWEL STANDS BELOW THE DOWEL PROUD, RETURN THE TOP FRAME"
-    )
-    assert steps["1P"].startswith("1P. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54")
-    labels = "1B 1C 1D 1E 1F 1G 1H 1J 1K 1L 1M 1N 1P".split()
+    assert steps["1N"].startswith("1N. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54")
+    labels = "1B 1C 1D 1E 1F 1G 1H 1J 1K 1L 1M 1N".split()
     for label in labels:
         assert steps[label].count(". ") == 1, steps[label]
     bond_note = notes.BOND_NOTE_A

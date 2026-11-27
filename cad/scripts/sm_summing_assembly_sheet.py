@@ -346,15 +346,14 @@ ASSEMBLY_STEPS = (
     # pulls out cold and is bonded again from 1B; a held dowel that stands
     # high is stoned down (the mount's slip hole clears the tip by
     # SLIP_DEPTH_CLEARANCE_MIN, 1.78 mm, at the printed maximum proud).  A
-    # held dowel that stands low goes back with the top frame; accepting it
-    # would widen the printed proud dimension, the owner's call (#3646).
+    # held dowel that stands low has no printed remedy yet: its repair (an
+    # oversize dowel with its own number, ream, bond and acceptance) or
+    # accepting it (widening the printed proud) is the owner's (#3646).
     "1J. IF A DOWEL TURNS OR SLIDES, PULL IT OUT OF ITS HOLE.",
     "1K. IF PULLED AT 1J, CLEAN THE DOWEL AND ITS HOLE TO BARE METAL.",
     "1L. IF PULLED AT 1J, REDO FROM 1B.",
     "1M. IF A HELD DOWEL STANDS ABOVE THE DOWEL PROUD, STONE ITS END DOWN TO IT.",
-    "1N. IF A HELD DOWEL STANDS BELOW THE DOWEL PROUD, RETURN THE TOP FRAME "
-    "MHA-FR-02 FOR A CARBIDE DRILL-OUT AND AN OVERSIZE DOWEL.",
-    "1P. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
+    "1N. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
     "2. THREAD MHA-SM-VN-50 INTO THE TAPPED BOSS OF MHA-SM-03 UNTIL ITS CUT "
     "END IS WITHIN HALF A TURN OF FLUSH WITH THE BOSS UNDERSIDE, FINISHING "
     "WITH THE EYE OPENING TOWARD THE KNIFE EDGE AND THE EYE PLANE SQUARE TO IT.",
