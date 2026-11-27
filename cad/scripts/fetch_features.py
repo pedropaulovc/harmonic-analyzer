@@ -45,6 +45,16 @@ declarations, keeping its geometry inputs: the seat-free step after a
 ``requirement(...)`` edit (``export_features.py <stem>`` alone writes no
 geometry inputs, so the bundle it binds is refused).
 
+``--trust-step`` in its place stamps a bundle restored by hand (the labelled
+STEPs and ``.faces.json`` inventories copied from a farm run's
+``out/features/<stem>/``, or a bundle bound before #3668): it binds
+``features.toml`` from this checkout's declarations and records this
+checkout's geometry inputs, refusing nothing. It cannot see what geometry the
+STEP was built from, so it warns for each part: use it only for a STEP built
+from this checkout's geometry inputs (a farm run of this commit, or of one
+whose ``--check`` findings would be empty). A release asset needs no such
+step: fetching it stamps it, or reports it STALE.
+
 With the bundle in place, the part's traveler and NC programs run seat-free
 without doit (whose ``prechips:<stem>``/``cam:<stem>`` tasks would first try to
 rebuild the bundle):
@@ -221,6 +231,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="fetch nothing: rebind current bundles under --out to this checkout's declarations",
     )
+    local.add_argument(
+        "--trust-step",
+        action="store_true",
+        help=(
+            "fetch nothing: bind and stamp hand-restored bundles under --out as this "
+            "checkout's, trusting that their STEPs were built from its geometry"
+        ),
+    )
     args = parser.parse_args(argv)
     stems = (
         list(export_features.SUPPORTED_PARTS)
@@ -234,8 +252,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     _telemetry.set_service("fetch-features")
     _telemetry.configure()
-    if args.check or args.rebind:
+    if args.check or args.rebind or args.trust_step:
         try:
+            if args.trust_step:
+                return trust_step(stems, Path(args.out))
             return check(stems, Path(args.out), rebind_current=args.rebind)
         except FeatureFaceError as exc:
             _telemetry.error(f"fetch-features: declarations do not bind: {exc}")
@@ -350,19 +370,7 @@ def check(stems: list[str], out: Path, *, rebind_current: bool = False) -> int:
         how = ""
         if rebind_current:
             try:
-                with tempfile.TemporaryDirectory(prefix="fetch-features-") as scratch:
-                    staging = Path(scratch)
-                    shutil.copytree(
-                        out / "features" / stem, staging / "features" / stem
-                    )
-                    rebind(stem, staging)
-                    validate_bundle(stem, staging)
-                    manifest = export_features.bundle_paths(stem, out)[0]
-                    partial = manifest.with_suffix(".toml.partial")
-                    shutil.copyfile(
-                        export_features.bundle_paths(stem, staging)[0], partial
-                    )
-                    partial.replace(manifest)
+                _rebind_staged(stem, out)
             except (FetchError, FeaturesBoundError) as exc:
                 stale += 1
                 _telemetry.warn(f"fetch-features: {stem}: {exc}", stem=stem)
@@ -372,6 +380,45 @@ def check(stems: list[str], out: Path, *, rebind_current: bool = False) -> int:
             f"fetch-features: {stem}: current for this checkout{how}", stem=stem
         )
     return 2 if stale else 0
+
+
+def _rebind_staged(stem: str, out: Path) -> None:
+    """:func:`rebind` ``stem``'s bundle under ``out`` in a scratch copy,
+    replacing its ``features.toml`` only once the copy binds and validates."""
+    with tempfile.TemporaryDirectory(prefix="fetch-features-") as scratch:
+        staging = Path(scratch)
+        shutil.copytree(out / "features" / stem, staging / "features" / stem)
+        rebind(stem, staging)
+        validate_bundle(stem, staging)
+        manifest = export_features.bundle_paths(stem, out)[0]
+        partial = manifest.with_suffix(".toml.partial")
+        shutil.copyfile(export_features.bundle_paths(stem, staging)[0], partial)
+        partial.replace(manifest)
+
+
+def trust_step(stems: list[str], out: Path) -> int:
+    """``--trust-step``: bind and stamp each hand-restored bundle under ``out``
+    as this checkout's, warning that its STEP is trusted, not checked. 1 if
+    any bundle has no STEP or inventory or does not validate."""
+    failed = 0
+    for stem in stems:
+        _telemetry.warn(
+            f"fetch-features: {stem}: TRUSTING the STEP under {out / 'features' / stem}: "
+            "stamping this checkout's geometry inputs without checking the STEP was "
+            "built from them; a STEP from other geometry gives wrong travelers and NC",
+            stem=stem,
+        )
+        try:
+            _rebind_staged(stem, out)
+        except (FetchError, FeaturesBoundError, OSError) as exc:
+            failed += 1
+            _telemetry.error(f"fetch-features: {stem}: {exc}", stem=stem)
+            continue
+        _telemetry.info(
+            f"fetch-features: {stem}: features.toml bound and stamped for this checkout",
+            stem=stem,
+        )
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

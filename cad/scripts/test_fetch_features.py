@@ -239,6 +239,37 @@ def test_check_reports_a_copied_bundle_against_this_checkout(
     assert "unreadable bundle" in capsys.readouterr().err
 
 
+def test_trust_step_stamps_a_bundle_restored_from_a_farm_run(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    _release(monkeypatch, tmp_path)
+    published = export_features.bundle_paths(UNDECLARED, tmp_path / "published")
+    # A farm run's out/features/<stem>/: the STEP and its inventory, copied by hand.
+    out = tmp_path / "restored"
+    manifest, step = export_features.bundle_paths(UNDECLARED, out)
+    step.parent.mkdir(parents=True)
+    step.write_bytes(published[1].read_bytes())
+    inventory_path(step).write_bytes(inventory_path(published[1]).read_bytes())
+    assert fetch_features.main(["--check", UNDECLARED, "--out", str(out)]) == 2
+    capsys.readouterr()
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 0
+    assert f"{UNDECLARED}: TRUSTING the STEP" in capsys.readouterr().err
+    assert (
+        manifest.read_bytes() == published[0].read_bytes() + _stamp(UNDECLARED).encode()
+    )
+    assert fetch_features.main(["--check", UNDECLARED, "--out", str(out)]) == 0
+    # A stamped bundle is bound and stamped afresh, not refused as stamped.
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 0
+    assert (
+        manifest.read_bytes() == published[0].read_bytes() + _stamp(UNDECLARED).encode()
+    )
+    # Nothing restored: refused, nothing written.
+    assert fetch_features.main(["--trust-step", DECLARED, "--out", str(out)]) == 1
+    assert not (out / "features" / DECLARED).exists()
+    with pytest.raises(SystemExit):
+        fetch_features.main(["--trust-step", "--check", UNDECLARED, "--out", str(out)])
+
+
 def test_a_bundle_that_does_not_bind_its_step_is_refused(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
