@@ -163,7 +163,7 @@ def sub_step(key: str, index: int) -> str:
 # MHA-SM-00's last step before its own AT FINAL ASSEMBLY step (that sheet
 # imports this package's step numbers, so the number is stated here and
 # test_ha_assembly_package holds it to the MHA-SM-00 sequence).
-SM_LAST_BENCH_STEP = "8D"
+SM_LAST_BENCH_STEP = "8G"
 # MHA-MS-00's in-use steps that set a bar with the stick (#2434, delegated
 # ruling 2026-11-17, no precedent, option 2, owner review on #2144), stated
 # as SM_LAST_BENCH_STEP is and held to
