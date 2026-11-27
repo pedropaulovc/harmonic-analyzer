@@ -6,8 +6,8 @@ The 3-jaw closes no smaller than Ø.175 and the 4-jaw no smaller than Ø.2865
 Ø.125 rod (#3498), the pinion cam pin's Ø.156 rod (#3499) and the cone tip
 end screw's .249 crests (#3496) are under them, so each plan makes a split
 bush of the 1/2 in brass bar on hand and holds the part in it (delegated
-ruling 2026-11-27 (Main), precedent: the transgear pin's split bush, #3494;
-owner review #2144 (D57)). These tests hold the plans to that: no lathe
+ruling 2026-11-27 (Main), no precedent (pattern: the transgear pin's split
+bush, #3494); owner review #2144 (D57)). These tests hold the plans to that: no lathe
 setup grips the part, the bush lies in its chuck's range, and its hole takes
 the part with a clearance the slit closes.
 """
