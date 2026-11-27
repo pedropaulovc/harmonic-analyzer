@@ -343,10 +343,17 @@ def test_trust_step_refuses_while_a_member_step_is_still_bound_to_other_geometry
     assert "TRUSTING" not in err
     assert manifest.read_bytes() == stamped
     # One member restored too: the other still binds, still refused.
-    first, second = members.values()
+    (kept, first), (_, second) = members.items()
     rewrite_step(first, first.read_bytes() + b"\n/* rebuilt */")
     assert fetch_features.main(["--trust-step", MEMBERED, "--out", str(out)]) == 2
     assert manifest.read_bytes() == stamped
+    # Were the untouched member no longer one of the part's (a configuration
+    # dropped by the geometry change), its leftover file proves nothing.
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            export_features, "member_step_paths", lambda *_args: {kept: first}
+        )
+        assert fetch_features._bound_to_other_geometry(MEMBERED, out) == []
     # Every STEP restored: nothing binds the old geometry, so it is trusted.
     rewrite_step(second, second.read_bytes() + b"\n/* rebuilt */")
     capsys.readouterr()

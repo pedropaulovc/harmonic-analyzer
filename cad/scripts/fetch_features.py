@@ -401,24 +401,24 @@ def _rebind_staged(stem: str, out: Path) -> None:
 
 
 def _binds_a_recorded_step(stem: str, out: Path, table: dict) -> bool:
-    """Does ``stem``'s manifest ``table`` still record the bytes of a STEP
-    under ``out``: the primary (:func:`check_binding`) or any member under
-    ``member_steps``?"""
-    try:
-        check_binding(stem, out)
-        return True
-    except FetchError:
-        pass
-    members = table.get("member_steps")
-    if table.get("part") != stem.replace("_", "-") or not isinstance(members, dict):
+    """Does ``stem``'s manifest ``table`` still record the bytes of one of the
+    checkout's STEPs under ``out``: the primary, or a current member under its
+    ``member_steps`` entry? Only the checkout's own STEP paths are read, so a
+    member STEP left behind by a since-removed configuration says nothing."""
+    if table.get("part") != stem.replace("_", "-"):
         return False
-    bundle = export_features.bundle_paths(stem, out)[0].parent
-    for entry in members.values():
-        if not isinstance(entry, dict) or not isinstance(entry.get("step"), str):
+    step = export_features.bundle_paths(stem, out)[1]
+    candidates = [(step, table)]
+    members = table.get("member_steps")
+    if isinstance(members, dict):
+        for cfg, path in export_features.member_step_paths(stem, out).items():
+            if isinstance(members.get(cfg), dict):
+                candidates.append((path, members[cfg]))
+    for path, entry in candidates:
+        if entry.get("step") != path.name:
             continue
-        member = bundle / entry["step"]
         try:
-            digest = hashlib.sha256(member.read_bytes()).hexdigest()
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
         except OSError:
             continue
         if digest == entry.get("step_sha256"):
