@@ -269,6 +269,25 @@ ASSEMBLED_NOTES = (
 # frame's own weight carries the coated dowel, stood on the gauge blocks,
 # up to the proud.
 DOWEL_PROUD = _length(knife_dowel.PROUD, 3)
+# Delegated ruling 2026-11-26 (Main), no precedent; owner form timed out on
+# this option; owner review #2144 (D56): a held dowel standing low is
+# accepted while it still keys the knife mount over the model's own 1.5 D
+# floor (sm_vn_knife_mount_dowel_spec PRESS_ENGAGEMENT_MIN_D and
+# SLIP_ENGAGEMENT_D_MIN: proud less the free end's crown), rounded up to the
+# printed place: (1.5 x 3.175 + 0.406) mm = .2035, printed .204.
+DOWEL_PROUD_FLOOR = render_number(
+    math.ceil(
+        (
+            knife_dowel.PRESS_ENGAGEMENT_MIN_D * knife_dowel.DIA
+            + knife_dowel.FREE_END_LEN
+        )
+        / LENGTH_UNITS[UNIT]
+        * 1000
+    )
+    / 1000,
+    UNIT,
+    3,
+)
 BOND_NOTE_A = (
     f"BOND NOTE A, {BOND_GRADE} (STEPS 1E-1G): DEGREASE DOWEL AND HOLE; COAT "
     "THE DOWEL, NEVER THE BLIND HOLE; SEAT IT WITHIN THE FIXTURE TIME AND "
@@ -346,12 +365,16 @@ ASSEMBLY_STEPS = (
     # pulls out cold and is bonded again from 1B; a held dowel that stands
     # high is stoned down (the mount's slip hole clears the tip by
     # SLIP_DEPTH_CLEARANCE_MIN, 1.78 mm, at the printed maximum proud).  A
-    # held dowel that stands low is the owner's (#3646 stays open for it).
+    # held dowel that stands low is accepted down to DOWEL_PROUD_FLOOR (D56,
+    # above); under it the top frame goes back for a drill-out (#3646).
     "1J. IF A DOWEL TURNS OR SLIDES, PULL IT OUT OF ITS HOLE.",
     "1K. IF PULLED, CLEAN THE DOWEL AND ITS HOLE TO BARE METAL.",
     "1L. IF PULLED, REDO FROM 1B.",
     "1M. IF A HELD DOWEL STANDS ABOVE THE DOWEL PROUD, STONE ITS END DOWN TO IT.",
-    "1N. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
+    f"1N. IF A HELD DOWEL STANDS LOW BUT AT LEAST {DOWEL_PROUD_FLOOR} PROUD, ACCEPT IT.",
+    f"1P. IF ONE STANDS UNDER {DOWEL_PROUD_FLOOR}, RETURN THE TOP FRAME FOR A CARBIDE "
+    "DRILL-OUT AND AN OVERSIZE DOWEL.",
+    "1Q. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
     "2. THREAD MHA-SM-VN-50 INTO THE TAPPED BOSS OF MHA-SM-03 UNTIL ITS CUT "
     "END IS WITHIN HALF A TURN OF FLUSH WITH THE BOSS UNDERSIDE, FINISHING "
     "WITH THE EYE OPENING TOWARD THE KNIFE EDGE AND THE EYE PLANE SQUARE TO IT.",
