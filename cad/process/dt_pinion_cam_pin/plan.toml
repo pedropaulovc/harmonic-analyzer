@@ -266,7 +266,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The trial offcut in the split bush, {{process.end_stickout_in:.2dot}} in out of the bush's front face; the bush in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the offcut cannot be turned by hand."
 datum = "Z0 (carriage DRO) the offcut's end, faced in Op 90, touched with the ball turner's tip in Op 120."
-diagram = { file = "diagrams/trial.svg", alt = "To scale: the trial offcut in the split bush, its end faced; the ball turner's pivot on the axis one radius behind the faced end, its bit swept from the apex toward you." }
+diagram = { file = "diagrams/trial.svg", alt = "To scale: the trial offcut in the split bush, the bush in the 3-jaw with its nick at jaw 1, the end .40 out: the AR tool faces it square." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{process.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -304,6 +304,7 @@ sizing = "other"
 instruction = "Spindle on. Cross slide in until the bit just touches the corner somewhere in the sweep. Sweep the frame from parallel to the axis round toward you to {{cad.dome_far_form_sweep_deg:.0f}}°, never toward the chuck; cross slide in .003 at most, sweep again. The last sweeps take .001."
 settings = "lathe-ball-turner-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
+diagram = { file = "diagrams/trial-crown.svg", alt = "To scale: the trial offcut in the split bush, its end faced; the ball turner's pivot on the axis one radius behind the faced end, its bit swept from the apex toward you." }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -327,7 +328,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round in the split bush: end B {{process.end_stickout_in:.2dot}} in out of the bush's front face, end A toward the chuck; the bush in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the blank cannot be turned by hand."
 datum = "End B's length is read by micrometer across both faces (Op 190). For the crown the DRO Z is zeroed where the ball turner's tip touches end B's faced end (Op 210)."
-diagram = { file = "diagrams/end-b.svg", alt = "To scale: the blank turned round in the split bush, end B out: faced to length, then crowned by the ball turner swept about its pivot on the axis." }
+diagram = { file = "diagrams/end-b.svg", alt = "To scale: the blank turned round in the split bush, end B .40 out: the AR tool faces it to length." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{process.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -367,6 +368,7 @@ sizing = "other"
 instruction = "Spindle on. Cross slide in until the bit just touches end B's corner somewhere in the sweep. Sweep from parallel to the axis round toward you to {{cad.dome_far_form_sweep_deg:.0f}}°, never toward the chuck; cross slide in .003 at most, sweep again. The last sweeps take .001."
 settings = "lathe-ball-turner-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
+diagram = { file = "diagrams/end-b-crown.svg", alt = "To scale: end B faced to length in the split bush; the ball turner's pivot on the axis one radius behind it, its bit swept from the apex toward you to form the crown." }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -400,7 +402,7 @@ instruction = "Repeat Ops 180–280 on the second blank."
 machine_kind = "other"
 title = "Bench: break the edge, check, oil"
 machine = "Bench"
-holding = "Bench vise with soft jaws, the pin gripped lightly over the brass shim wrap on its O.D., the end being filed just clear of the jaws."
+holding = "Bench vise with soft jaws closed lightly on the split bush, the pin in the bush, the end being filed just clear of the bush's face."
 indexing = "none"
 envelope = "other"
 vise_hold = "other"

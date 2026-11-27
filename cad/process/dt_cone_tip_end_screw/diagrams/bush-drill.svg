@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" width="760" height="460" font-family="sans-serif" font-size="13">
-  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the Ø.500 x .30 brass piece (bush_dia_in, bush_length_in) in the 6 in 4-jaw on the jaws' front step over its whole length, its face at the jaw fronts. The jaws and the chuck's body are schematic (their sizes and the step's depth are not on record; drawn .30 deep). The E drill to scale (Ø.2500 = 75 px), its 118 deg point, its full diameter drawn .05 past the piece's back end, into the opening between the jaws. Drawn short to a break line (its length out of the chuck is not on record). The centre drill's spot is not drawn. -->
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the Ø.500 x .30 brass piece (bush_dia_in, bush_length_in) in the 6 in 4-jaw on the jaws' front step, its face .10 out of the jaw fronts (bush_face_out_in). The jaws and the chuck's body are schematic (their sizes and the step's depth are not on record; drawn .30 deep). The E drill to scale (Ø.2500 = 75 px), its 118 deg point, its full diameter drawn .05 past the piece's back end, into the opening between the jaws. Drawn short to a break line (its length out of the chuck is not on record). The centre drill's spot is not drawn. -->
   <rect class="paper" x="0" y="0" width="760" height="460"/>
   <text class="title" x="20" y="22">Setup 1, Op 30: the E drill from the tailstock right through the piece (to scale, 300 px/in)</text>
   <path class="clamp" d="M400 145L400 85L133.9 85L133.9 130L310 130L310 145Z"/>
   <path class="clamp" d="M400 295L400 355L133.9 355L133.9 310L310 310L310 295Z"/>
   <rect class="fixture-vise" x="73.9" y="64" width="60" height="312"/>
   <line class="centre-line" x1="80" y1="220" x2="750" y2="220"/>
-  <rect class="part-kept" x="310" y="145" width="90" height="150"/>
-  <path class="cutter" d="M740 182.5L295 182.5L272.47 220L295 257.5L740 257.5L737 242.5L740 227.5L737 212.5L740 197.5Z"/>
+  <rect class="part-kept" x="340" y="145" width="90" height="150"/>
+  <path class="cutter" d="M740 182.5L325 182.5L302.47 220L325 257.5L740 257.5L737 242.5L740 227.5L737 212.5L740 197.5Z"/>
   <line class="arrow" x1="720" y1="166.5" x2="660" y2="166.5"/>
   <text class="label" x="470" y="410">E drill right through in one</text>
   <text class="label" x="470" y="426">steady feed (1.2 diameters deep)</text>

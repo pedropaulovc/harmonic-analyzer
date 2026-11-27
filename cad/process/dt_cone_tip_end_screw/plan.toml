@@ -25,7 +25,9 @@
 # that carries the drills are not on record (#3754).
 #
 # Bought, not stock (owner ruling 2026-11-20, #2368, as MHA-DT-09): no stock
-# row; the stock BOM reads the registry SKU. The brass is the bush's. Every
+# row; the stock BOM reads the registry SKU, which a stock_refs entry would
+# replace, so the bush's brass (stock-bought.toml c360-round-1-2, a .30 in
+# piece) is named in the stock line only. Every
 # tool but the junior hacksaw that slits the bush is on hand: the #52
 # drill is in the owned 115-piece index (tools-drills.toml drill-52). The
 # .0630 reamer and its Class ZZ pins (reamer-0630, zz-pins-0630-0635) are no
@@ -35,7 +37,6 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "18-8 stainless steel, McMaster-Carr 91794A559 (1/4-28 x 3/4 in slotted fillister head screw), as supplied"
 stock = "Lot: {{process.quantity:d}} screw, bought: McMaster-Carr 91794A559, used as supplied but for the added hole. For the split bush that holds it: a {{process.bush_length_in:.2dot}} in piece of the Ø{{process.bush_dia_in:.2dot}} C360 brass bar on hand."
-stock_refs = ["c360-round-1-2"]  # the split bush's brass (#3496); the screw is bought
 shop = "../shop"
 material_key = "lathe-18-8"
 
@@ -65,12 +66,13 @@ blank_z_in = 0.414
 # DTI's tip on the crests and for the drill chuck, the head and .35 of the
 # shank behind it.
 stickout_in = 0.4
-# The split bush (#3496): a piece of the 1/2 in C360 bar on hand, held on
-# its whole length on the 4-jaw's front step, its face at the jaw fronts,
-# drilled E (.250) through, then slit along one side. The 4-jaw grips its
-# Ø.50, inside the chuck's measured range; it closes on the crests. .30 long:
-# the screw's .75 shank less the .40 out leaves .35, and .05 of it stays
-# clear between the bush and the head.
+# The split bush (#3496): a piece of the 1/2 in C360 bar on hand, faced
+# and drilled E (.250) through standing .10 out of the 4-jaw's jaw fronts
+# (so the AR tool clears the jaws), then slit along one side. The 4-jaw
+# grips its Ø.50, inside the chuck's measured range; it closes on the crests.
+# .30 long: the screw's .75 shank less the .40 out leaves .35, and .05 of it
+# stays clear between the bush and the head.
+bush_face_out_in = 0.1
 bush_dia_in = 0.5
 bush_dia_mm = 12.7
 bush_length_in = 0.3
@@ -102,6 +104,11 @@ name = "Letter E drill (.250)"
 ref = "drill-e"
 
 [[tools]]
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
+
+[[tools]]
 id = "hacksaw"
 name = "Junior hacksaw, 32 TPI"
 ref = "junior-hacksaw"
@@ -123,11 +130,11 @@ title = "Split bush in the 4-jaw: face, drill, slit"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "A {{process.bush_length_in:.2dot}} in piece sawn off the Ø{{process.bush_dia_in:.2dot}} brass bar with the metal-cutting saw, in the 6 in 4-jaw on the jaws' front step over its whole length, its face at the jaw fronts, centred by eye on the chuck's face rings: it need not run true, as Setup 2 dials the screw. The screw's .249 crests are under the 4-jaw's least grip (Ø.2865): this bush holds it in Setup 2."
+holding = "A {{process.bush_length_in:.2dot}} in piece sawn off the Ø{{process.bush_dia_in:.2dot}} brass bar with the metal-cutting saw, in the 6 in 4-jaw on the jaws' front step, its sawn face {{process.bush_face_out_in:.2dot}} in out of the jaw fronts (the AR tool's room), centred by eye on the chuck's face rings: it need not run true, as Setup 2 dials the screw. The screw's .249 crests are under the 4-jaw's least grip (Ø.2865): this bush holds it in Setup 2."
 datum = "None read: the hole is drilled from the tailstock right through the piece."
 # Independent jaws set by hand (shop workholding.chuck-4jaw-6).
 lathe_hold = "other"
-diagram = { file = "diagrams/bush.svg", alt = "To scale: the 1/2 in brass piece in the 4-jaw on the front step, its face at the jaw fronts; the AR tool facing it; hatched, the E hole drilled right through." }
+diagram = { file = "diagrams/bush.svg", alt = "To scale: the 1/2 in brass piece in the 4-jaw on the front step, its face .10 out of the jaw fronts; the AR tool facing it; hatched, the E hole drilled right through." }
 
 [[setups.operations]]
 cut_kind = "other"

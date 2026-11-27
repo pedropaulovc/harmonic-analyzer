@@ -12,7 +12,6 @@
   <rect class="part-removed" x="524" y="181.25" width="6" height="37.5"/>
   <line class="hidden" x1="470" y1="181.25" x2="30" y2="181.25"/>
   <line class="hidden" x1="470" y1="218.75" x2="30" y2="218.75"/>
-  <line class="hidden" x1="234" y1="181.25" x2="30" y2="181.25"/>
   <path class="cutter" d="M524 212L554 224L554 332L546 329L538 332L530 332L530 236Z"/>
   <line class="arrow" x1="568" y1="278" x2="568" y2="230"/>
   <line class="datum" x1="524" y1="70" x2="524" y2="120"/>

@@ -1,18 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" width="760" height="460" font-family="sans-serif" font-size="13">
-  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the Ø.500 x .30 brass piece (bush_dia_in, bush_length_in) in the 6 in 4-jaw on the jaws' front step over its whole length, its face at the jaw fronts. The jaws and the chuck's body are schematic (their sizes and the step's depth are not on record; drawn .30 deep). The AR tool schematic (not on record), its point on the face. Hatched: the hole this setup drills through. -->
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the Ø.500 x .30 brass piece (bush_dia_in, bush_length_in) in the 6 in 4-jaw on the jaws' front step, its face .10 out of the jaw fronts (bush_face_out_in). The jaws and the chuck's body are schematic (their sizes and the step's depth are not on record; drawn .30 deep). The AR tool schematic (not on record), its point on the face. Hatched: the hole this setup drills through. -->
   <rect class="paper" x="0" y="0" width="760" height="460"/>
   <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool faces the brass piece in the 4-jaw (to scale, 300 px/in)</text>
   <path class="clamp" d="M400 145L400 85L133.9 85L133.9 130L310 130L310 145Z"/>
   <path class="clamp" d="M400 295L400 355L133.9 355L133.9 310L310 310L310 295Z"/>
   <rect class="fixture-vise" x="73.9" y="64" width="60" height="312"/>
   <line class="centre-line" x1="80" y1="220" x2="750" y2="220"/>
-  <rect class="part-kept" x="310" y="145" width="90" height="150"/>
-  <rect class="part-removed" x="310" y="182.5" width="90" height="75"/>
-  <path class="cutter" d="M400 268L430 280L430 388L422 385L414 388L406 388L406 292Z"/>
-  <line class="arrow" x1="444" y1="324" x2="444" y2="278"/>
-  <text class="label" x="464" y="430">AR, a light skim</text>
-  <line class="leader" x1="462" y1="426" x2="418" y2="360"/>
-  <circle class="leader-dot" cx="418" cy="360" r="2"/>
+  <rect class="part-kept" x="340" y="145" width="90" height="150"/>
+  <rect class="part-removed" x="340" y="182.5" width="90" height="75"/>
+  <path class="cutter" d="M430 268L460 280L460 388L452 385L444 388L436 388L436 292Z"/>
+  <line class="arrow" x1="474" y1="324" x2="474" y2="278"/>
+  <text class="label" x="494" y="430">AR, a light skim</text>
+  <line class="leader" x1="492" y1="426" x2="448" y2="360"/>
+  <circle class="leader-dot" cx="448" cy="360" r="2"/>
+  <line class="dims" x1="400" y1="120" x2="430" y2="120"/>
+  <line class="dims" x1="400" y1="112" x2="400" y2="128"/>
+  <line class="dims" x1="430" y1="112" x2="430" y2="128"/>
+  <text class="label" x="438" y="124" text-anchor="start">{{process.bush_face_out_in:.2dot}} out of the jaw fronts</text>
   <text class="label" x="40" y="410">4-jaw on the front step, the piece</text>
   <text class="label" x="40" y="426">centred by eye: it need not run true</text>
   <line class="leader" x1="150" y1="398" x2="360" y2="315"/>

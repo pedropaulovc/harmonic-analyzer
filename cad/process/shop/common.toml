@@ -975,6 +975,11 @@ description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 18 in length"
 # the MHA-PD-02 platen's fixture bar (moved here from dt.toml and pd.toml).
 [stock.c360-flat-3-4x1-1-4]
 description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/4 x 1-1/4 in"
+# The 1/2 in bar (stock-bought, same key, on hand), named by two families'
+# stock_refs: the PD bushings and spacers, and the brass split bushes of the
+# small DT lathe parts (moved here from pd.toml, #3498 #3499).
+[stock.c360-round-1-2]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 1/2 in"
 [stock.c360-round-1-4]
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 1/4 in"
 [stock.c360-round-7-8]
