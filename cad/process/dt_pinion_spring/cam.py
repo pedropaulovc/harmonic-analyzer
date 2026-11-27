@@ -65,6 +65,8 @@ SAFE_MM = 1.0
 CLEAR_MM = 5.0
 # Rapid re-entry into a pecked hole stops this far above the last peck.
 PECK_REENTRY_MM = 0.5
+# Setup 3 marks the rough outline this far outside the finished edges.
+MARK_OUTSIDE_IN = 1 / 32
 # Keep-outs: each vise jaw's depth outward from the gripped plate.
 JAW_DEPTH_MM = IN
 # A plan number the recipe recomputes must agree to this (its rounding).
@@ -158,7 +160,7 @@ def _point(dia: float) -> float:
 def _pecked(
     xy: list[float], top: float, tip: float, peck: float, clear: float
 ) -> list[str]:
-    """Drill from ``top`` (the cover's least top) to ``tip`` in pecks of
+    """Drill from ``top`` (the cover's highest top) to ``tip`` in pecks of
     ``peck``, each with a full retract to the R plane and a rapid back to
     just above the last peck. Moves to and from the hole run at ``clear``."""
     clear, r_plane = _r(clear), _r(top + SAFE_MM)
@@ -237,9 +239,13 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "hole_dia": hole["dia"],
         "hole_x": hole["x_nominal"],
         "hole_x_band": hole["x"],
+        "hole_z": hole["z_nominal"],
         "hole_z_band": hole["z"],
+        "pad_width": f["pad_edge"]["width_nominal"],
         "pad_width_band": f["pad_edge"]["width"],
+        "strip_width": f["strip_edge"]["width_nominal"],
         "strip_width_band": f["strip_edge"]["width"],
+        "wing": f["pad_wing"]["length_nominal"],
         "wing_band": f["pad_wing"]["length"],
         "bend_radius": bend["radius_nominal"],
         "bend_band": bend["radius"],
@@ -353,6 +359,22 @@ def context(
     _agree_inward(plan, "wing_reading", tuple(w + half30 for w in g["wing_band"]))
     # The hole's go and no-go pins: its band, inward to the pins' .001 steps.
     _agree_inward(plan, "hole_pin", tuple(g["hole_dia"]))
+    # Setup 3's rough marks, each a nominal edge's station from the hole's
+    # centre plus MARK_OUTSIDE_IN: the pad's end, the pad's forward edge,
+    # the aft edge (the pad's width less the forward edge's station), the
+    # wing's face (toward the tip), the strip's forward edge (forward of the
+    # hole: the strip's width less the aft edge's station) and the tip (the
+    # developed length less the hole's station from the pad's end).
+    aft = g["pad_width"] - g["hole_z"]
+    for key, station in (
+        ("mark_end", g["hole_x"]),
+        ("mark_edge", g["hole_z"]),
+        ("mark_aft", aft),
+        ("mark_wing", g["wing"]),
+        ("mark_strip_edge", g["strip_width"] - aft),
+        ("mark_tip", g["developed"] - g["hole_x"]),
+    ):
+        _agree(plan, f"{key}_from_hole_in", station / IN + MARK_OUTSIDE_IN, PLAN_TOL_IN)
 
     # The piece: the hole's station leaves the pad's end and both pad edges
     # a filing allowance; the piece covers the developed strip past the tip.
@@ -469,7 +491,7 @@ def context(
                 [
                     "hole_drill",
                     "peck the #30 through the cover and the strip",
-                    _pecked(hole, cover_top_min, tip, peck, clear),
+                    _pecked(hole, cover_top_max, tip, peck, clear),
                 ]
             ],
         }
@@ -498,9 +520,9 @@ def context(
     ]
     for check, kwargs in (
         ["holes", {"centres": [hole], "z_bottom": _r(tip)}],
-        ["rapids_clear", {"z_top": cover_top_min, "open_holes": [hole]}],
-        ["vertical_below_top", {"z_top": cover_top_min}],
-        ["air_feed", {"z_top": cover_top_min}],
+        ["rapids_clear", {"z_top": cover_top_max, "open_holes": [hole]}],
+        ["vertical_below_top", {"z_top": cover_top_max}],
+        ["air_feed", {"z_top": cover_top_max}],
         ["keep_out", {"radius": d30 / 2, "boxes": boxes}],
     ):
         expect.append([f"{name}@0", check, kwargs])

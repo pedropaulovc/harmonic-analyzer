@@ -22,6 +22,7 @@ HOLD = _shop_equipment.load()["consumables"]["hold-painters-tape-ca"]
 STEMS = (
     "ch_rocker_strap",
     "dt_cone_gear_tl_phasing_comb",
+    "dt_pinion_spring",
     "ms_stick",
     "pd_platen",
     "pd_platen_clip",

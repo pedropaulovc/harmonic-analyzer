@@ -46,8 +46,8 @@ shop = "../shop"
 stock_refs = ["ss177-c-roll-015x6"]
 
 # The shop's standing page carries what every traveler shares (units,
-# homing, speeds, Feed Hold, tool changes, coolant); the Holdings and the
-# template print the rest. This job keeps what is bought or made ahead.
+# homing, speeds, Feed Hold, tool changes); the Holdings and the template
+# print the rest. This job keeps what is bought or made ahead.
 standing = true
 
 [[notes]]
@@ -55,7 +55,6 @@ title = "This job"
 rows = [
   ["To order", "The 17-7 PH roll (McMaster-Carr 2325K19) and the pin gauges are to order, not on hand."],
   ["To make", "Before Setup 2: the spoil plate (a 5 in length of the owned 1/2 x 6 in 6061 bar) and the drill cover (a 1 in length of the owned 1/2 x 3/4 in 6061 bar), each sawn and its burrs filed off."],
-  ["Template", "Setup 5's template prints at full size: print this sheet at 100 % (never fit to page) and read its 1.000 in bar with the calipers before Setup 4, which checks each bend on it."],
 ]
 
 [cad]
@@ -129,6 +128,16 @@ wing_reading_max_in = 0.224
 # The hole's pins, its .1285-.1325 band inward to the pins' .001 steps.
 hole_pin_min_in = 0.129
 hole_pin_max_in = 0.132
+# Setup 3's rough marks, each from the hole's centre: a nominal edge's
+# station (the pad's end .18, the pad's forward edge .19, the aft edge .19,
+# the wing's face .15 toward the tip, the strip's forward edge .06 forward,
+# the tip 1.880) plus 1/32 outside it (cam.py recomputes each).
+mark_end_from_hole_in = 0.211
+mark_edge_from_hole_in = 0.221
+mark_aft_from_hole_in = 0.221
+mark_wing_from_hole_in = 0.181
+mark_strip_edge_from_hole_in = 0.091
+mark_tip_from_hole_in = 1.911
 # --- Setup 2: layout on the spoil plate (work X/Y) ---
 # The hole's station on the piece: .30 from its left (pad) end, across its
 # middle. The piece's left end .25 from the plate's left end, its back edge
@@ -159,8 +168,9 @@ bond_accepted_tensile_mpa = 0.6
 # The cover (fixtures.dt-pinion-spring-drill-cover): 1 in long along the
 # piece, its left end flush with the piece's, 1/2 in wide (under the
 # piece's .60) and its 3/4 in height miked inside this band before use
-# (authored: the bar's supply tolerance is not on record), so the
-# program's R plane, 1 mm over the least top, clears the highest.
+# (authored: the bar's supply tolerance is not on record): the program's R
+# plane stands 1 mm over the highest top, and a cover at the band's foot
+# adds under 1 mm of air to the first peck.
 cover_length_mm = 25.4
 cover_width_mm = 12.7
 cover_height_min_in = 0.740
@@ -286,7 +296,7 @@ beam = "other"
 
 [[setups.operations]]
 instruction = "Mike the strip 1 in in from the roll's edge at three places along it."
-inspection = "Thickness {{cad.strip_thickness_min_in:.5dot}}–{{cad.strip_thickness_max_in:.5dot}} (.015 ±.00075)."
+inspection = "Thickness {{cad.strip_thickness_min_in:.5dot}}–{{cad.strip_thickness_max_in:.5dot}} (.015 ±.00075) at all three, else stop: it is not the drawing's strip; set the roll aside and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.strip_thickness_band_mm}}" }]
 
 [[setups.operations]]
@@ -305,6 +315,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Lay the piece on the spoil plate and file the saw burr off its sawn edges, the file flat on the plate's top." },
   { kind = "check", text = "The piece lies flat on the plate: no end stands up when the middle is pressed." },
+  { kind = "stop", text = "An end still stands up: press it flat between thumb and plate and check again; still up, saw a new piece off the roll (ops 20–40)." },
 ]
 feed = "hand"
 
@@ -315,7 +326,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top. The piece bonded to it, its left end {{process.piece_x_mm:in.2dot}} from the plate's left end and its back edge {{process.piece_y_mm:in.2dot}} off the fixed jaw; the cover bonded on it on its 1/2 in face, its left end flush with the piece's, centred across it. Each bond: blue tape on both faces, thick CA between (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}})."
-datum = "Program PS01_hole (cam:dt_pinion_spring). G54: X0 the plate's left end, Y0 the fixed jaw's face (+Y toward it), Z0 the plate's bare top right of the tape. The hole at X {{process.hole_x_mm:in.3dot}} Y {{process.hole_y_mm:in.3dot}}; the R plane 1 mm over the cover's least top."
+datum = "Program PS01_hole (cam:dt_pinion_spring). G54: X0 the plate's left end, Y0 the fixed jaw's face (+Y toward it), Z0 the plate's bare top right of the tape. The hole at X {{process.hole_x_mm:in.3dot}} Y {{process.hole_y_mm:in.3dot}}; the R plane 1 mm over the cover's highest top."
 diagram = { file = "diagrams/hole.svg", alt = "PS01 T1, to scale. A section across the jaws through the hole: the spoil plate on a 1 in parallel at each jaw, its back edge on the fixed jaw; on its tape the piece, on the piece's tape the cover, the #30 drill at its last peck through the cover and the strip, its point at Z {{process.hole_tip_z_mm:in.3dot}}, in the plate. Below, plan of the plate's left end: the piece, the cover over its left end and the hole's station." }
 envelope = { x_span_mm = ["{{process.blank_length_mm}}"], y_span_mm = ["{{process.blank_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.cover_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.hole_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_30_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_30_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -408,7 +419,11 @@ drilling = "twist_drill"
 # (3.264, the .1285 rounded): sized "other", as sm_knife_mount's #30, and
 # the hole gauged with the pins in Setup 3.
 sizing = "other"
-instruction = "Run PS01_hole (M6 T1: set 600, then Cycle Start; about 2 min): the #30 pecks {{process.hole_peck_mm:in.3dot}} in at a time through the cover and the strip, full retract between, its point to Z {{process.hole_tip_z_mm:in.3dot}}, in the plate."
+# Lubrication: the tool audit's "slow speed, cutting oil" (2026-11-23, row
+# drill-30-cobalt) against the taped hold's "no flood or mist coolant and no
+# water (the paper tape soaks and lets go)" (pd_platen_clip, Setup 2): one
+# drop of cutting oil brushed on the drill, none on the tape.
+instruction = "Brush one drop of cutting oil on the #30's point and flutes, none on the tape; no flood or mist coolant (the tape soaks and lets go). Run PS01_hole (M6 T1: set 600, then Cycle Start; about 2 min): the #30 pecks {{process.hole_peck_mm:in.3dot}} in at a time through the cover and the strip, full retract between, its point to Z {{process.hole_tip_z_mm:in.3dot}}, in the plate."
 settings = "dt-pinion-spring-drill-30"
 peck = { step_mm = "{{process.hole_peck_mm}}", retract = "full" }
 hole_depth_mm = "{{process.hole_depth_mm}}"
@@ -418,7 +433,12 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Raise the spindle clear and take the plate out of the vise, the piece and the cover still bonded on it."
+steps = [
+  { kind = "action", text = "Raise the spindle clear. Push the cover hard along and across with a thumb." },
+  { kind = "check", text = "The cover and the piece have not moved: no creak, no lifted corner." },
+  { kind = "stop", text = "Either moved: the hole may have wandered oval; do not drill it again. Setup 3's pins (op 200) decide the piece." },
+  { kind = "action", text = "Take the plate out of the vise, the piece and the cover still bonded on it." },
+]
 feed = "hand"
 
 [[setups]]
@@ -454,7 +474,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "With the marker and the steel rule, mark the outline about 1/32 outside the picture's: the aft edge about .21 from the hole's centre, the pad's forward edge about .22 on the other side, the pad's end about .21 from it, the strip's forward edge from the wing to the tip, the tip about 2.09 from the pad's end. Saw just outside each line, the aft edge's first, the line just above the wood blocks and the waste above it."
+instruction = "With the marker and the steel rule, mark the outline 1/32 outside the picture's, each line measured from the hole's centre (half the hole, .06, past its near edge): the pad's end {{process.mark_end_from_hole_in:.2dot}} on the pad's side; the pad's forward edge {{process.mark_edge_from_hole_in:.2dot}} and the aft edge {{process.mark_aft_from_hole_in:.2dot}}, either side; the wing's face {{process.mark_wing_from_hole_in:.2dot}} toward the tip, and the strip's forward edge {{process.mark_strip_edge_from_hole_in:.2dot}} forward of the centre, from the wing's face to the tip; the tip {{process.mark_tip_from_hole_in:.2dot}} from the centre. Saw just outside each line, the aft edge's first, the line just above the wood blocks and the waste above it."
 feed = "hand"
 
 [[setups.operations]]
@@ -511,7 +531,7 @@ instruction = "Rub both faces flat on the 320-grit face of the stone to take the
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Set the calipers to {{process.kink_mark_from_end_in:.3dot}}, one jaw on the pad's end, and tick the aft edge with the fine marker at the other jaw's tip: the kink's mark. Tick it again at {{process.foot_mark_from_end_in:.3dot}}: the foot's mark."
+instruction = "Set the calipers to {{process.kink_mark_from_end_in:.3dot}}, one jaw on the pad's end, and tick the aft edge with the fine marker at the other jaw's tip: the kink's mark. Tick it again at {{process.foot_mark_from_end_in:.3dot}}: the foot's mark. Lay the strip flat, pad end to your left and the wing away from you, and write I on the face up, near the pad's end: the inside of both bends."
 feed = "hand"
 
 [[setups]]
@@ -519,15 +539,24 @@ machine_kind = "other"
 title = "Bench vise: form the kink and the foot bend over the #2 shank"
 machine = "Bench vise"
 indexing = "none"
-holding = "The strip upright against the fixed jaw, its pad's wing side toward the moving jaw; the #2 drill's shank across the jaws between the strip and the moving jaw, its top {{process.shank_top_over_jaw_mm:in.3dot}} over the jaw tops (calipers' depth rod), the flutes out to the side. Close the vise hard: the shank pinches the strip at its axis height."
+holding = "The strip upright, pad end up: its outside face flat against the fixed jaw, its I face (Setup 3, the inside of both bends) toward the moving jaw. Standing at the moving jaw facing the fixed jaw, the pad's wing points to your RIGHT and the ticked aft edge to your left. The #2 drill's shank across the jaws between the strip and the moving jaw, its top {{process.shank_top_over_jaw_mm:in.3dot}} over the jaw tops (calipers' depth rod), the flutes out to the side. Close the vise hard: the shank pinches the strip at its axis height."
 datum = "The bend's mark, level with the jaw tops."
-diagram = { file = "diagrams/form.svg", alt = "To scale, end view along the shank: the strip upright on the fixed jaw, its tip end down, the #2 shank between it and the moving jaw, the kink's mark level with the jaw tops; the blade bent over the shank {{process.kink_on_shank_deg:.1f}}° from upright, a 1/2 in parallel pressing it close to the shank." }
+diagram = { file = "diagrams/form.svg", alt = "To scale, end view along the shank from the vise's left end: the strip upright on the fixed jaw, its tip end down, the #2 shank between it and the moving jaw, the kink's mark level with the jaw tops; the blade bent over the shank {{process.kink_on_shank_deg:.1f}}° from upright, a 1/2 in parallel pressing it close to the shank. Callout: the ticked aft edge toward the viewer, the wing away (to the operator's right)." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Kink: clamp the strip tip end down, the kink's mark level with the jaw tops, the shank's top {{process.shank_top_over_jaw_mm:in.3dot}} over them."
+instruction = "Read Setup 5's template's 1.000 in bar with the calipers before the first bend."
+inspection = "Bar .995–1.005, else stop: the sheet did not print full size. Print it again at 100 % (never fit to page) and read the bar again; never bend against a template out of scale."
+gauge_checks = "other"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Kink: clamp the strip tip end down, the kink's mark level with the jaw tops, the shank's top {{process.shank_top_over_jaw_mm:in.3dot}} over them." },
+  { kind = "check", text = "The I face toward the shank; the wing to your right, the ticked aft edge to your left." },
+  { kind = "stop", text = "The wing to your left: the spring would bend to its mirror image. Turn the strip face for face, I toward the shank, and clamp it again." },
+]
 feed = "hand"
 
 [[setups.operations]]
@@ -547,8 +576,12 @@ instruction = "Read the blade with the protractor, its head on the jaw tops: {{p
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Foot bend: clamp the strip blade down, the foot's mark level with the jaw tops, the shank's top {{process.shank_top_over_jaw_mm:in.3dot}} over them, the kink's inside toward the shank."
-diagram = { file = "diagrams/form-foot.svg", alt = "To scale, end view along the shank: the strip upright on the fixed jaw, blade down and the kink hanging below the jaws, the foot's mark level with the jaw tops; the foot bent over the shank {{process.bend_on_shank_deg:.1f}}°, past square, a 1/2 in parallel pressing it." }
+steps = [
+  { kind = "action", text = "Foot bend: clamp the strip blade down, the foot's mark level with the jaw tops, the shank's top {{process.shank_top_over_jaw_mm:in.3dot}} over them." },
+  { kind = "check", text = "The I face and the kink's inside toward the shank; the wing to your right, the ticked aft edge to your left." },
+  { kind = "stop", text = "The wing to your left: the strip is turned; turn it face for face, I toward the shank, and clamp it again." },
+]
+diagram = { file = "diagrams/form-foot.svg", alt = "To scale, end view along the shank from the vise's left end: the strip upright on the fixed jaw, blade down and the kink hanging below the jaws, the foot's mark level with the jaw tops; the foot bent over the shank {{process.bend_on_shank_deg:.1f}}°, past square, a 1/2 in parallel pressing it. Callout: the ticked aft edge toward the viewer, the wing away." }
 feed = "hand"
 
 [[setups.operations]]
@@ -578,11 +611,6 @@ inspection = [
   "Foot bend's tangent {{cad.bend_foot_len_min_in:.3dot}}–{{cad.bend_foot_len_max_in:.3dot}} from the hole; the kink's start {{cad.kink_free_h_min_in:.3dot}}–{{cad.kink_free_h_max_in:.3dot}} from the hole and {{cad.kink_free_v_min_in:.3dot}}–{{cad.kink_free_v_max_in:.3dot}} from the foot (FREE); the flat {{cad.kink_included_angle_min_deg:.0f}}°–{{cad.kink_included_angle_max_deg:.0f}}° to the blade and {{cad.flat_length_min_in:.2dot}}–{{cad.flat_length_max_in:.2dot}} long: each inside its band on the template.",
   "Both bends' radii are the shank's: inside R{{process.formed_radius_min_mm:in.4dot}}–{{process.formed_radius_max_mm:in.4dot}} at the strip's limits (the drawing's R{{cad.bend_radius_min_in:.3dot}}–{{cad.bend_radius_max_in:.3dot}}), not gauged.",
 ]
-gauge_checks = "other"
-
-[[setups.operations]]
-instruction = "Read the template's 1.000 in bar with the calipers."
-inspection = "Bar .995–1.005: the sheet printed full size."
 gauge_checks = "other"
 
 [[setups.operations]]

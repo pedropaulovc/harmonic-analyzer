@@ -90,6 +90,21 @@ def test_the_recipes_program_passes_every_check_it_declares(ctx, tmp_path) -> No
     assert set(times) == {name for name, _ops in RECIPE.PROGRAMS}
 
 
+def test_the_pecks_and_checks_start_over_the_highest_cover(ctx) -> None:
+    """The R plane stands SAFE_MM over the cover's highest top, the first
+    peck bites no more than one peck into a cover that tall, and every check
+    that guards the cover's top uses that top."""
+    top = PLAN["parameters"]["cover_top_max_mm"]
+    lines = ctx["jobs"][0]["ops"][0][2]
+    r_plane = float(lines[2].removeprefix("G0 Z"))
+    first = float(lines[3].split()[1].removeprefix("Z"))
+    assert math.isclose(r_plane - top, RECIPE.SAFE_MM, abs_tol=1e-3)
+    assert top - first <= PLAN["parameters"]["hole_peck_mm"] + 1e-3
+    for program, check, kwargs in RECIPE.expectations(ctx):
+        if "z_top" in kwargs:
+            assert math.isclose(kwargs["z_top"], top, abs_tol=1e-3), (program, check)
+
+
 def test_the_strength_inputs_are_the_designs() -> None:
     p = PLAN["parameters"]
     assert p["strip_modulus_mpa"] == geometry.MODULUS_MPA
@@ -138,6 +153,8 @@ def test_the_marks_rebuild_the_free_form() -> None:
         ("end_reading_min_in", 0.234, "end_reading_min_in"),
         ("wing_reading_max_in", 0.225, "wing_reading_max_in"),
         ("hole_pin_max_in", 0.133, "hole_pin_max_in"),
+        ("mark_tip_from_hole_in", 2.091, "mark_tip_from_hole_in"),
+        ("mark_aft_from_hole_in", 0.211, "mark_aft_from_hole_in"),
         ("jaw_top_over_plate_mm", 7.5, "jaw_top_over_plate_mm"),
         ("hole_tip_z_mm", -0.5, "hole_tip_z_mm"),
         ("hole_peck_mm", 3.5, "over one #30 diameter"),
@@ -180,7 +197,7 @@ def _seed(ctx: dict, old: str, new: str) -> dict:
         # The #30 stopped above the strip's underside: no hole through.
         ("G1 Z-1.231 F{feed}", "G1 Z0.000 F{feed}", "holes"),
         # A peck re-entry rapided past the depth already drilled.
-        ("G0 Z2.118", "G0 Z1.000", "rapid"),
+        ("G0 Z2.864", "G0 Z1.500", "rapid"),
         # The hole moved over the fixed jaw.
         ("G0 X13.970 Y-13.970", "G0 X13.970 Y0.500", "keep_out"),
     ],

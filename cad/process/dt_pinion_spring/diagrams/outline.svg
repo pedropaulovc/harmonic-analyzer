@@ -6,7 +6,7 @@
   <path class="part-kept" d="M84.00 102.00 L150.00 102.00 L150.00 128.00 L495.96 128.00 L495.96 178.00 L84.00 178.00 Z"/>
   <circle class="holes" cx="120.00" cy="140.00" r="12.85"/>
   <text class="label" x="568.00" y="92.00">waste</text>
-  <text class="label" x="335.96" y="224.25">marker lines 1/32 outside the outline</text>
+  <text class="label" x="335.96" y="224.25">marker lines 1/32 outside, from the hole's centre</text>
   <line class="leader" x1="333.96" y1="220.25" x2="320.96" y2="185.25"/>
   <circle class="leader-dot" cx="320.96" cy="185.25" r="2"/>
   <text class="label" x="217.48" y="112.00">the spring's outline</text>
