@@ -210,7 +210,11 @@ APPROVED_CNC_ENDMILL_KIT_KEYS = (
 )
 
 
-def _verify_cnc_endmill_kit(tools: dict, shop_tools: dict) -> int:
+def _verify_cnc_endmill_kit(
+    tools: dict, shop_tools: dict, known_part_numbers: set[str]
+) -> int:
+    import re
+
     total_pieces = 0
     for key in APPROVED_CNC_ENDMILL_KIT_KEYS:
         rec = tools[key]
@@ -222,11 +226,16 @@ def _verify_cnc_endmill_kit(tools: dict, shop_tools: dict) -> int:
         if not str(rec["source"]).startswith("https://"):
             raise ValueError(f"{key}: source must be an https URL")
         pieces = rec.get("pieces")
-        if not isinstance(pieces, int) or pieces <= 0:
+        if isinstance(pieces, bool) or not isinstance(pieces, int) or pieces <= 0:
             raise ValueError(f"{key}: pieces must be a positive int")
         total_pieces += pieces
+        if rec.get("corner_radius_in", 0.0) > 0.015:
+            raise ValueError(f"{key}: corner_radius_in exceeds R.015 policy")
+        for number in re.findall(r"MHA-[A-Z0-9-]+", str(rec.get("note", ""))):
+            if number not in known_part_numbers:
+                raise ValueError(f"{key}: unknown part number {number!r} in note")
         if key in shop_tools:
-            overlap = {"dia_in", "loc_in"} & set(rec)
+            overlap = {"dia_in", "loc_in", "helix_deg"} & set(rec)
             if overlap:
                 raise ValueError(f"{key}: duplicates prechips sizing fields {sorted(overlap)}")
         else:
@@ -234,30 +243,60 @@ def _verify_cnc_endmill_kit(tools: dict, shop_tools: dict) -> int:
                 raise ValueError(f"{key}: dia_in {rec['dia_in']} outside (0, 0.5]")
             if not (0.0 < rec["loc_in"] < rec["oal_in"]):
                 raise ValueError(f"{key}: expected 0 < loc_in < oal_in")
-            if rec.get("corner_radius_in", 0.0) > 0.015:
-                raise ValueError(f"{key}: corner_radius_in exceeds R.015 policy")
     return total_pieces
 
 
 def test_approved_cnc_endmill_kit_records_are_complete_and_disjoint_from_prechips() -> None:
+    import _config
     import _process_plans
 
     tools = _shop_equipment.load()["tools"]
     shop_tools = _process_plans.load_shop()["tools"]
-    assert _verify_cnc_endmill_kit(tools, shop_tools) == 34
+    known_numbers = {info["number"] for info in _config.parts().values()}
+    assert _verify_cnc_endmill_kit(tools, shop_tools, known_numbers) == 34
     assert "do not reorder McMaster-Carr 88815A45" in tools["endmill-carbide-3fl-1-2"]["purchase"]
 
 
 def test_approved_cnc_endmill_kit_rejects_prechips_overlap_and_oversize_radius() -> None:
+    import _config
     import _process_plans
 
     tools = {k: dict(v) for k, v in _shop_equipment.load()["tools"].items()}
     shop_tools = _process_plans.load_shop()["tools"]
+    known_numbers = {info["number"] for info in _config.parts().values()}
 
-    bad_overlap = {**tools, "endmill-carbide-3fl-1-16-downcut": {**tools["endmill-carbide-3fl-1-16-downcut"], "dia_in": 0.062}}
-    with pytest.raises(ValueError, match="duplicates prechips sizing fields"):
-        _verify_cnc_endmill_kit(bad_overlap, shop_tools)
+    for bad_field in ("dia_in", "helix_deg"):
+        bad_overlap = {
+            **tools,
+            "endmill-carbide-3fl-1-16-downcut": {
+                **tools["endmill-carbide-3fl-1-16-downcut"],
+                bad_field: 0.062,
+            },
+        }
+        with pytest.raises(ValueError, match="duplicates prechips sizing fields"):
+            _verify_cnc_endmill_kit(bad_overlap, shop_tools, known_numbers)
 
-    bad_radius = {**tools, "endmill-ferrous-1-2-var-5fl-r015": {**tools["endmill-ferrous-1-2-var-5fl-r015"], "corner_radius_in": 0.030}}
-    with pytest.raises(ValueError, match="corner_radius_in exceeds"):
-        _verify_cnc_endmill_kit(bad_radius, shop_tools)
+    for radius_key in ("endmill-ferrous-1-2-var-5fl-r015", "endmill-carbide-3fl-1-16-downcut"):
+        bad_radius = {
+            **tools,
+            radius_key: {**tools[radius_key], "corner_radius_in": 0.030},
+        }
+        with pytest.raises(ValueError, match="corner_radius_in exceeds"):
+            _verify_cnc_endmill_kit(bad_radius, shop_tools, known_numbers)
+
+    bad_bool = {
+        **tools,
+        "endmill-ferrous-1-16-stub": {**tools["endmill-ferrous-1-16-stub"], "pieces": True},
+    }
+    with pytest.raises(ValueError, match="pieces must be a positive int"):
+        _verify_cnc_endmill_kit(bad_bool, shop_tools, known_numbers)
+
+    bad_part = {
+        **tools,
+        "endmill-nonferrous-1-8-3fl": {
+            **tools["endmill-nonferrous-1-8-3fl"],
+            "note": "Cuts MHA-PN-03 V-groove",
+        },
+    }
+    with pytest.raises(ValueError, match="unknown part number 'MHA-PN-03'"):
+        _verify_cnc_endmill_kit(bad_part, shop_tools, known_numbers)
