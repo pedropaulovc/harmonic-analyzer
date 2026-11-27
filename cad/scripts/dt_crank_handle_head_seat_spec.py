@@ -40,30 +40,24 @@ import math
 
 import dt_crank_handle_butt_cup_spec as cup
 import dt_crank_handle_pivot_screw_spec as screw
+from _printed_tolerance import edge_break_chamfer_mm
 from dt_crank_handle_butt_cup_seat_spec import FLOOR_HOLE_CHAMFER_LIMITS
+from dt_crank_handle_pivot_screw_spec import (
+    HEAD_CHAMFER as HEAD_CHAMFER,
+    HEAD_CHAMFER_LIMITS as HEAD_CHAMFER_LIMITS,
+)
 
-# Delegated ruling 2026-11-12 (#1757, #2144): the owner's millimetre inner
-# R0.1 MAX and head outer 0.11-0.26 X 45 (#1694 proof), at this inch
-# package's three places.  The radius prints the single limit R.004 MAX
-# (swTolMAX: the modelled radius IS the printed limit, sharp allowed); the
-# 1.6 um over R0.1 is swallowed by the larger break minima.  The break's
-# larger minimum only adds air over the cup's R.003 MAX floor corner, and its
-# maximum is the title block's edge break.
-#
-# The break prints the single limit .005 MIN (swTolMIN, modelled at it), as
-# the cup's floor-hole mouth does: the stacked .010/.005 was a band .005 wide
-# with no register entry (machinist review r1, farm run 20261124T110807008Z;
-# drawing-guidelines rule 4: a single-limit edge break is not a tight band).  The title block's .010 chamfer
-# MAX is its upper limit, so the limits below are the analysis band the
-# proofs read.  A single size at the .XXX row would not serve: .005 +/-.005
-# can come out sharp on the R.003 corner, and .010 +/-.005 breaks .015, past
-# the edge break the bearing annulus budgets.  (min, max) legs.
+# Delegated ruling 2026-11-12 (#1757, #2144) and owner ruling 2026-11-26
+# (#3743, option A): the under-head inside corner prints the single limit
+# R.004 MAX (swTolMAX: the modelled radius IS the printed limit, sharp
+# allowed), which lands inside MHA-DT-35's .005 MIN floor-hole chamfer.
+# The head's outer under-head edge prints .021 at the title block's .XXX
+# +/-.005 row (.016-.026 x 45 deg, swTolNONE) so its .016 lower limit clears
+# MHA-DT-35's R.015 MAX pocket-floor corner at zero radial gap, while its
+# .026 upper limit is directly budgeted by HEAD_BEARING_RADIAL_CONCENTRIC_MIN.
 UNDER_HEAD_RADIUS_MAX = 0.1016  # .004
 UNDER_HEAD_RADIUS_BAND = (0.0, -UNDER_HEAD_RADIUS_MAX)  # (upper, lower)
 UNDER_HEAD_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX
-HEAD_CHAMFER_TOL_TYPE = 5  # swTolType_e.swTolMIN
-HEAD_CHAMFER_LIMITS = (0.127, screw.EDGE_BREAK_MAX_MM)  # .005-.010
-HEAD_CHAMFER = HEAD_CHAMFER_LIMITS[0]
 
 # Corner air at the worst case, normal to each break, with the mating corner
 # pushed against its wall (zero radial gap).  A radius R fills its corner out
@@ -85,12 +79,11 @@ for _ok, _what in (
         HEAD_EDGE_AIR_MIN > 0.0,
         "the head's outer edge lands on the cup's pocket-floor radius",
     ),
-    # The screw spec's bearing annulus budgets the edge break on the head's
-    # edge and on the floor hole's mouth: neither break may exceed it.
+    # The screw spec's bearing annulus budgets HEAD_CHAMFER_LIMITS[1] on the
+    # head's outer edge and the cup sheet's edge break on the floor hole's mouth.
     (
-        max(HEAD_CHAMFER_LIMITS[1], FLOOR_HOLE_CHAMFER_LIMITS[1])
-        <= screw.EDGE_BREAK_MAX_MM,
-        "a seat break exceeds the edge break the screw spec's annulus budgets",
+        FLOOR_HOLE_CHAMFER_LIMITS[1] <= edge_break_chamfer_mm(unit=cup.UNIT),
+        "the floor-hole break exceeds the edge break the screw spec's annulus budgets",
     ),
     (
         UNDER_HEAD_RADIUS_MAX + HEAD_CHAMFER_LIMITS[1]

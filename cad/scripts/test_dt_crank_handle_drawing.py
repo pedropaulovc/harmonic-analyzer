@@ -162,7 +162,7 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     # to the next printed thousandth.
     needed = cup.BODY_DIA + cup.BODY_DIA_TOL + spec.COUNTERBORE_GLUE_LINE[1] + 0.002 * IN
     assert needed - 1e-6 <= spec.COUNTERBORE_DIA_MAX < needed + 0.001 * IN
-    assert spec.COUNTERBORE_DIA_MAX == pytest.approx(0.435 * IN)
+    assert spec.COUNTERBORE_DIA_MAX == pytest.approx(0.460 * IN)
     # The historical oak feather was fixed in #1650.  Keep the ordinary .XX
     # diameter band and both eccentricities, with the .080 target plus
     # owner ruling B's .002 radial design margin at the worst case, after the
@@ -501,7 +501,7 @@ def test_grip_contour_is_tangent_arcs_dimensioned_on_the_section() -> None:
     # Owner ruling B on #1375 widens the crest, not the swell or end round;
     # #2170 (option B, and the counterbore mouth's break) widens it again; the
     # tangent dome and its printed reference radius follow automatically.
-    assert (spec.CREST_DIA, spec.END_ROUND_R) == pytest.approx((0.65 * IN, 0.06 * IN))
+    assert (spec.CREST_DIA, spec.END_ROUND_R) == pytest.approx((0.67 * IN, 0.06 * IN))
     assert math.dist(spec.DOME_CENTER, spec.END_ROUND_CENTER) == pytest.approx(
         spec.DOME_R - spec.END_ROUND_R
     )

@@ -239,9 +239,9 @@ def test_printed_bands_are_the_sheets() -> None:
     # in the turned_bush adapter's form: the reference size, the upper limit
     # the .257 pin checks, and the head's clearance in the pocket.
     pocket = cup_features["pocket"]
-    assert pocket["dia_ref"] == pytest.approx(0.25 * IN)
-    assert pocket["dia_max"] == pytest.approx(0.257 * IN)
-    assert _inch(pocket["diametral_clearance"]) == [0.007, 0.026]
+    assert pocket["dia_ref"] == pytest.approx(0.275 * IN)
+    assert pocket["dia_max"] == pytest.approx(0.280 * IN)
+    assert _inch(pocket["diametral_clearance"]) == [0.003, 0.023]
     assert "dia" not in pocket
     assert _inch(cup_features["chamfer_bore"]["leg"]) == [0.005, 0.01]
     plug_end = manifest("sm_gooseneck_end_plug")["features"]

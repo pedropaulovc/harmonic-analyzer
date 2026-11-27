@@ -161,8 +161,8 @@ material = "lathe-1018-cold-finished"
 sfm = 60
 feed = "tailstock quill by hand, steady, cutting oil"
 
-[settings.lathe-chamfer-3-16-1018]
-tool = "chamfer-mill-3-16-90"
+[settings.lathe-chamfer-1-4-1018]
+tool = "chamfer-mill-330ch-1-4-90"
 material = "lathe-1018-cold-finished"
 sfm = 65
 feed = "tailstock quill by hand, a light plunge, cutting oil"

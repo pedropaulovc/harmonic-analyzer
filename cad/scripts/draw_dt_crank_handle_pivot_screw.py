@@ -75,7 +75,6 @@ import _telemetry
 from dt_crank_handle_head_seat_spec import (
     HEAD_CHAMFER,
     HEAD_CHAMFER_LIMITS,
-    HEAD_CHAMFER_TOL_TYPE,
     SCREW_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
     SCREW_DRAWING_PRECISION_BY_NAME as DRAWING_PRECISION_BY_NAME,
     UNDER_HEAD_RADIUS_BAND,
@@ -321,22 +320,24 @@ DETAIL_KEEP = {
         DETAIL_CENTER[1] + DETAIL_CROP_RADIUS + 0.004 + RELIEF_LEAD_LINE_DROP,
     ),
 }
-# DETAIL B (#1757): the head seat on MHA-DT-35.  The under-head radius (0.1)
-# and the head's break (0.19) are under 0.6 mm of sheet at 3:1, so a 20:1
-# native detail of the flat under-head face carries both model dimensions.
-# The fence takes in the round's two tangent points and the break's two ends,
-# and stays above the axis.
+# DETAIL B (#1757, #3743): the head seat on MHA-DT-35.  The under-head radius
+# (.004 MAX) and the head's break (.021 at .XXX) print in a 20:1 native detail
+# of the flat under-head face.  The fence centres on the diagonal between the
+# round's shoulder tangent and the break's OD corner so it takes in all four
+# corner points with margin and stays above the axis.
 DETAIL_B_LETTER = "B"
 DETAIL_B_SCALE = (20, 1)
 _DBS = DETAIL_B_SCALE[0] / DETAIL_B_SCALE[1] / 1000.0
-# (model station z, radius): just past the under-head face, halfway up it.
-DETAIL_B_FOCUS_MM = (HEAD_LENGTH + 0.1, (SHOULDER_DIA + HEAD_DIA) / 4.0)
-DETAIL_B_RADIUS_MM = 0.8
-_DETAIL_B_MARGIN_MM = 0.2
 _ROUND_ON_SHOULDER = (HEAD_LENGTH + UNDER_HEAD_RADIUS_MAX, SHOULDER_DIA / 2.0)
 _ROUND_ON_FACE = (HEAD_LENGTH, SHOULDER_DIA / 2.0 + UNDER_HEAD_RADIUS_MAX)
 _BREAK_ON_OD = (HEAD_LENGTH - HEAD_CHAMFER, HEAD_DIA / 2.0)
 _BREAK_ON_FACE = (HEAD_LENGTH, HEAD_DIA / 2.0 - HEAD_CHAMFER)
+DETAIL_B_FOCUS_MM = (
+    (_ROUND_ON_SHOULDER[0] + _BREAK_ON_OD[0]) / 2.0,
+    (_ROUND_ON_SHOULDER[1] + _BREAK_ON_OD[1]) / 2.0,
+)
+DETAIL_B_RADIUS_MM = 0.90
+_DETAIL_B_MARGIN_MM = 0.15
 if (
     any(
         math.dist(DETAIL_B_FOCUS_MM, point) > DETAIL_B_RADIUS_MM - _DETAIL_B_MARGIN_MM
@@ -349,12 +350,13 @@ if (
         "and stay above the axis"
     )
 # Bottom middle, right of detail A and left of the title block: the circle
-# spans x 0.156..0.188, y 0.038..0.070, under the overall's row.
-DETAIL_B_CENTER = (0.172, 0.054)
+# spans x 0.154..0.190, y 0.038..0.074, under the overall's row, with its
+# two-line label at y 0.034 wholly inside the 0.0127 inner border.
+DETAIL_B_CENTER = (0.172, 0.056)
 DETAIL_B_CROP_RADIUS = DETAIL_B_RADIUS_MM * _DBS
 DETAIL_B_LABEL_XY = (
     DETAIL_B_CENTER[0],
-    DETAIL_B_CENTER[1] - DETAIL_B_CROP_RADIUS - 0.005,
+    DETAIL_B_CENTER[1] - DETAIL_B_CROP_RADIUS - 0.004,
 )
 # The circle's letter on the side view stands up-left of the under-head
 # corner, left of the head and right of the finish symbol's leader.
@@ -369,20 +371,20 @@ def _detail_b_xy(model_z_mm: float, radius_mm: float) -> tuple[float, float]:
     )
 
 
-# The break's horizontal leg prints its two limits, then its three callout
-# rows, with the dimension line under the last row (as the lead's): the line
-# 4 mm over the break's top end, the block right of both extension lines so
-# the line runs to the arrows over open sheet.  The radius's block stands
-# up-left of the circle, on the round's centre side, where its leader reaches
-# the arc through air above the shoulder (its arc extension drawn,
-# draw_dt_crank_handle._dress_inside_corner).
+# The break's horizontal leg prints its .021 nominal, then its three callout
+# rows, with the dimension line under the last row: the line sits just above
+# the circle's top (6 mm over _BREAK_ON_OD) and the block stands right of both
+# extension lines so the line runs to the arrows over open sheet and tops out
+# clear below OverallLength's row.  The radius's block stands up-left of the
+# circle, on the round's centre side, where its leader reaches the arc through
+# air above the shoulder (its arc extension drawn).
 HEAD_CHAMFER_TEXT_WIDTH = 0.041
 DETAIL_B_KEEP = {
     "HeadChamfer": (
         _detail_b_xy(*_BREAK_ON_OD)[0] + 0.004 + HEAD_CHAMFER_TEXT_WIDTH / 2.0,
-        _detail_b_xy(*_BREAK_ON_OD)[1] + 0.004 + RELIEF_LEAD_LINE_DROP,
+        DETAIL_B_CENTER[1] + DETAIL_B_CROP_RADIUS + 0.0115,
     ),
-    "UnderHeadRadius": (0.140, 0.074),
+    "UnderHeadRadius": (0.135, 0.077),
 }
 # The running shoulder's upper flank, right of the Ø dimension line and its
 # callout block (farm r1 of eb22a22f1: at x - 0.050 the leader ran through
@@ -537,9 +539,9 @@ requirement(
         "length_callout": (HEAD_LENGTH_CALLOUT, ((_NOTES, "HEAD_LENGTH_CALLOUT"),)),
         "chamfer": (
             list(HEAD_CHAMFER_LIMITS),
-            ((_SEAT, "HEAD_CHAMFER_LIMITS"), (_SELF, "DETAIL_B_KEEP")),
+            ("HEAD_CHAMFER_LIMITS", (_SELF, "DETAIL_B_KEEP")),
         ),
-        "chamfer_nominal": (HEAD_CHAMFER, ((_SEAT, "HEAD_CHAMFER"),)),
+        "chamfer_nominal": (HEAD_CHAMFER, ("HEAD_CHAMFER",)),
         "chamfer_callout": (HEAD_CHAMFER_CALLOUT, ((_NOTES, "HEAD_CHAMFER_CALLOUT"),)),
     },
     precision={
@@ -735,20 +737,14 @@ def _dress_head_seat(adapter: Any, annotations: list[Any]) -> None:
     dimension = _early_bound(chamfer.GetDimension2(0), "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     nominal = float(dimension.SystemValue) * 1000.0
-    limits = (
-        nominal + float(tolerance.GetMinValue()) * 1000.0,
-        nominal + float(tolerance.GetMaxValue()) * 1000.0,
-    )
     if (
         not math.isclose(nominal, HEAD_CHAMFER, abs_tol=1e-6)
-        or int(tolerance.Type) != HEAD_CHAMFER_TOL_TYPE
-        or any(
-            not math.isclose(actual, expected, abs_tol=1e-6)
-            for actual, expected in zip(limits, HEAD_CHAMFER_LIMITS, strict=True)
-        )
+        or int(tolerance.Type) != 0  # swTolNONE: .XXX title-block row governs
         or bool(dimension.IsReference())
     ):
-        raise RuntimeError(f"MHA-DT-32 HeadChamfer lost its model limits: {limits}")
+        raise RuntimeError(
+            f"MHA-DT-32 HeadChamfer lost its bare .XXX model nominal: {nominal}"
+        )
 
 
 @dataclass(frozen=True)

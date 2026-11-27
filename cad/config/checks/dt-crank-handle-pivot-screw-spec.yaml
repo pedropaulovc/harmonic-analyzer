@@ -12,16 +12,16 @@ checks:
     source: "dt_crank_handle_spec PIVOT_BORE_FIT_MAX, the #20's DRILLED HOLES .165; delegated ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the owner's fit-audit Q14 answer's trial step; owner review #2144 (D26)"
     basis: worst_case
   - id: C-03
-    check: "the MHA-DT-35 pocket at its .257 limit leaves under its .060 "
+    check: "the MHA-DT-35 pocket at its .280 limit leaves under its .060 "
     kind: wall
     reason: "the cup's face wall falls under the rule-17 floor"
-    source: "owner ruling B on #1375; owner ruling 2026-11-24, fit audit question 15"
+    source: "owner ruling B on #1375; owner ruling 2026-11-26, issue #3743"
     basis: worst_case
   - id: C-04
     check: "the MHA-DT-35 pocket clearance is not the head's band in the pocket's limits"
     kind: gap
     reason: "the head binds in the smallest pocket"
-    source: "owner ruling 2026-11-24, fit audit question 15"
+    source: "owner ruling 2026-11-24, fit audit question 15; owner ruling 2026-11-26, issue #3743"
     basis: worst_case
   - id: C-05
     check: "the shoulder's seat on the arm face is under 0.2 radial"

@@ -32,22 +32,10 @@ sku = "S10R-SCLCR3"
 status = "on_hand"
 note = "Owner inventory 2026-11-13; lathe boring bar."
 
-# To buy with it: the floor-side chamfer of the butt cup's #20 hole sits
-# inside the bored pocket (Ø.239-.257), where the owned 1/4 in chamfer mill
-# does not fit. Harvey Tool 902345-C3 (Turner Supply listing read
-# 2026-11-21): 3/16 in 90° pointed 2-flute solid carbide chamfer cutter,
-# 3/16 in shank, double ended.
-[tools.chamfer-mill-3-16-90]
-source = "https://www.dixie-tool.com/0-1875-3-16-shank-dia-x-45-per-side-de-2-fl-altin-coated-902345-c3/"
-purchase = "Dixie Tool HARTO1-902345-C3, $67.20 (read live 2026-11-22). The uncoated 902345 is $54.60 there."
-name = "Harvey Tool 902345-C3 3/16 in 90 deg pointed 2-flute carbide chamfer cutter, double ended"
-kind = "chamfer_mill"
-sku = "902345-C3"
-status = "to_order"
-note = "To buy. Supplier and price for the order not chosen."
-
-# Owner inventory, 2026-11-13: the shop's only 90 deg countersinking tool. No
-# 82 deg countersink is owned.
+# Owner inventory, 2026-11-13: the shop's 90 deg chamfer/countersinking cutter
+# (used on MHA-PD-13 and, after #3743 opened MHA-DT-35's pocket to Ø.275, inside
+# MHA-DT-35's pocket to chamfer the #20 floor hole; replaces Harvey 902345-C3).
+# No 82 deg countersink is owned.
 [tools.chamfer-mill-330ch-1-4-90]
 name = "330CH 1/4 in 90 deg included 2-flute chamfer mill, 2-1/2 in OAL"
 kind = "chamfer_mill"
@@ -219,9 +207,9 @@ note = "Not owned: to buy. The 3/8 in 82° countersink: MHA-PD-19 arm plate (Ø.
 # older record may be the same object (noted at the record), neither is
 # merged: the packing list does not say.
 
-# Carbide 3-flute square end mills. The 1/8, 1/4, 3/8 and 1/2 in share their
-# keys with cad/process/shop/, which holds their diameters and their
-# cutting settings on 1018.
+# Carbide 3-flute square end mills. All five (1/8, 3/16, 1/4, 3/8 and 1/2 in)
+# share their keys with cad/process/shop/, which holds their diameters and
+# their cutting settings on 1018.
 [tools.endmill-carbide-3fl-1-8]
 name = "Uncoated carbide square 3-flute end mill, 1/8 in, 1-1/2 in OAL"
 kind = "endmill"
@@ -239,10 +227,9 @@ sku = "88815A23"
 status = "on_hand"
 pieces = 2
 flutes = 3
-dia_in = 0.1875
 oal_in = 2.0
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 11: \"Uncoated Carbide Square 3-Flute End Mill, 3/16\" Mill Diameter, 2\" Overall Length\", 2 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
-note = "No plan uses it (#3741)."
+note = "Clamped in the AXA No. 2 V-groove boring holder on the lathe to bore MHA-DT-35's .250 plunged pocket .0125/side out to Ø.275 (#3743; retired from MHA-PN-02 in #3741)."
 
 [tools.endmill-carbide-3fl-1-4]
 name = "Uncoated carbide square 3-flute end mill, 1/4 in, 3 in OAL"

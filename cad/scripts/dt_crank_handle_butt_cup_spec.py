@@ -62,32 +62,34 @@ OVERALL_LENGTH = 8.636  # .34
 # play, still sits below the face (Codex P2 on #1139).  User ruling 2026-09-30.
 POCKET_DEPTH = 5.5118  # .217
 POCKET_DEPTH_TOL = printed_band_mm(3, unit=UNIT)
-# Plunged with the owned 1/4 carbide end mill (owner ruling 2026-11-23, tool
-# audit Q6) and printed at its own limits .248-.257, not derived from the
-# head (owner ruling 2026-11-24, fit audit question 15: no matching; the
-# head is turned to its own band and clears any pocket inside these limits).
-# Modelled at the end mill's .250.  POCKET_CLEARANCE is the clearance those
-# limits leave on the head's .231-.241, the modelled result, not a printed
-# one; POCKET_DIA_MAX is the pocket's own upper limit, which the wall reads.
-POCKET_DIA = 6.35  # .250
-POCKET_DIA_LIMITS = (6.2992, 6.5278)  # .248-.257
-POCKET_DIA_BAND = (
-    round(POCKET_DIA_LIMITS[1] - POCKET_DIA, 6),
-    round(POCKET_DIA_LIMITS[0] - POCKET_DIA, 6),
-)  # (upper, lower): +.007/-.002
+# Plunged .250 with the owned 1/4 carbide end mill and bored .0125/side to
+# .275 with the owned 3/16 carbide end mill in AXA #2, printed at the title
+# block's .XXX +/-.005 (.270-.280), unmatched to the head (owner ruling
+# 2026-11-26, issue #3743; retires the tighter .248-.257 band of fit audit
+# question 15).  POCKET_CLEARANCE is the clearance those limits leave on the
+# head's .257-.267, the modelled result, not a printed one; POCKET_DIA_MAX is
+# the pocket's own upper limit, which the wall reads.
+POCKET_DIA = 6.985  # .275
+POCKET_DIA_TOL = printed_band_mm(3, unit=UNIT)
+POCKET_DIA_LIMITS = (
+    round(POCKET_DIA - POCKET_DIA_TOL, 6),
+    round(POCKET_DIA + POCKET_DIA_TOL, 6),
+)  # .270-.280
 POCKET_DIA_MAX = POCKET_DIA_LIMITS[1]
-POCKET_CLEARANCE = (0.1778, 0.6604)  # .007-.026, unmatched
-# Owner ruling B on #1375: the cup grows around the unchanged head and pocket,
-# rather than retaining a sub-floor wall or tightening the body band.  Owner ruling 2026-11-08 (Pedro), #2144 item 7.1 (#2170, option B) grows it again so that the
-# floor holds at the outer face, where both of the wall's edges are broken.
+POCKET_CLEARANCE = (0.0762, 0.5842)  # .003-.023, unmatched
+# Owner ruling B on #1375: the cup grows around the pocket to retain the wall
+# floor rather than tightening the body band.  Owner ruling 2026-11-08 (Pedro),
+# #2144 item 7.1 (#2170, option B) holds the floor at the outer face, where
+# both of the wall's edges are broken; owner ruling 2026-11-26 (#3743, option A)
+# grows the body +.025 with the .275 pocket so the straight wall holds .081 and
+# the broken face .061.
 POCKET_WALL_FLOOR_MM = WALL_FLOOR_MM
-BODY_DIA = 10.7188  # .422: the largest pocket, two .060 face walls, their breaks and the band
-# The head bears on the floor: the floor-to-wall corner may round no more than
-# half the tightest radial clearance, so a sharp-edged, centred head still
-# seats on the flat (rule 16: the largest radius acceptable; MHA-DT-35 r1
-# finding 5).  Half of .007 is .0035; the sheet prints the three-place limit
-# under it, R.003 MAX (owner ruling 2026-11-24, fit audit question 15).
-POCKET_FLOOR_CORNER_R_MAX = 0.0762  # .003
+BODY_DIA = 11.3538  # .447: the .280 max pocket, two .061 face walls, their breaks and the band
+# Owner ruling 2026-11-26 (#3743, option A): R.015 MAX floor corner (rule 16:
+# the largest radius acceptable for a standard square end mill / boring corner),
+# cleared at zero radial gap by MHA-DT-32's .021 +/-.005 x 45 deg under-head
+# rim break (.016 min leg; proved in dt_crank_handle_head_seat_spec).
+POCKET_FLOOR_CORNER_R_MAX = 0.381  # .015
 POCKET_FLOOR_CORNER_R_BAND = (0.0, -POCKET_FLOOR_CORNER_R_MAX)  # (upper, lower)
 POCKET_FLOOR_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: nominal is the limit
 # The floor hole passes the MHA-DT-32 shoulder: a #20 drill (.161) under the
@@ -150,8 +152,9 @@ for _ok, _what in (
         "the modelled pocket is outside its printed limits",
     ),
     (
-        POCKET_FLOOR_CORNER_R_MAX <= POCKET_CLEARANCE[0] / 2.0,
-        "the pocket's floor corner rounds past half the tightest head clearance",
+        (FLOOR_HOLE_DIA + drilled_oversize_mm(unit=UNIT)) / 2.0 + EDGE_BREAK_MAX_MM
+        < POCKET_DIA_LIMITS[0] / 2.0 - POCKET_FLOOR_CORNER_R_MAX,
+        "the pocket's floor corner leaves no flat floor outside the broken hole",
     ),
     (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 1/2-in rod"),
 ):

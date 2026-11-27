@@ -90,7 +90,6 @@ def _expect(ctx: dict, program: str, check: str) -> dict:
 
 def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
     assert ctx["numbers"] == {"spot": 1, "drill-15": 2, "em-eighth": 3}
-    assert "endmill-carbide-3fl-3-16" not in SHOP["tools"]
     assert "pn-em-3-16-1018-cf" not in SHOP["settings"]
     assert "endmill-hss-tin-2fl-3-16" not in SHOP["tools"]
     assert "lathe-plunge-3-16-c360" not in SHOP["settings"]

@@ -1,6 +1,0 @@
-machinist_exceptions:
-  - id: TV-001
-    where: "Setup 1, the head window worked out from the cup's tag; Setup 3 head turn, its check and its scrap remedy"
-    finding: "The head is held to a window from the MHA-DT-35 pocket reading C (the larger of .231 and C - .015 to the smaller of .241 and C - .009) and scrapped below it, though a smaller head still meets this sheet's Ø.231-.241"
-    reason: "Owner ruling 2026-11-23 (tool audit Q6): 'B. End-mill the pocket with the owned 1/4 carbide end mill and turn the MHA-DT-32 head to it (pocket less .012 +/-.004); no boring bar.' The pocket is no longer bored to the head, so the head carries MHA-DT-35 note 1's running fit (clearance .008-.016): a head under C - .015 leaves more than .016."
-    kind: accept

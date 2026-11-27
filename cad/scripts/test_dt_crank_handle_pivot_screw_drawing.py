@@ -42,7 +42,7 @@ def test_part_registry_row_is_the_made_screw() -> None:
     assert row["number"] == "MHA-DT-32"
     # The title block prints the registry title, not the slug.
     assert row["title"] == "Crank Handle Pivot Screw"
-    for grade in ("1018", "12L14", "1/4 in"):
+    for grade in ("1018", "12L14", "3/8 in"):
         assert grade in row["material"]
         assert grade in row["material_specification"]
     assert int(row["quantity"]) == 1
@@ -147,7 +147,8 @@ def test_geometry_matches_the_u33_ruling() -> None:
     assert spec.OVERALL_LENGTH == pytest.approx(spec.SEAT_STATION + spec.THREAD_LENGTH)
     # The largest tip chamfer stays within the thread depth (17/24 H).
     assert spec.TIP_CHAMFER_MAX <= 0.61343 * 25.4 / 40.0
-    assert spec.HEAD_DIA + spec.HEAD_DIA_TOL < spec.STOCK_DIA == pytest.approx(6.35)
+    assert spec.HEAD_DIA == pytest.approx(0.262 * 25.4)
+    assert spec.HEAD_DIA + spec.HEAD_DIA_TOL < spec.STOCK_DIA == pytest.approx(0.375 * 25.4)
 
 
 def test_u33_running_fit_end_play_and_engagement() -> None:
@@ -396,7 +397,8 @@ def test_head_bearing_acceptance_accounts_for_running_offset() -> None:
     floor_hole_max = cup.FLOOR_HOLE_DIA + drilled_oversize_mm(unit=cup.UNIT)
     assert spec.HEAD_BEARING_RADIAL_CONCENTRIC_MIN == pytest.approx(
         ((spec.HEAD_DIA - spec.HEAD_DIA_TOL) - floor_hole_max) / 2.0
-        - 2.0 * spec.EDGE_BREAK_MAX_MM
+        - spec.HEAD_CHAMFER_LIMITS[1]
+        - edge_break_chamfer_mm(unit=cup.UNIT)
     )
     assert spec.HEAD_RUNNING_OFFSET_MAX == pytest.approx(
         min(cup.POCKET_CLEARANCE[1] / 2.0, (floor_hole_max - spec.SHOULDER_DIA_MIN) / 2.0)
@@ -749,18 +751,16 @@ def test_head_seat_breaks_clear_each_mating_corner_and_keep_a_bearing_flat() -> 
     assert under_head == pytest.approx(seat.UNDER_HEAD_AIR_MIN, abs=1e-6)
     assert head_edge == pytest.approx(seat.HEAD_EDGE_AIR_MIN, abs=1e-6)
     assert min(under_head, head_edge) > 0.0
-    # Each break prints its single limit .005 MIN and is modelled at it; the
-    # title block's edge break caps it (machinist review r1, farm run
-    # 20261124T110807008Z: the stacked .010/.005 was a tight band), so the
-    # specs' existing annulus budgets still hold.  The two are one mating
-    # pair and print alike.
-    assert seat.HEAD_CHAMFER_TOL_TYPE == cup_seat.MIN_TOL_TYPE == 5  # swTolMIN
-    for nominal, (low, high) in (
-        (seat.HEAD_CHAMFER, seat.HEAD_CHAMFER_LIMITS),
-        (cup_seat.FLOOR_HOLE_CHAMFER, cup_seat.FLOOR_HOLE_CHAMFER_LIMITS),
-    ):
-        assert low == nominal == pytest.approx(0.005 * 25.4)
-        assert high == edge_break_chamfer_mm(unit=spec.UNIT)
+    # #3743 option A: the cup's floor-hole mouth break keeps its single limit
+    # .005 MIN (capped by the cup sheet's .010 edge break), while the screw's
+    # outer under-head break prints .021 at the title block's .XXX +/-.005 row
+    # (.016-.026) so its .016 lower limit clears MHA-DT-35's R.015 MAX corner.
+    assert cup_seat.MIN_TOL_TYPE == 5  # swTolMIN
+    assert not hasattr(seat, "HEAD_CHAMFER_TOL_TYPE")
+    assert seat.HEAD_CHAMFER == pytest.approx(0.021 * 25.4)
+    assert seat.HEAD_CHAMFER_LIMITS == pytest.approx((0.016 * 25.4, 0.026 * 25.4))
+    assert cup_seat.FLOOR_HOLE_CHAMFER == cup_seat.FLOOR_HOLE_CHAMFER_LIMITS[0] == pytest.approx(0.005 * 25.4)
+    assert cup_seat.FLOOR_HOLE_CHAMFER_LIMITS[1] == edge_break_chamfer_mm(unit=cup.UNIT)
     # The flat annulus left on the narrow side, from the printed limits:
     # smallest head less its largest break, over the largest drilled hole
     # plus its largest break, the head pushed over by its running play.  The
@@ -788,12 +788,19 @@ def test_head_seat_prints_native_limits_with_words_only_callouts() -> None:
 
 def test_detail_b_frames_the_head_seat_inside_the_sheet() -> None:
     focus_z, focus_r = drawing.DETAIL_B_FOCUS_MM
-    for z, r in (drawing._ROUND_ON_SHOULDER, drawing._ROUND_ON_FACE, drawing._BREAK_ON_OD):
+    for z, r in (
+        drawing._ROUND_ON_SHOULDER,
+        drawing._ROUND_ON_FACE,
+        drawing._BREAK_ON_OD,
+        drawing._BREAK_ON_FACE,
+    ):
         assert math.hypot(z - focus_z, r - focus_r) < drawing.DETAIL_B_RADIUS_MM
     x, y = drawing.DETAIL_B_CENTER
     crop = drawing.DETAIL_B_CROP_RADIUS
     assert 0.0127 < x - crop and x + crop < 0.4191 and 0.0127 < y - crop
-    # Clear of the title block and of detail A.
+    # Clear of the bottom inner border (two-line label ~13 mm tall from top),
+    # the title block, and detail A.
+    assert drawing.DETAIL_B_LABEL_XY[1] - 0.014 > 0.0127
     assert x + crop < 0.218 or y - crop > 0.065
     ax, ay = drawing.DETAIL_CENTER
     assert math.hypot(x - ax, y - ay) > crop + drawing.DETAIL_CROP_RADIUS

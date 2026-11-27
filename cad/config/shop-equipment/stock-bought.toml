@@ -173,7 +173,7 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [stock.1018-round-1-4]
 form = "round_bar"
 material = "1018 cold-finish carbon steel"
-note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4791, 1/4 in round 1018 CF, 1 x 72 in, $4.75. Item notes: Drawing Number: MHA-CH-04, MHA-DT-17, MHA-DT-19, MHA-DT-15, MHA-DT-09, MHA-PD-23, MHA-DT-32 | Custom Part: ch-fulcrum-shaft, dt-pinion-lift-rod, dt-pinion-pivot-shaft, dt-pinion-handle, dt-crank-pin +2. The printed part list is truncated in the document itself. ch-fulcrum-shaft, dt-pinion-lift-rod and dt-pinion-pivot-shaft are now cut from 1018-ground-round-1-4 (owner ruling 2026-11-20, #2346), so their shares are not allocated here."
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4791, 1/4 in round 1018 CF, 1 x 72 in, $4.75. Item notes: Drawing Number: MHA-CH-04, MHA-DT-17, MHA-DT-19, MHA-DT-15, MHA-DT-09, MHA-PD-23, MHA-DT-32 | Custom Part: ch-fulcrum-shaft, dt-pinion-lift-rod, dt-pinion-pivot-shaft, dt-pinion-handle, dt-crank-pin +2. The printed part list is truncated in the document itself. ch-fulcrum-shaft, dt-pinion-lift-rod and dt-pinion-pivot-shaft are now cut from 1018-ground-round-1-4 (owner ruling 2026-11-20, #2346), and dt-crank-handle-pivot-screw (MHA-DT-32) is now turned from 1018-round-3-8 (owner ruling 2026-11-26, #3743), so their shares are not allocated here."
 dia_in = [0.25]
 length_in = [72]
 status = "on_hand"
@@ -182,7 +182,7 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [stock.1018-round-3-8]
 form = "round_bar"
 material = "1018 cold-finish carbon steel"
-note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4792, 3/8 in round 1018 CF, 1 x 36 in, $4.60. Item notes: Drawing Number: MHA-DT-13, MHA-CH-05 | Custom Part: dt-cylinder-gear-shaft, ch-pivot-shaft. ch-pivot-shaft (MHA-CH-05) and dt-cylinder-gear-shaft (MHA-DT-13) are now cut from ground rod (owner ruling 2026-11-20, #2346), so neither share is allocated here."
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4792, 3/8 in round 1018 CF, 1 x 36 in, $4.60. Item notes: Drawing Number: MHA-DT-13, MHA-CH-05 | Custom Part: dt-cylinder-gear-shaft, ch-pivot-shaft. ch-pivot-shaft (MHA-CH-05) and dt-cylinder-gear-shaft (MHA-DT-13) are now cut from ground rod (owner ruling 2026-11-20, #2346), so neither share is allocated here. Now allocated to MHA-DT-32 dt-crank-handle-pivot-screw (owner ruling 2026-11-26, #3743)."
 dia_in = [0.375]
 length_in = [36]
 status = "on_hand"

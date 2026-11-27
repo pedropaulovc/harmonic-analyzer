@@ -67,8 +67,6 @@ from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from dt_crank_handle_head_seat_spec import (
     HEAD_CHAMFER,
-    HEAD_CHAMFER_LIMITS,
-    HEAD_CHAMFER_TOL_TYPE,
     SCREW_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
     SCREW_DRAWING_PRECISION as DRAWING_PRECISION,
     UNDER_HEAD_RADIUS_BAND,
@@ -479,9 +477,8 @@ def build(adapter) -> dict[str, str]:
         band=TIP_CHAMFER_BAND,
         tol_type=TIP_CHAMFER_TOL_TYPE,
     )
-    # The head seat (#1757): the under-head radius as its single limit
-    # R.004 MAX, the head's break as its single limit .005 MIN (the title
-    # block's edge break caps it).
+    # The head seat (#1757, #3743): the under-head radius as its single limit
+    # R.004 MAX; the head's .021 break prints under the title block's .XXX row.
     set_single_limit(
         adapter,
         "ScrewProfile",
@@ -489,14 +486,6 @@ def build(adapter) -> dict[str, str]:
         limit=UNDER_HEAD_RADIUS_MAX,
         band=UNDER_HEAD_RADIUS_BAND,
         tol_type=UNDER_HEAD_RADIUS_TOL_TYPE,
-    )
-    set_single_limit(
-        adapter,
-        "ScrewProfile",
-        "HeadChamfer",
-        limit=HEAD_CHAMFER,
-        band=(HEAD_CHAMFER_LIMITS[1] - HEAD_CHAMFER, 0.0),
-        tol_type=HEAD_CHAMFER_TOL_TYPE,
     )
 
     # Every model edit -- the material, the appearance, the drawing marks, the

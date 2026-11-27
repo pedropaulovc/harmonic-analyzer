@@ -105,10 +105,8 @@ description = "Straightedge"
 # Tools the v50 drawings call for that the quote workbook left out, from the
 # drawing cross-check of the placeholder plans (2026-11-19) and the owner's
 # rulings of that day. The comment cites the drawing callout or the inventory
-# record that holds the tool's ownership.
-[tools.chamfer-mill-330ch-1-4-90]  # inventory tools.chamfer-mill-330ch-1-4-90
-description = "330CH 1/4 in 90° included 2-flute chamfer mill"
-diameter_mm = 6.35
+# record that holds the tool's ownership. (chamfer-mill-330ch-1-4-90 moved to
+# common.toml for #3743.)
 [tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
 description = "Gauge pin .0625 in, class ZZ"
 [tools.dial-indicators]  # MHA-PD-13 compound set to the dish flank; inventory gauges.dial-indicators, gauges.mag-base

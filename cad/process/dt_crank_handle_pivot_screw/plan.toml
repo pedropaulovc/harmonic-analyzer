@@ -1,10 +1,11 @@
 # Crank handle pivot screw MHA-DT-32, one off, on the manual PM-1127VF-LB
 # (owner ruling 2026-11-21: turned parts get lathe travelers, no NC), from
-# the owned 1/4 in 1018 rod. Order of manufacture: the MHA-DT-35 butt cup
-# (bonded into the handle) first, this screw last. Owner ruling 2026-11-24,
-# fit audit question 15 (no matching): the head is turned to its own
-# Ø.231-.241 and clears any pocket the cup's 1/4 end mill cuts (.248-.257);
-# nothing is read off the cup. The shoulder is turned to its own drawn
+# the owned 3/8 in 1018 rod (owner ruling 2026-11-26, #3743 option A). Order of
+# manufacture: the MHA-DT-35 butt cup (bonded into the handle) first, this
+# screw last. Owner ruling 2026-11-24, fit audit question 15 (no matching) and
+# #3743 option A: the head is turned to its own Ø.257-.267 (.262 +/-.005) with
+# a .016-.026 x 45° (.021 +/-.005) under-head outer rim break and clears any
+# pocket the cup cuts (.270-.280, R.015 MAX corner); nothing is read off the cup. The shoulder is turned to its own drawn
 # .1535-.1585 (owner ruling 2026-11-24, fit audit question 14: "limits
 # .1535-.1585"); MHA-DT-08's bore is a plain #20 drilled hole, .1610-.1650
 # (D26), so the largest shoulder still clears the smallest bore by .0025
@@ -41,7 +42,7 @@ revision = "{{cad.revision}}"
 material = "{{cad.material_spec}}"
 stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} 1018 cold-finished rod, the bar on hand; one blank B = P + {{process.blank_over_p_in:.2dot}} long (Setup 1), {{process.blank_min_in:.2dot}}–{{process.blank_max_in:.2dot}} over the accepted stack."
 shop = "../shop"
-stock_refs = ["1018-round-1-4"]
+stock_refs = ["1018-round-3-8"]
 material_key = "lathe-1018-cold-finished"
 turning_material = "steel_1018"
 
@@ -57,11 +58,11 @@ part = "dt-crank-handle-pivot-screw"
 
 [parameters]
 quantity = 1
-stock_dia_in = 0.25
-stock_dia_mm = 6.35
-# The 1/4 in rod as the stock fit reads it (the export's envelope).
-blank_x_in = 0.25
-blank_y_in = 0.25
+stock_dia_in = 0.375
+stock_dia_mm = 9.525
+# The 3/8 in rod as the stock fit reads it (the export's envelope).
+blank_x_in = 0.375
+blank_y_in = 0.375
 # The blank and the stickout follow the part-off station P (Setup 1, from the
 # measured stack M): out of the jaw fronts S = P + .33 as chucked (.03 faced
 # off the tip leaves P + .30: the head turn's end at P + .10 then stands .20
@@ -101,21 +102,21 @@ turn_feed_mm_rev = 0.0508
 # The head's diameter turned over the whole stickout, to the part-off and
 # .8 mm past the blade: Z of its end (the drawn screw).
 head_turn_end_z_mm = -69.0
-# Aims, mm: the head at the middle of its drawn Ø.231-.241 (.236; owner
-# ruling 2026-11-24, fit audit question 15: nothing is read off the cup);
+# Aims, mm: the head at the middle of its drawn Ø.257-.267 (.262; owner
+# ruling 2026-11-26, #3743 option A: nothing is read off the cup);
 # the shoulder roughed to .1654 and finished at the middle of its drawn
 # .1535-.1585 (owner ruling 2026-11-24, fit audit question 14: "limits
 # .1535-.1585"); the thread blank at .1085, inside
 # cad.thread_dia (the #4-40 UNC-2A major .1061-.1112, the title block's
 # CLASS 2A).
-head_aim_dia_mm = 5.9944
+head_aim_dia_mm = 6.6548
 shoulder_rough_dia_mm = 4.2
 shoulder_aim_dia_mm = 3.9624
 thread_rough_dia_mm = 2.957
 thread_aim_dia_mm = 2.7559
 # The bands' low ends, mm (cad.head_dia, cad.shoulder_dia, cad.thread_dia):
 # no pass goes under them.
-head_dia_min_mm = 5.8674
+head_dia_min_mm = 6.5278
 shoulder_dia_min_mm = 3.8989
 thread_dia_min_mm = 2.69494
 # The drawn under-head and seat stations from the tip (Z0), mm: the
@@ -140,8 +141,10 @@ relief_aim_dia_in = 0.070
 lead_outer_dia_in = 0.094
 lead_axial_in = 0.012
 lead_compound_in = 0.017
-# The head's chamfer (.005-.010 X 45°) aimed at its middle.
-head_chamfer_aim_in = 0.0075
+# The head's under-head outer chamfer (.016-.026 X 45°, #3743) aimed at .021
+# (.030 along the 45° compound slide).
+head_chamfer_aim_in = 0.021
+head_chamfer_compound_in = 0.030
 # The tip's thread-start chamfer (the drawing's .015 MAX) is filed at the
 # bench after the part-off (Setup 4): no lathe cut at the unsupported tip.
 
@@ -222,7 +225,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-diagram = { file = "diagrams/saw.svg", alt = "Op 30, to scale: the blank B = P + {{process.blank_over_p_in:.2dot}} marked off the 1/4 rod and sawn on the waste side of the scribe." }
+diagram = { file = "diagrams/saw.svg", alt = "Op 30, to scale: the blank B = P + {{process.blank_over_p_in:.2dot}} marked off the 3/8 rod and sawn on the waste side of the scribe." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -379,7 +382,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Head chamfer 45°, {{cad.head_chamfer_min_in:.3dot}}–{{cad.head_chamfer_max_in:.3dot}}: swing the compound to 45° (its feed in and toward the tip); re-square the blade's holder. Spindle stopped: back the quill until the centre clears the tip. With the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +.002; its chuck-side corner on the head's O.D. at Z−(U + {{process.head_chamfer_aim_in:.4dot}}), zero the compound. Spindle on: feed .011 along the compound, then back to its zero."
+instruction = "Head chamfer 45°, {{cad.head_chamfer_min_in:.3dot}}–{{cad.head_chamfer_max_in:.3dot}}: swing the compound to 45° (its feed in and toward the tip); re-square the blade's holder. Spindle stopped: back the quill until the centre clears the tip. With the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +.002; bring the centre back snug. Bring its chuck-side corner onto the head's O.D. at Z−(U + {{process.head_chamfer_aim_in:.3dot}}), zero the compound. Spindle on: feed {{process.head_chamfer_compound_in:.3dot}} along the compound in two light passes (.015, then to .030) so the 45° break meets the under-head face at Z−U, then wind the compound back to its zero."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 

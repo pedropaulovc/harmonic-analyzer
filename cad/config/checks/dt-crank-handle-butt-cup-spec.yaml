@@ -3,11 +3,11 @@ checks:
     check: "the modelled pocket is outside its printed limits"
     kind: gap
     reason: "the model shows a pocket the sheet rejects"
-    source: "owner ruling 2026-11-24, fit audit question 15"
+    source: "owner ruling 2026-11-26, issue #3743"
     basis: worst_case
   - id: C-02
-    check: "the pocket's floor corner rounds past half the tightest head clearance"
+    check: "the pocket's floor corner leaves no flat floor outside the broken hole"
     kind: gap
-    reason: "the corner props the head's edge off the floor"
-    source: "owner ruling 2026-11-24, fit audit question 15"
+    reason: "the corner reaches the floor hole's mouth break"
+    source: "owner ruling 2026-11-26, issue #3743"
     basis: worst_case
