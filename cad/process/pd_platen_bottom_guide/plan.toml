@@ -35,9 +35,9 @@
 #
 # Not made here (one line on the sheet): the five #4-40 platen taps
 # (transferred from MHA-PD-02) and the four Ø.067 rack-screw holes with
-# their Ø.110 counterbores (struck from MHA-PD-26) are made at MHA-PD-00
-# (made_at = "assembly" in the export); their tools (#51, #35, 3/32 end
-# mill, transfer punches) are that sheet's.
+# their Ø.125 counterbores (struck from MHA-PD-26) are made at MHA-PD-00
+# (made_at = "assembly" in the export); their tools (#51, 1/8 end mill,
+# transfer punches) are that sheet's.
 #
 # Stock (cad/config/shop-equipment/ stock.1018-square-3-4, on hand, one
 # 36 in bar): its order note allocates it to MHA-CH-08, CH-07, SH-01 and
@@ -605,7 +605,7 @@ inspection = "{{cad.lock_tap_1_height_min_in:.3dot}}–{{cad.lock_tap_1_height_m
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.lock_tap_1_height_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Not made here: the five #4-40 platen taps (transferred from MHA-PD-02) and the four Ø.067 rack-screw holes with their Ø.110 counterbores (struck from MHA-PD-26) are made at MHA-PD-00."
+instruction = "Not made here: the five #4-40 platen taps (transferred from MHA-PD-02) and the four Ø.067 rack-screw holes with their Ø.125 counterbores (struck from MHA-PD-26) are made at MHA-PD-00."
 feed = "hand"
 
 [[setups]]

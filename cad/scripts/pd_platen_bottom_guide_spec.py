@@ -17,7 +17,7 @@ as MHA-PD-11. Three hole families:
   crests set: the platen-screw float cannot absorb the crest set, so the
   holes follow it;
 * four stepped rack-screw holes from the top face, #51 through and a
-  Ø.110 counterbore, struck from the rack's taps at MHA-PD-00 with a
+  Ø.125 counterbore, struck from the rack's taps at MHA-PD-00 with a
   transfer screw.
 
 Both transfers: delegated ruling 2026-11-14 (Main), pending owner
@@ -42,7 +42,7 @@ from _printed_tolerance import (
     edge_break_radius_mm,
     printed_band_mm,
 )
-import _mcmaster_91794a055 as _screw
+import _mcmaster_91794a060 as _screw
 import pd_feed_rack_spec as rack
 import pd_platen_guide_spec as top_rail
 from pd_platen_spec import DRAWING_PRECISION_BY_NAME as PLATEN_PRECISION
@@ -152,30 +152,30 @@ if min(PLATEN_TAP_TOP_WALL_MIN, PLATEN_TAP_BOTTOM_WALL_MIN, LOCK_TAP_TOP_WALL_MI
 # Over the rack's taps (the strip lies flush with the rail's ends), on the
 # strip's centreline: FRONT_BEHIND_PLATEN plus half the strip's face width
 # from the front face. #51 through (close to the .060 screw), counterbored
-# Ø.110 from the top to the rack spec's floor (rail height less the
-# counterbore depth: the height's .XXX and the depth's own ±.005,
-# pd_feed_rack_spec.SCREW_FLOOR_BAND).
+# Ø.125 with a 1/8 end mill from the top to the rack spec's floor (rail height
+# less the counterbore depth: the height's .XXX and the depth's own ±.005,
+# pd_feed_rack_spec.SCREW_FLOOR_BAND; owner ruling 2026-11-26, #3738).
 # The rail is placed Ry180 (its native Front on the platen, as MHA-PD-11), so
 # its local x runs from the platen's +X end while the strip's runs from its
 # -X end: the stations mirror about the rail's length.
 SCREW_HOLE_X = tuple(sorted(GUIDE_LENGTH - x for x in rack.TAP_X))
 SCREW_HOLE_Z = rack.FRONT_BEHIND_PLATEN + rack.TAP_Z  # from the front face
 SCREW_HOLE_DIA = NUMBER_DRILL_MM["#51"]  # .067
-SCREW_CBORE_DIA = 0.110 * MM_PER_IN  # #35
-SCREW_CBORE_DEPTH = GUIDE_HEIGHT - rack.SCREW_FLOOR  # .469
+SCREW_CBORE_DIA = 0.125 * MM_PER_IN  # 1/8 end mill
+SCREW_CBORE_DEPTH = GUIDE_HEIGHT - rack.SCREW_FLOOR  # .219
 # The counterbore's printed bands, (upper, lower) in mm: owner ruling
-# 2026-11-25 (#3620), "b: Ø.110 +.004/−0 and depth .469 ±.005". With no band of
+# 2026-11-26 (#3738), Ø.125 +.005/-.000 and depth .219 ±.005. With no band of
 # its own each would be a Hole Wizard pocket at the .XX grade, ±.01 (rule 3,
-# _wizard_pocket_band), and at ±.01 the Ø.096 #0 head can hang on a Ø.100
-# pocket (SCREW_HEAD_ENTRY_MIN -.003), the longest screw on the thinnest floor
-# runs .005 into the rack tap's lead (pd_feed_rack_spec.SCREW_TIP_REACH_MAX),
-# the engagement falls to .0275 under MHA-PD-26's printed .032 MIN
-# (ENGAGEMENT_WORST) and the front wall to .0417 under the printed .044 MIN
-# (SCREW_CBORE_FRONT_WALL_MIN). The part puts both bands on the RackScrewHoles
-# Hole Wizard feature (build_pd_platen_bottom_guide._band_rack_screw_counterbores)
-# so the native callout displays them.
-SCREW_CBORE_DIA_BAND = (0.1016, 0.0)  # Ø.110 +.004/-.000
-SCREW_CBORE_DEPTH_BAND = (0.127, -0.127)  # .469 +.005/-.005
+# _wizard_pocket_band), and at ±.01 the front wall at Ø.135 falls to .0422
+# under the printed .044 MIN (SCREW_CBORE_FRONT_WALL_MIN), the longest screw
+# on the thinnest floor runs .005 into the rack tap's lead
+# (pd_feed_rack_spec.SCREW_TIP_REACH_MAX), and the engagement falls to .0275
+# under MHA-PD-26's printed .032 MIN (ENGAGEMENT_WORST). The part puts both
+# bands on the RackScrewHoles Hole Wizard feature
+# (build_pd_platen_bottom_guide._band_rack_screw_counterbores) so the native
+# callout displays them.
+SCREW_CBORE_DIA_BAND = (0.127, 0.0)  # Ø.125 +.005/-.000
+SCREW_CBORE_DEPTH_BAND = (0.127, -0.127)  # .219 +.005/-.005
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
     "#0",

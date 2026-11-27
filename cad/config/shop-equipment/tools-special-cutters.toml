@@ -28,11 +28,6 @@ status = "to_order"
 note = "Not owned: to buy. Variable Helix End Mills for Aluminum Alloys - Square - Downcut: 3 left-hand spiral, right-hand cut flutes, centre cutting, uncoated; the family page states it prevents lifting of the workpiece and performs in brass. Cuts the MHA-PD-03 platen clip out of .032 brass strip bonded on tape (PC01_sheet): its .031 fits the clip's .04 slits (drawing cross-check 2026-11-19, 2X .04 SLIT, FULL R END; it replaces the 3/64 end mill that list named, too wide to cut the slit's two sides), and a downcut pushes the narrow finger onto the tape instead of lifting it."
 flutes = 3
 
-[tools.endmill-carbide-3-32]
-kind = "end_mill"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-27 flat floor for the Ø.110 counterbore (MHA-CH-03's .106 fork slot is sawn since #3505 and needs no 3/32 cutter; #3568)."
-
 [tools.endmill-carbide-3fl-1-16-loc-1-2]
 kind = "end_mill"
 make = "Accupro"

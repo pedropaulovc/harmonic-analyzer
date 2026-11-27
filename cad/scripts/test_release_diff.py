@@ -67,18 +67,13 @@ KITS = [
     }),
 ]
 FAMILIES = GROUPS + KITS
-# Families allocated with no prior native identity (#2339, #2410): no prior
+# Families allocated with no prior native identity (#2339): no prior
 # stem pairs; the identities they replaced stay retired reservations.
 INTRODUCED = [
     ("sh-vn-pivot-pin", "MHA-SH-VN-58", "RodPin", ("RodPin", "BarPin")),
-    (
-        "sh-vn-fillister-screw-91794a055", "MHA-SH-VN-59", "RackScrew",
-        ("RackScrew", "DiscScrew"),
-    ),
 ]
 INTRODUCED_RETIRED = {
     "sh-vn-pivot-pin": ("ch-rod-pivot-pin", "MHA-CH-10"),
-    "sh-vn-fillister-screw-91794a055": ("pd-vn-transgear-disc-screw", "MHA-PD-VN-55"),
 }
 NAMED_FAMILIES = [family for family in FAMILIES if family[2] != "Default"]
 

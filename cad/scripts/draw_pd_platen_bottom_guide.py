@@ -134,7 +134,7 @@ RIGHT_KEEP = {"Depth": (0.358, 0.161)}
 # rack screws' worst engagement pays (pd_feed_rack_spec.SCREW_FLOOR_BAND); the
 # band names its mate by number (rule 4, r4), two lines that fit between the
 # front and right views.
-SCREW_NUMBER = _config.parts("sh-vn-fillister-screw-91794a055")["number"]
+SCREW_NUMBER = _config.parts("pd-vn-feed-rack-screw")["number"]
 HEIGHT_CALLOUT = f"SETS ENGAGEMENT\nOF {SCREW_NUMBER}"
 # Both front-view tap callouts sit between the views, clear under the top
 # view (its underside ~0.155) so the counterbore leader into it runs past
@@ -152,8 +152,8 @@ PLATEN_CALLOUT_BELOW = f"TRANSFER FROM {PLATEN_NUMBER} AT ASSEMBLY"
 SCREW_CALLOUT_BELOW = (
     f"TRANSFER FROM {RACK_NUMBER} AT ASSEMBLY\n{SCREW_CBORE_FRONT_WALL_TEXT}"
 )
-# The counterbore prints its own bands (owner ruling 2026-11-25, #3620: "b:
-# Ø.110 +.004/−0 and depth .469 ±.005"; build_pd_platen_bottom_guide puts them
+# The counterbore prints its own bands (owner ruling 2026-11-26, #3738:
+# Ø.125 +.005/−0 and depth .219 ±.005; build_pd_platen_bottom_guide puts them
 # on the Hole Wizard feature, _print_counterbore_bands their places). It names
 # no function: a dimension with its own band needs none (rule 3), the floor's
 # reason is already the height's (HEIGHT_CALLOUT: the floor is the height less

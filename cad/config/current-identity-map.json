@@ -2505,16 +2505,19 @@
         {
           "parent": "pd-paper-drive",
           "stem": "sh-vn-fillister-screw-91794a055",
-          "number": "MHA-SH-VN-59",
-          "configuration": "RackScrew",
-          "role": "RackScrew"
-        },
+          "number": "MHA-SH-VN-59"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-vn-feed-rack-screw",
+      "old_number": null,
+      "introduced": "2026-11-26",
+      "new_identities": [
         {
           "parent": "pd-paper-drive",
-          "stem": "sh-vn-fillister-screw-91794a055",
-          "number": "MHA-SH-VN-59",
-          "configuration": "DiscScrew",
-          "role": "DiscScrew"
+          "stem": "pd-vn-feed-rack-screw",
+          "number": "MHA-PD-VN-72"
         }
       ]
     },
@@ -3382,17 +3385,6 @@
         "BarPin"
       ],
       "neutral_export_configuration": "RodPin"
-    },
-    {
-      "stem": "sh-vn-fillister-screw-91794a055",
-      "number": "MHA-SH-VN-59",
-      "supplier": "McMaster",
-      "supplier_sku": "91794A055",
-      "configurations": [
-        "RackScrew",
-        "DiscScrew"
-      ],
-      "neutral_export_configuration": "RackScrew"
     }
   ],
   "configured_kits": [

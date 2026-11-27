@@ -46,11 +46,9 @@ _ARCHIVE_MEMBERS = {
     "dt-vn-swing-stop-screw": (
         "sh-vn-fillister-screw-90280a108", "Default", "SwingStopScrew"
     ),
-    "pd-vn-transgear-disc-screw": (
-        "sh-vn-fillister-screw-91794a055", "DiscScrew", "DiscScrew"
-    ),
 }
 _ARCHIVE_STOCK = {
+    "pd-vn-transgear-disc-screw": "sh-vn-fillister-screw-91794a055",
     "dt-vn-fillister-screw": "sh-vn-brass-fillister-screw",
     "fr-vn-fillister-screw": "sh-vn-brass-fillister-screw",
     "pd-vn-fillister-screw": "sh-vn-brass-fillister-screw",

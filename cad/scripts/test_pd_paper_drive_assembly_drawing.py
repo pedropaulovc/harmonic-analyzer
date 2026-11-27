@@ -86,7 +86,7 @@ UNCHANGED_FAMILIES = {
     "pd-feed-rack",  # #2410: the bare purchased strip replaces MHA-PD-05
     "pd-platen-bottom-guide",  # #2410: MHA-PD-27, the rack screwed under it
     "pd-platen-guide",
-    "sh-vn-fillister-screw-91794a055--RackScrew",
+    "pd-vn-feed-rack-screw",
     "pd-guide-lock",
     "pd-platen-clip",
     "pd-platen-paper",
@@ -118,7 +118,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-vn-transgear-retaining-ring": 1,
     "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MAX,
     "pd-rack-pinion": 1,
-    "sh-vn-fillister-screw-91794a055--DiscScrew": 3,
+    "sh-vn-fillister-screw-91794a055": 3,
     "pd-transgear-knob-shaft": 1,
     "pd-transgear-drive-collar": 1,
     "pd-vn-transgear-knob-drive-pin": 2,
@@ -130,10 +130,8 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-knob-cup": 1,
     "pd-vn-transgear-knob-cup-screw": 1,
 }
-# The shared #0-80 fillister's native names: the builder places the four
-# RackScrews first, then the three DiscScrews (it proves each name).
-RACK_SCREW_INSTANCES = tuple(f"sh-vn-fillister-screw-91794a055-{i}" for i in (1, 2, 3, 4))
-DISC_SCREW_INSTANCES = tuple(f"sh-vn-fillister-screw-91794a055-{i}" for i in (5, 6, 7))
+RACK_SCREW_INSTANCES = tuple(f"pd-vn-feed-rack-screw-{i}" for i in (1, 2, 3, 4))
+DISC_SCREW_INSTANCES = tuple(f"sh-vn-fillister-screw-91794a055-{i}" for i in (1, 2, 3))
 RETIRED_FAMILIES = {
     "transgear-latch",
     "transgear-pinion",
@@ -346,40 +344,30 @@ def test_bom_rows_are_exactly_the_round10_families() -> None:
     assert not families & RETIRED_FAMILIES
     assert drawing.TRANSGEAR_QUANTITIES == CONTRACT_TRANSGEAR_QUANTITIES
     assert drawing.PLATEN_QUANTITIES == {
-        "sh-vn-fillister-screw-91794a055--RackScrew": len(feed_rack.TAP_X)
+        "pd-vn-feed-rack-screw": len(feed_rack.TAP_X)
     }
 
 
 def test_bom_numbers_and_purchased_skus_come_from_the_registry() -> None:
     for stem, number in drawing.BOM_PART_NUMBERS.items():
         assert number == _number(stem), stem
-    # A shared member's BOM text is its model's own (the builder stamps it
-    # on the configuration, and it wins over a written cell).
-    members = {
-        explode.RACK_SCREW: drawing.rack_screw.BOM_DESCRIPTION,
-        explode.DISC_SCREW: drawing.disc_screw.BOM_DESCRIPTION,
-    }
     for stem, description in drawing.BOM_DESCRIPTIONS.items():
         registry = _config.parts(drawing.BOM_COMPONENT_IDENTITIES[stem][0])
         skus = registry.get("supplier_skus") or ()
-        if stem in members:
-            assert description == members[stem], stem
         # A fabricated part from purchased stock (the SDP/SI feed rack) is
         # not itself a McMaster purchase line.
-        elif skus and registry.get("supplier") == "McMaster-Carr":
+        if skus and registry.get("supplier") == "McMaster-Carr":
             assert description.endswith(f"MCMASTER {skus[0]}"), stem
         else:
             assert "MCMASTER" not in description, stem
-    # Distinct physical members deliberately share one canonical purchase Number.
-    for first, second in (
-        ("sh-vn-chain-link--InnerLink", "sh-vn-chain-link--OuterLink"),
-        (explode.RACK_SCREW, explode.DISC_SCREW),
-    ):
-        assert drawing.BOM_PART_NUMBERS[first] == drawing.BOM_PART_NUMBERS[second]
-        assert (
-            drawing.BOM_COMPONENT_IDENTITIES[first]
-            != drawing.BOM_COMPONENT_IDENTITIES[second]
-        )
+    # Distinct physical chain members deliberately share one canonical purchase Number.
+    first, second = "sh-vn-chain-link--InnerLink", "sh-vn-chain-link--OuterLink"
+    assert drawing.BOM_PART_NUMBERS[first] == drawing.BOM_PART_NUMBERS[second]
+    assert (
+        drawing.BOM_COMPONENT_IDENTITIES[first]
+        != drawing.BOM_COMPONENT_IDENTITIES[second]
+    )
+    assert drawing.BOM_PART_NUMBERS[explode.RACK_SCREW] != drawing.BOM_PART_NUMBERS[explode.DISC_SCREW]
 
 
 def test_bom_sheet_says_what_the_shared_chain_number_orders() -> None:
@@ -448,24 +436,21 @@ def test_the_spare_sprocket_loops_close_and_the_order_covers_them() -> None:
 
 
 def test_shared_numbers_print_the_item_the_native_bom_gives(monkeypatch) -> None:
-    """#3106 (rule 22): MHA-SH-VN-59 and MHA-SH-VN-50 each number two rows,
-    so the steps add the item, and the native fill refuses a different one."""
+    """#3106 (rule 22): MHA-SH-VN-50 numbers two rows (inner and outer chain
+    links), so the steps add the item, and the native fill refuses a different one."""
+    inner, outer = "sh-vn-chain-link--InnerLink", "sh-vn-chain-link--OuterLink"
     texts = " ".join(
         " ".join(text)
         for text in drawing._step_text(
             operating_domain=_unit_operating_domain()
         ).values()
     )
-    for stem in (explode.RACK_SCREW, explode.DISC_SCREW):
-        assert f"{_number(stem)} (ITEM {drawing.SHARED_NUMBER_ITEMS[stem]})" in texts, (
-            stem
-        )
+    for stem in (inner, outer):
+        assert f"ITEM {drawing.SHARED_NUMBER_ITEMS[stem]}" in texts, stem
     model, _components, table, adapter, cells, keys = _pd_bom_fixture(monkeypatch)
     counts = drawing._source_family_counts(model)
-    rack, disc_screw = (
-        keys.index(stem) + 1 for stem in (explode.RACK_SCREW, explode.DISC_SCREW)
-    )
-    cells[rack][0], cells[disc_screw][0] = cells[disc_screw][0], cells[rack][0]
+    first, second = (keys.index(stem) + 1 for stem in (inner, outer))
+    cells[first][0], cells[second][0] = cells[second][0], cells[first][0]
     with pytest.raises(RuntimeError, match="the steps print ITEM"):
         drawing._validate_bom(
             adapter, table, counts, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
@@ -2559,7 +2544,7 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
         "pd-feed-rack",
         "pd-platen-bottom-guide",
         "pd-platen-guide",
-        "sh-vn-fillister-screw-91794a055--RackScrew",
+        "pd-vn-feed-rack-screw",
         "pd-guide-lock",
         "pd-platen-clip",
         "pd-platen-paper",
@@ -2646,13 +2631,20 @@ def _moved_families(plan) -> set[str]:
     return {family[name] for _step, names in plan for name in names}
 
 
-def test_the_shared_fillister_is_one_family_per_member() -> None:
-    stem = "sh-vn-fillister-screw-91794a055"
-    assert explode.member_family(stem, "RackScrew") == explode.RACK_SCREW
-    assert explode.member_family(stem, "DiscScrew") == explode.DISC_SCREW
+def test_rack_and_disc_screws_have_distinct_identities() -> None:
+    assert explode.RACK_SCREW == "pd-vn-feed-rack-screw"
+    assert explode.DISC_SCREW == "sh-vn-fillister-screw-91794a055"
+    assert explode.member_family(explode.RACK_SCREW, "Default") == explode.RACK_SCREW
+    assert explode.member_family(explode.DISC_SCREW, "Default") == explode.DISC_SCREW
     assert explode.member_family("pd-feed-rack", "Default") == "pd-feed-rack"
-    assert drawing.BOM_COMPONENT_IDENTITIES[explode.RACK_SCREW] == (stem, "RackScrew")
-    assert drawing.BOM_COMPONENT_IDENTITIES[explode.DISC_SCREW] == (stem, "DiscScrew")
+    assert drawing.BOM_COMPONENT_IDENTITIES[explode.RACK_SCREW] == (
+        explode.RACK_SCREW,
+        None,
+    )
+    assert drawing.BOM_COMPONENT_IDENTITIES[explode.DISC_SCREW] == (
+        explode.DISC_SCREW,
+        "Default",
+    )
 
 
 def test_each_fillister_member_moves_and_shows_only_on_its_own_sheet() -> None:
@@ -2699,11 +2691,11 @@ def test_the_explode_moves_only_the_platen_group_and_keeps_the_platen() -> None:
 
 
 def test_the_platen_explode_hangs_the_rack_group_below_the_platen() -> None:
-    """#2410: the bottom guide, the rack and its screws drop below the platen
-    together; the rack then hangs clear under the guide and the screws stand
-    above the guide's top, in sight under the platen's bottom edge; the top
-    guide and every lock still rise."""
-    import _mcmaster_91794a055 as fillister
+    """#2410, #3738: the bottom guide, the rack and its 1/2 in screws drop
+    below the platen together; the rack then hangs clear under the guide and
+    the screws stand above the guide's top, in sight under the platen's bottom
+    edge; the top guide and every lock still rise."""
+    import _mcmaster_91794a060 as fillister
 
     def throw(family: str) -> float:
         return sum(
@@ -2791,12 +2783,12 @@ def test_the_explode_refuses_a_model_missing_a_shown_family() -> None:
     instances = [i for i in _explode_instances() if i.stem != "pd-transgear-thumbnut"]
     with pytest.raises(ValueError, match="pd-transgear-thumbnut"):
         explode.plan_explode(instances)
-    # A model whose fillisters all read as one member lacks the other.
+    # A model missing the rack-screw family is refused.
     instances = [
         explode.Instance(i.name, explode.DISC_SCREW) if i.stem == explode.RACK_SCREW else i
         for i in _explode_instances()
     ]
-    with pytest.raises(ValueError, match="RackScrew"):
+    with pytest.raises(ValueError, match="pd-vn-feed-rack-screw"):
         explode.plan_explode(instances)
 
 

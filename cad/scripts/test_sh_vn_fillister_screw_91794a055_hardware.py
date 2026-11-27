@@ -328,9 +328,9 @@ def test_recipe_refuses_a_cut_it_cannot_draw(cut_length, cut_end_break) -> None:
         entry.revolved_volume(cut_length, cut_end_break)
 
 
-def test_one_part_two_members_in_registry_order() -> None:
-    """One SKU in two modelled forms is Shared (subsystem-identities.md): the
-    default RackScrew is the stock screw, DiscScrew the cut disc screw."""
+def test_part_registry_and_spec_cover_the_cut_disc_screws() -> None:
+    """Retained under MHA-SH-VN-59 after the four rack screws moved to
+    MHA-PD-VN-72 (91794A060, #3738): three cut-to-fit disc screws."""
     metadata = discovered_recipes()[screw.SKU]
     assert metadata.module == entry.__name__
     assert metadata.callable_name == entry.build_91794A055.__name__
@@ -343,33 +343,17 @@ def test_one_part_two_members_in_registry_order() -> None:
     assert row["number"] == "MHA-SH-VN-59"
     assert row["supplier_skus"] == [screw.SKU]
     assert row["stock_name"] == part.SPEC.stock_name
-    assert row["default_configuration"] == "RackScrew"
-    assert row["configuration_quantities"] == {"RackScrew": 4, "DiscScrew": 3}
-    assert int(row["quantity"]) == 7
-    assert shared.CONFIGURATIONS == ("RackScrew", "DiscScrew")
-    assert (screw.STEM, screw.CONFIGURATION) == (shared.PART_STEM, "DiscScrew")
-    assert (rack.STEM, rack.CONFIGURATION) == (shared.PART_STEM, "RackScrew")
+    assert "configuration_quantities" not in row
+    assert int(row["quantity"]) == 3
+    assert (screw.STEM, screw.CONFIGURATION) == (shared.PART_STEM, "Default")
     assert screw.UNIT == shared.UNIT == "in"
-
-
-def test_each_member_is_modelled_at_its_installed_length() -> None:
-    """DiscScrew is the cut screw (R9-47); RackScrew the stock 1/4 untrimmed,
-    the length the strip's engagement stack reads."""
-    import pd_feed_rack_spec as feed_rack
-
     assert screw.LENGTH == screw.CUT_LENGTH < screw.SHANK_LEN
-    assert rack.LENGTH == feed_rack.SCREW_LENGTH == pytest.approx(0.25 * IN)
-    assert (rack.UNDER_HEAD_Y, rack.TIP_Y) == pytest.approx((0.0, -0.25 * IN))
-    assert rack.AXIS == (0.0, 1.0, 0.0)
-    assert part.LENGTHS == {"DiscScrew": screw.CUT_LENGTH, "RackScrew": rack.LENGTH}
-    # Only DiscScrew owns a feature: the cut; RackScrew is the supplied screw.
-    assert part.MEMBER_FEATURES == {
-        "DiscScrew": part.DISC_CUT_FEATURES,
-        "RackScrew": (),
-    }
+    assert rack.STEM == "pd-vn-feed-rack-screw"
 
 
-def test_stock_build_cuts_the_disc_member_from_the_supplied_screw(monkeypatch) -> None:
+def test_stock_build_passes_the_cut_to_fit_parameters_and_supplier_references(
+    monkeypatch,
+) -> None:
     seen: dict = {}
 
     def fake_build(adapter, **kwargs):
@@ -380,104 +364,18 @@ def test_stock_build_cuts_the_disc_member_from_the_supplied_screw(monkeypatch) -
     part.build(None)
     (component,) = seen["components"]
     assert component.sku == screw.SKU
-    # The registered recipe, wrapped: the stock build validates its identity.
-    assert component.author.__wrapped__ is entry.build_91794A055
-    assert component.parameters is None
+    assert component.author is entry.build_91794A055
+    assert component.parameters == {
+        "cut_length": screw.CUT_LENGTH,
+        "cut_end_break": screw.CUT_END_BREAK_MAX,
+    }
     assert component.transform.translation_mm == (0.0, 0.0, 0.0)
     assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
     assert seen["material"] == part.SPEC.material
     assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
-    assert seen["save_threaded_part"] is part._save_members
-
-
-def test_disc_cut_leaves_the_replicas_cut_profile(monkeypatch) -> None:
-    """The supplied replica, then one revolve cut whose break corner is the
-    replica's own cut-to-fit end: above the cut the two profiles agree."""
-    _adapter, calls = _record(monkeypatch, author=part._supplied_with_disc_cut)
-    profile, _slot, _cutter, _runout, disc_cut = _chains(calls)
-    assert min(y for _x, y in profile) == pytest.approx(-screw.SHANK_LEN)
-    length, brk = screw.CUT_LENGTH, screw.CUT_END_BREAK_MAX
-    major_r = screw.SHANK_DIA / 2.0
-    assert [v for point in disc_cut[:3] for v in point] == pytest.approx(
-        [0.0, -length, major_r - brk, -length, major_r, -(length - brk)]
-    )
-    # It reaches past the factory tip and outside the major, from the axis.
-    assert min(y for _x, y in disc_cut) < -screw.SHANK_LEN
-    assert max(x for x, _y in disc_cut) > major_r
-    assert {x for x, _y in disc_cut[-1:] + disc_cut[:1]} == {0.0}
-    revolves = [c for c in calls if c[0] == "create_revolve"]
-    assert [r[1][0].is_cut for r in revolves] == [False, False, True]
-    named = [c[1][1] for c in calls if c[0] == "name_last_feature"]
-    assert named[-2:] == list(part.DISC_CUT_FEATURES)
-    assert ("require_tip", (_adapter, "DiscScrew"), {}) in calls
-
-
-def test_members_are_split_suppressed_and_exported_after_the_save(monkeypatch) -> None:
-    events: list[tuple] = []
-
-    def sync(name):
-        return lambda *args, **kwargs: events.append((name, *args[1:]))
-
-    def coro(name, result=None):
-        def call(*args, **kwargs):
-            events.append((name, *args[1:], *sorted(kwargs.items())))
-            return result
-
-        return call
-
-    for name in (
-        "create_member_configurations",
-        "select_member_features",
-        "force_rebuild",
-        "apply_material",
-        "report_mass_properties",
-        "activate_member",
-        "add_supplier_reference_sketch",
-        "export_member_configurations",
-    ):
-        monkeypatch.setattr(part, name, coro(name))
-    monkeypatch.setattr(
-        part, "save_simplified_part", coro("save_simplified_part", {"part": "p"})
-    )
-    for name in (
-        "require_member_configurations",
-        "_require_tip",
-        "apply_member_properties",
-        "require_material_in_every_configuration",
-    ):
-        monkeypatch.setattr(part, name, sync(name))
-    artefacts = part._save_members(None, part.PART_NAME, ("ThreadGroove",))
-    assert artefacts == {"part": "p"}
-    kinds = [event[0] for event in events]
-    assert events[kinds.index("create_member_configurations")][1:] == (
-        part.PART_NAME,
-        ("RackScrew", "DiscScrew"),
-    )
-    selected = [e[1:] for e in events if e[0] == "select_member_features"]
-    assert selected == [
-        ("RackScrew", part.MEMBER_FEATURES),
-        ("DiscScrew", part.MEMBER_FEATURES),
-    ]
-    assert [e[1] for e in events if e[0] == "_require_tip"] == [
-        "RackScrew",
-        "DiscScrew",
-    ]
-    assert [e[1:3] for e in events if e[0] == "apply_member_properties"] == [
-        (part.PART_NAME, "RackScrew"),
-        (part.PART_NAME, "DiscScrew"),
-    ]
-    assert [e[1:] for e in events if e[0] == "apply_member_properties"][1][2] == (
-        screw.BOM_DESCRIPTION
-    )
-    # Every catalogue reference, the stock length included, rides the part.
-    (reference,) = [e for e in events if e[0] == "add_supplier_reference_sketch"]
-    assert reference[1] == supplier_module().SUPPLIER_REFERENCE_DIMENSIONS
-    # The default member, the drawing's, is active for the save; the member
-    # exports follow it.
-    assert kinds.index("activate_member") < kinds.index("save_simplified_part")
-    assert events[kinds.index("activate_member")][1] == shared.DRAWING_CONFIGURATION
-    assert kinds[-2:] == ["save_simplified_part", "export_member_configurations"]
-    assert events[-1][1:] == (part.PART_NAME, ("RackScrew", "DiscScrew"))
+    saver = seen["save_threaded_part"]
+    assert saver.func is part.save_supplier_reference_part
+    assert saver.keywords["dimensions"] == supplier_module().SUPPLIER_REFERENCE_DIMENSIONS
 
 
 def supplier_module():

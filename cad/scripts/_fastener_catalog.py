@@ -315,11 +315,19 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "90145A414",
         material="AISI 304",
     ),
-    # #2410: one SKU, DiscScrew (cut to fit) and RackScrew (stock) members.
+    # Three #0-80 x 1/4 disc screws cut to fit (#2410; the four rack screws
+    # moved to 1/2 in 91794A060, MHA-PD-VN-72, in #3738).
     "sh-vn-fillister-screw-91794a055": _stock(
         "sh-vn-fillister-screw-91794a055",
         "18-8 Stainless Steel Fillister Head Slotted Screw",
         "91794A055",
+        material="AISI 304",
+    ),
+    # #3738: four stock #0-80 x 1/2 fillisters screwing MHA-PD-26 to MHA-PD-27.
+    "pd-vn-feed-rack-screw": _stock(
+        "pd-vn-feed-rack-screw",
+        "18-8 Stainless Steel Fillister Head Slotted Screw",
+        "91794A060",
         material="AISI 304",
     ),
     "pd-vn-transgear-arm-plate-screw": _stock(

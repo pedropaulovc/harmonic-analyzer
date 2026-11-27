@@ -116,16 +116,16 @@ def test_disc_cluster_rows_follow_the_pin_hub_and_disc() -> None:
     engaged = disc_screw.CUT_LENGTH - hub.FLANGE_THICK
     assert 0.0 < disc.FACE_WIDTH - engaged <= disc_screw.TIP_BELOW_REAR_FACE[1]
     limit = _annulus(disc.SCREW_MAJOR_DIA, disc.TAP_DRILL_DIA, engaged)
-    for n in (5, 6, 7):
+    for n in (1, 2, 3):
         pair = _pair(f"sh-vn-fillister-screw-91794a055-{n}", "pd-rack-pinion-1")
         assert allowed[pair] == pytest.approx(limit)
 
 
 def test_rack_screw_rows_follow_the_strip_and_the_bottom_guide() -> None:
     allowed = _allowed()
-    # #2410: each stock RackScrew under-head on MHA-PD-27's counterbore floor,
-    # the screw floor above the strip's flat top; the rest of its shank in the
-    # strip's tap drill, short of the drill's bottom.
+    # #3738: each stock 1/2 in rack screw under-head on MHA-PD-27's counterbore
+    # floor, the screw floor above the strip's flat top; the rest of its shank
+    # in the strip's tap drill, short of the drill's bottom.
     floor = bottom_guide.GUIDE_HEIGHT - bottom_guide.SCREW_CBORE_DEPTH
     assert floor == pytest.approx(feed_rack.SCREW_FLOOR)
     engaged = rack_screw.LENGTH - floor
@@ -134,7 +134,7 @@ def test_rack_screw_rows_follow_the_strip_and_the_bottom_guide() -> None:
         feed_rack.TAP_MAJOR_DIA, TAP_DRILL_MM[feed_rack.TAP_SIZE], engaged
     )
     for n in (1, 2, 3, 4):
-        pair = _pair(f"sh-vn-fillister-screw-91794a055-{n}", "pd-feed-rack-1")
+        pair = _pair(f"pd-vn-feed-rack-screw-{n}", "pd-feed-rack-1")
         assert allowed[pair] == pytest.approx(limit)
 
 

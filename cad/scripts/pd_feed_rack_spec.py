@@ -37,7 +37,7 @@ from _hole_spec import (
     HoleSpec,
     blind_cut_dia_mm,
 )
-import _mcmaster_91794a055 as _screw
+import _mcmaster_91794a060 as _screw
 from _printed_tolerance import (
     drilled_oversize_mm,
     edge_break_chamfer_mm,
@@ -116,13 +116,14 @@ FIRST_GAP_X = PITCH / 2.0  # nominal CAD phase; not a finished-end control
 # The gaps centre half a pitch in, so the teeth centre on whole pitches.
 TOOTH_CENTRE_PHASE_X = FIRST_GAP_X - PITCH / 2.0
 
-# --- Placement under the rail (owner ruling 2026-11-13, #2410) --------------
+# --- Placement under the rail (owner rulings 2026-11-13 #2410, 2026-11-26 #3738) ---
 # The strip's front face stands this far behind the platen's back face (the
 # rail's platen-mating face), so the 12T's full-depth teeth cover the strip's
-# whole face; its ends lie flush with the rail's (and so the platen's). It is
+# whole face while MHA-PD-27's Ø.125 +.005/-0 counterbores keep the .044 MIN
+# front wall; its ends lie flush with the rail's (and so the platen's). It is
 # set there against a rule when the rail's holes are struck from its taps at
 # MHA-PD-00 (FRONT_SET_BAND); the screws then return it to that place.
-FRONT_BEHIND_PLATEN = 0.040 * MM_PER_IN
+FRONT_BEHIND_PLATEN = 0.048 * MM_PER_IN
 FRONT_SET_BAND = 0.010 * MM_PER_IN
 
 # --- Rack-screw taps (drawing-guidelines.md rules 17, 18, 20) ----------------
@@ -322,25 +323,23 @@ if not all(0.0 < x < BAR_LENGTH for x in TAP_X):
     raise AssertionError("a rack tap is off the strip")
 
 # --- The rack screws' engagement (rule 18; RV-02) ----------------------------
-# Four stock 91794A055 #0-80 x 1/4 fillisters, untrimmed (owner ruling
-# 2026-11-13), their heads on the floor of the MHA-PD-27 rail's counterbores.
-# The floor (rail underside to counterbore floor) is the rail's .XXX height
-# less the native callout's counterbore depth from its top, which prints its
-# own .469 ±.005 (owner ruling 2026-11-25, #3620; at the wizard pocket's ±.01
-# of rule 3 this stack fails), so it carries both bands. It is the least that
-# keeps the longest stock screw on the thinnest floor at or above the least
-# full thread, so no tip reaches the tap's lead.
+# Four stock 91794A060 #0-80 x 1/2 fillisters, untrimmed (owner ruling
+# 2026-11-26, #3738), their heads on the floor of the MHA-PD-27 rail's
+# counterbores. The floor (rail underside to counterbore floor) is the rail's
+# .XXX height less the native callout's counterbore depth from its top, which
+# prints its own .219 ±.005 (#3738; at the wizard pocket's ±.01 of rule 3 this
+# stack fails), so it carries both bands. It is the least that keeps the
+# longest stock screw on the thinnest floor at or above the least full thread,
+# so no tip reaches the tap's lead.
 SCREW_LENGTH = _screw.SHANK_LEN
 SCREW_LENGTH_MIN = SCREW_LENGTH - 0.03 * MM_PER_IN  # ASME B18.6.3 length band
 SCREW_FIRST_THREAD_LOSS = _screw.PITCH
 SCREW_FLOOR_BAND = 2.0 * TAP_BAND  # rail height .XXX + counterbore depth's own ±.005
-SCREW_FLOOR = _ceil_in(SCREW_LENGTH - TAP_THREAD_DEPTH_MIN + SCREW_FLOOR_BAND)  # .155
+SCREW_FLOOR = _ceil_in(SCREW_LENGTH - TAP_THREAD_DEPTH_MIN + SCREW_FLOOR_BAND)  # .405
 SCREW_TIP_REACH_MAX = SCREW_LENGTH - (SCREW_FLOOR - SCREW_FLOOR_BAND)
-# The margin is ZERO at the printed bands: the longest .250 screw on the
-# thinnest .145 floor reaches .105, the tap's least full thread exactly. The
-# owner chose this form knowing it: "b: Ø.110 +.004/−0 and depth .469 ±.005"
-# (owner ruling 2026-11-25, #3620), over option b's sketch line "tip short of
-# lead +0.0000" (cbore-band-audit-2026-11-25/bottom-guide-cbore-options.png).
+# The margin is ZERO at the printed bands: the longest .500 screw on the
+# thinnest .395 floor reaches .105, the tap's least full thread exactly
+# (owner rulings 2026-11-25 #3620 and 2026-11-26 #3738).
 # The guard has no rounding and no epsilon: the difference is exactly 0.0 mm
 # here, and any negative fails.
 SCREW_TIP_MARGIN = TAP_THREAD_DEPTH_MIN - SCREW_TIP_REACH_MAX
