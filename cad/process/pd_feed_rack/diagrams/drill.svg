@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560" font-family="sans-serif" font-size="13">
+  <!-- Hand picture from the front (the operator's side, looking +Y): +X to the right, +Z up; the strip cut away on the tap line to show the hole. To scale at 7 px/mm from the strip's 4.7625 mm height: the nominal strip teeth down, flat top up, 32 DP teeth from cad.teeth_pitch_ref, tap 1's tooth at cad.tap_1_x_mm from the LEFT end; the jaws' left side process.hole_overhang_mm from the LEFT end, the fixed jaw behind the strip, the moving jaw in front not drawn; the stack (process.riser_height_mm) under the middle 4 in, to a break line. The 3/64 drill (Ø1.1906, process.drill_3_64_dia_mm) at X0, its full diameter cad.tap_1_drill_depth_mm under the flat top, its 118° point below, drawn to a break line (the chuck not drawn); the spot's countersink Ø1.524 (process.spot_dia_mm) at the mouth. -->
+  <rect class="paper" x="0" y="0" width="760" height="560"/>
+  <text class="title" x="20" y="24">Setup 3, FR03: the 3/64 drill in hole 1, over its tooth's centre (to scale, 7 px/mm)</text>
+  <rect class="fixture-vise" x="418.76" y="511.15" width="331.24" height="14"/>
+  <path class="clamp" d="M418.76 196.53L750 196.53L750 196.53L753 203.68L750 210.83L753 217.98L750 225.13L753 232.28L750 239.44L753 246.59L750 253.74L753 260.89L750 268.04L753 275.19L750 282.34L753 289.49L750 296.64L753 303.79L750 310.94L753 318.09L750 325.24L753 332.39L750 339.54L753 346.69L750 353.84L753 360.99L750 368.14L753 375.29L750 382.44L753 389.59L750 396.74L753 403.89L750 411.04L753 418.19L750 425.35L753 432.5L750 439.65L753 446.8L750 453.95L753 461.1L750 468.25L753 475.4L750 482.55L753 489.7L750 496.85L753 504L750 511.15L418.76 511.15Z"/>
+  <path class="fixture-support" d="M618.52 233.34L746 233.34L746 233.34L749 240.46L746 247.58L749 254.71L746 261.83L749 268.95L746 276.08L749 283.2L746 290.32L749 297.45L746 304.57L749 311.69L746 318.82L749 325.94L746 333.07L749 340.19L746 347.31L749 354.44L746 361.56L749 368.68L746 375.81L749 382.93L746 390.05L749 397.18L746 404.3L749 411.42L746 418.55L749 425.67L746 432.79L749 439.92L746 447.04L749 454.16L746 461.29L749 468.41L746 475.53L749 482.66L746 489.78L749 496.9L746 504.03L749 511.15L618.52 511.15Z"/>
+  <path class="part-kept" d="M30 200L30 233.34L32.34 233.34L36.89 220.84L40.56 220.84L45.11 233.34L49.8 233.34L54.35 220.84L58.02 220.84L62.57 233.34L67.25 233.34L71.8 220.84L75.47 220.84L80.02 233.34L84.71 233.34L89.26 220.84L92.93 220.84L97.48 233.34L102.16 233.34L106.71 220.84L110.39 220.84L114.94 233.34L119.62 233.34L124.17 220.84L127.84 220.84L132.39 233.34L137.07 233.34L141.62 220.84L145.3 220.84L149.85 233.34L154.53 233.34L159.08 220.84L162.75 220.84L167.3 233.34L171.99 233.34L176.54 220.84L180.21 220.84L184.76 233.34L189.44 233.34L193.99 220.84L197.66 220.84L202.21 233.34L206.9 233.34L211.45 220.84L215.12 220.84L219.67 233.34L224.35 233.34L228.9 220.84L232.57 220.84L237.12 233.34L241.81 233.34L246.36 220.84L250.03 220.84L254.58 233.34L259.26 233.34L263.81 220.84L267.48 220.84L272.04 233.34L276.72 233.34L281.27 220.84L284.94 220.84L289.49 233.34L294.17 233.34L298.72 220.84L302.4 220.84L306.95 233.34L311.63 233.34L316.18 220.84L319.85 220.84L324.4 233.34L329.08 233.34L333.63 220.84L337.31 220.84L341.86 233.34L346.54 233.34L351.09 220.84L354.76 220.84L359.31 233.34L364 233.34L368.55 220.84L372.22 220.84L376.77 233.34L381.45 233.34L386 220.84L389.67 220.84L394.22 233.34L398.91 233.34L403.46 220.84L407.13 220.84L411.68 233.34L416.36 233.34L420.91 220.84L424.58 220.84L429.13 233.34L433.82 233.34L438.37 220.84L442.04 220.84L446.59 233.34L451.27 233.34L455.82 220.84L459.5 220.84L464.05 233.34L468.73 233.34L473.28 220.84L476.95 220.84L481.5 233.34L486.18 233.34L490.73 220.84L494.41 220.84L498.96 233.34L503.64 233.34L508.19 220.84L511.86 220.84L516.41 233.34L521.09 233.34L525.65 220.84L529.32 220.84L533.87 233.34L538.55 233.34L543.1 220.84L546.77 220.84L551.32 233.34L556.01 233.34L560.56 220.84L564.23 220.84L568.78 233.34L573.46 233.34L578.01 220.84L581.68 220.84L586.23 233.34L590.92 233.34L595.47 220.84L599.14 220.84L603.69 233.34L608.37 233.34L612.92 220.84L616.59 220.84L621.14 233.34L625.83 233.34L630.38 220.84L634.05 220.84L638.6 233.34L643.28 233.34L647.83 220.84L651.51 220.84L656.06 233.34L660.74 233.34L665.29 220.84L668.96 220.84L673.51 233.34L678.19 233.34L682.74 220.84L686.42 220.84L690.97 233.34L695.65 233.34L700.2 220.84L703.87 220.84L708.42 233.34L713.11 233.34L717.66 220.84L721.33 220.84L725.88 233.34L730 233.34L730 200Z"/>
+  <path class="holes" d="M391.23 200L392.4 202.02L392.4 222.94L396.56 225.44L400.73 222.94L400.73 202.02L401.9 200Z"/>
+  <path class="cutter" d="M400.73 222.94L400.73 60L396.56 63L392.4 60L392.4 222.94L396.56 225.44Z"/>
+  <line class="arrow" x1="410.56" y1="90" x2="410.56" y2="120"/>
+  <line class="datum" x1="396.56" y1="260" x2="396.56" y2="310"/>
+  <text class="datum-label" x="402.56" y="308">X0 hole 1's tooth (E + t)</text>
+  <line class="datum" x1="10" y1="200" x2="366.56" y2="200"/>
+  <text class="datum-label" x="12" y="192">Z0 the flat top</text>
+  <text class="label" x="120" y="70">3/64 drill, pecked; its full diameter {{cad.tap_1_drill_depth_in:.3dot}}</text>
+  <text class="label" x="120" y="86">under the flat top</text>
+  <line class="leader" x1="118" y1="90" x2="401.56" y2="110"/>
+  <circle class="leader-dot" cx="401.56" cy="110" r="2"/>
+  <text class="label" x="140" y="350">the tooth under the hole; Y0 the tap line,</text>
+  <text class="label" x="140" y="366">{{cad.tap_1_inset_in:.3dot}} behind the front face (into the page)</text>
+  <line class="leader" x1="138" y1="346" x2="396.56" y2="229.34"/>
+  <circle class="leader-dot" cx="396.56" cy="229.34" r="2"/>
+  <text class="label" x="470" y="130">fixed jaw (behind); the moving jaw,</text>
+  <text class="label" x="470" y="146">in front, not drawn</text>
+  <line class="leader" x1="468" y1="150" x2="450" y2="200.53"/>
+  <circle class="leader-dot" cx="450" cy="200.53" r="2"/>
+  <text class="label" x="600" y="471.15">the stack</text>
+  <line class="leader" x1="598" y1="467.15" x2="638.52" y2="451.15"/>
+  <circle class="leader-dot" cx="638.52" cy="451.15" r="2"/>
+  <text class="label" x="20" y="546">The strip teeth down, flat top up, LEFT end to the left; hole 1 lies 3 mm left of the jaws.</text>
+</svg>

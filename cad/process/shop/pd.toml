@@ -325,6 +325,8 @@ description = "C36000 free-machining brass (360-H02, extruded), flat bar, 1/8 x 
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 1-1/8 in"
 [stock.c360-round-5-8]
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 5/8 in"
+[stock.sdp-rack-a-1b12-y324]
+description = "Brass gear rack, 32 DP 20° PA, 3/16 x 3/16 in, 48 in, commercial (SDP/SI A 1B12-Y324)"
 
 # MHA-PD-02 platen (cnc/flat-b-pd-platen)
 # Plan: cad/process/pd_platen/plan.toml. Material key platen-c360: the C360
@@ -353,5 +355,41 @@ tool = "endmill-carbide-3fl-1-4"
 material = "platen-c360"
 rpm = 2800
 chip_load_mm_per_tooth = 0.05588  # .0022 in; 2800 × 3 × .0022 = 18.5 in/min
+flutes = 3
+feed_unit = "in/min"
+
+# MHA-PD-26 feed rack (cnc/w3b-rack)
+# Plan: cad/process/pd_feed_rack/plan.toml. Material key rack-brass: the SDP/SI
+# A 1B12-Y324 strip, "Brass" with no alloy stated (stock.sdp-rack-a-1b12-y324);
+# the rows below are each source's brass rows. On the PM-30MV's low belt,
+# 100-2800 rpm (machines.pm-30mv).
+# - #1 carbide centre drill (3/64 pilot, 1/8 body) and the 3/64 (.0469 in)
+#   drill: LittleMachineShop "Cutting Speeds" (read live 2026-11-22, as the
+#   MHA-PD-22 block above), Drilling & Reaming, Brass (C36000): 160-175
+#   ft/min, the low end 4890 rpm on the body and 13000 on the 3/64, so the
+#   spindle's 2800; AutoDrill "Suggested drilling feed rates" (read
+#   2026-11-20), row Brass: 1/16 in .001 in/rev (the 3/64 and the pilot under
+#   the first column take it): 2800 × .001 = 2.8 in/min.
+# - 1/4 in carbide end mill, the ends' side passes: The Carbide End Mill
+#   Store's Brass/Bronze row (the platen block above): 400 SFM (6112 rpm, so
+#   2800) and 1/4 in .0022 in/tooth. The rack plan takes half of it, .0011:
+#   each end stands 2.2-2.3 in out past the jaws on a 3/16 square section, so
+#   the strip's own stiffness, not the cutter's, limits the cut (author's
+#   choice; the plan's beam check carries it).
+[settings.rack-spot-brass]
+tool = "centre-drills-carbide-60"
+material = "rack-brass"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.rack-drill-3-64-brass]
+tool = "drill-3-64"
+material = "rack-brass"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.rack-em-quarter-brass]
+tool = "endmill-carbide-3fl-1-4"
+material = "rack-brass"
+rpm = 2800
+chip_load_mm_per_tooth = 0.02794  # .0011 in; 2800 × 3 × .0011 = 9.2 in/min
 flutes = 3
 feed_unit = "in/min"

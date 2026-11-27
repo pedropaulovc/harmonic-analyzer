@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 2.4 px/mm from the rack's 4.7625 mm (3/16 in) face width. The piece from the rack's own end (LEFT) to the scribed line at 10.75 in; the kerf the plan's kerf_in (.03), the junior hacksaw's blade drawn in it on the waste side, cut short to break lines (its frame is not drawn: its size is not on record). The bench vise's soft jaws grip the rest of the rack just past the line; their size is not on record: schematic. The rest of the 48 in rack drawn short, to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="250"/>
+  <text class="title" x="20" y="24">Setup 1: one 10.75 piece off the rack's end, from above (to scale, 2.4 px/mm)</text>
+  <path class="part-rest" d="M687.15 110L740 110L740 110L743 115.72L740 121.43L687.15 121.43Z"/>
+  <rect class="part-kept" x="30" y="110" width="655.32" height="11.43"/>
+  <rect class="part-waste" x="685.32" y="110" width="1.83" height="11.43"/>
+  <rect class="clamp" x="691.15" y="84" width="80" height="26"/>
+  <rect class="clamp" x="691.15" y="121.43" width="80" height="26"/>
+  <text class="label-on-clamp" x="731.15" y="101" text-anchor="middle">soft jaw</text>
+  <text class="label-on-clamp" x="731.15" y="139.43" text-anchor="middle">soft jaw</text>
+  <path class="cutter" d="M685.32 70L686.23 67L687.15 70L687.15 161.43L686.23 164.43L685.32 161.43Z"/>
+  <line class="dims" x1="30" y1="143.43" x2="685.32" y2="143.43"/>
+  <line class="dims" x1="30" y1="135.43" x2="30" y2="151.43"/>
+  <line class="dims" x1="685.32" y1="135.43" x2="685.32" y2="151.43"/>
+  <text class="label" x="357.66" y="161.43" text-anchor="middle">piece {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in, scribed at 10.75</text>
+  <text class="label" x="679.32" y="60" text-anchor="end">junior hacksaw's blade, on the waste side,</text>
+  <text class="label" x="679.32" y="76" text-anchor="end">in its {{process.kerf_in:.2dot}} kerf</text>
+  <line class="leader" x1="681.32" y1="80" x2="686.32" y2="76"/>
+  <circle class="leader-dot" cx="686.32" cy="76" r="2"/>
+  <text class="label" x="740" y="214" text-anchor="end">rest of the 48 in rack (flat top up)</text>
+  <line class="leader" x1="742" y1="210" x2="700" y2="121.43"/>
+  <circle class="leader-dot" cx="700" cy="121.43" r="2"/>
+  <line class="datum" x1="30" y1="90" x2="30" y2="155.43"/>
+  <text class="datum-label" x="34" y="86">LEFT end (the rack's own end; marked)</text>
+  <text class="label" x="20" y="238">The rack flat top up in the bench vise's soft jaws (drawn schematic); hold the piece while the cut finishes.</text>
+</svg>
