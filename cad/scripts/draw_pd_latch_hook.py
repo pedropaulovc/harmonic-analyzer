@@ -66,50 +66,81 @@ from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
+from _printed_tolerance import printed_deviations
 from _session import run_build
 import _telemetry
 from build_pd_latch_hook import FAR_FACE_POINT, FLAT_GAP
 from pd_latch_hook_geometry import (
     ARM_N,
     ARM_U,
+    ARM_W,
     BASE_LENGTH,
     BBOX_X,
     BBOX_Y,
     BBOX_Z,
     DEV_ROLL_C,
+    DEV_TAB_C,
     DEV_TAPER,
     DEV_TIP,
     EAR_HEIGHT,
     FLAT_BEND_C,
     FLAT_LENGTH,
+    INNER_ROLL_R,
+    INNER_TAB_R,
+    INSIDE_BEND_R,
+    K_BEND,
+    LOW_W,
     OUTER_ROLL_END,
+    OUTER_ROLL_R,
     OUTER_ROLL_START,
     OUTER_TAB_END,
+    OUTER_TAB_R,
+    OUTER_TAB_START,
+    OUTSIDE_BEND_R,
     PART_ORIGIN_MACHINE,
     PIN_HOLE_DIA,
     PIN_HOLE_L,
     PIN_HOLE_ZL,
+    ROLL_TURN_DEG,
+    ROOT_R,
     ROUND_C_L,
     ROUND_R,
+    SCREW_HOLE_DIA,
+    SCREW_HOLE_X,
     SCREW_HOLE_Y,
     SHEET_T,
+    SHEET_T_MINUS,
+    SHEET_T_PLUS,
     TAB_C_L,
+    TAB_TURN_DEG,
+    TAPER_L,
     WIDTH,
 )
 from pd_latch_hook_spec import (
     BEND_LINE_DIMENSIONS,
+    BEND_TOL_DEG,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     FLAT_SKETCH,
+    FORMED_PLACES,
+    FORMED_TOL,
+    HOLE_PLACES,
+    MATERIAL_TITLE,
     OVERALL_HEIGHT,
     PAIR_CALLOUT,
+    PIN_HOLE_CALLOUT,
     PIN_HOLE_NOTE,
     REFERENCE_DIMENSIONS,
     ROUND_CALLOUT,
@@ -117,6 +148,7 @@ from pd_latch_hook_spec import (
     SCREW_HOLE_CALLOUT,
     SCREW_HOLE_MATE,
     SCREW_HOLE_WALL_TEXT,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -341,6 +373,369 @@ OVERALL_PICKS = (
     ),
 )
 OVERALL_TEXT_XY = _right(38.0, -55.0)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_pd_latch_hook's docstring: origin at the ear's outer face x = 0, the
+# base's underside z = 0 and its low-Y edge y = 0).  The hook is one strip
+# blank, the flat pattern: FlatLength across the ear's bend, the base's width
+# plus the arm's developed length along the arm.  The ear is bent, the screw
+# holes drilled from its outer face, the arm rolled and the tab formed; the
+# pin hole is transferred at assembly (note 2).  The formed arm's values take
+# the printed ±FORMED_TOL on their printed .XX value; the developed stations
+# are the flat pattern's.  The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_latch_hook"
+_GEOM = "pd_latch_hook_geometry"
+_KEEPS = (
+    ("FRONT_KEEP", FRONT_KEEP),
+    ("RIGHT_KEEP", RIGHT_KEEP),
+    ("BOTTOM_KEEP", BOTTOM_KEEP),
+)
+_NOTE_LINES = DRAWING_NOTES.split("\n")
+RADII_NOTE = _NOTE_LINES[0].removeprefix("1. ")
+PIN_NOTE = " ".join(line.strip() for line in _NOTE_LINES[1:]).removeprefix("2. ")
+_ARM_FRONT_Z = EAR_HEIGHT - ARM_W  # the arm's front edge above the taper
+_ARM_LOW_Z = EAR_HEIGHT - LOW_W  # and below it
+_TAPER_RUN = math.hypot(TAPER_L[1] - TAPER_L[0], _ARM_LOW_Z - _ARM_FRONT_Z)
+# The taper's outward normal: square to its run in (y, z), toward -Z.
+_TAPER_N = (
+    0.0,
+    (_ARM_FRONT_Z - _ARM_LOW_Z) / _TAPER_RUN,
+    (TAPER_L[1] - TAPER_L[0]) / _TAPER_RUN,
+)
+_FAR_N = (ARM_U[0], ARM_U[1], 0.0)  # the straight's far face looks along +U
+
+
+def _g(*names: str) -> tuple[tuple[str, str], ...]:
+    return tuple((_GEOM, name) for name in names)
+
+
+def _keep(name: str) -> tuple[str, str]:
+    """The view table that places a printed dimension."""
+    return next((_SELF, keep) for keep, table in _KEEPS if name in table)
+
+
+def _row(value: float, name: str, *sources) -> tuple[list[float], tuple]:
+    """A title-block band on the printed ``name``."""
+    return (
+        limits(value, _P[name], unit=UNIT),
+        (*sources, "DRAWING_PRECISION_BY_NAME", "UNIT", _keep(name)),
+    )
+
+
+def _formed(value: float, name: str, *sources) -> tuple[list[float], tuple]:
+    """A formed arm value: its printed .XX value ±FORMED_TOL."""
+    low, high = printed_deviations(
+        value, FORMED_PLACES, (-FORMED_TOL, FORMED_TOL), unit=UNIT
+    )
+    return (
+        [round(value + low, 12), round(value + high, 12)],
+        (*sources, "FORMED_TOL", "FORMED_PLACES", "UNIT", _keep(name)),
+    )
+
+
+part_metadata(
+    model_sources=_g("PART_ORIGIN_MACHINE", "SHEET_T", "WIDTH", "EAR_HEIGHT"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME", "HOLE_PLACES"),
+)
+requirement(
+    "strip",
+    kind="blank",
+    faces=(PlanarFace((0.0, 0.0, 1.0), SHEET_T),),
+    requirements=("width", "thickness", "developed_length"),
+    fields={
+        "section": ("strip", _g("SHEET_T")),
+        "width": _row(FLAT_LENGTH, "FlatLength", *_g("FLAT_LENGTH")),
+        "width_nominal": (FLAT_LENGTH, _g("FLAT_LENGTH")),
+        "thickness": (
+            [SHEET_T - SHEET_T_MINUS, SHEET_T + SHEET_T_PLUS],
+            (*_g("SHEET_T", "SHEET_T_MINUS", "SHEET_T_PLUS"), "MATERIAL_TITLE"),
+        ),
+        "thickness_nominal": (SHEET_T, _g("SHEET_T")),
+        "developed_length": (WIDTH + DEV_TIP, _g("WIDTH", "DEV_TIP")),
+        "k_factor": (K_BEND, _g("K_BEND")),
+        "material": (MATERIAL_TITLE, ("MATERIAL_TITLE",)),
+        "radii_note": (RADII_NOTE, ("DRAWING_NOTES",)),
+    },
+    precision={"width": _P["FlatLength"]},
+)
+requirement(
+    "base_underside",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": 0.0},
+            _g("PART_ORIGIN_MACHINE"),
+        )
+    },
+)
+requirement(
+    "ear_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": 0.0},
+            _g("PART_ORIGIN_MACHINE"),
+        )
+    },
+)
+requirement(
+    "low_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": 0.0},
+            _g("PART_ORIGIN_MACHINE"),
+        )
+    },
+)
+requirement(
+    "base_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), BASE_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": -BASE_LENGTH},
+            _g("BASE_LENGTH"),
+        ),
+        "length": _row(BASE_LENGTH, "BaseLength", *_g("BASE_LENGTH")),
+        "length_nominal": (BASE_LENGTH, _g("BASE_LENGTH")),
+        "length_from": ("ear_face", (_keep("BaseLength"),)),
+    },
+    precision={"length": _P["BaseLength"]},
+)
+requirement(
+    "side_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), WIDTH),),
+    requirements=("width",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": WIDTH}, _g("WIDTH")),
+        "width": _row(WIDTH, "Width", *_g("WIDTH")),
+        "width_nominal": (WIDTH, _g("WIDTH")),
+        "width_from": ("low_edge", (_keep("Width"),)),
+    },
+    precision={"width": _P["Width"]},
+)
+requirement(
+    "ear_top",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), EAR_HEIGHT),),
+    requirements=("height",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": EAR_HEIGHT},
+            _g("EAR_HEIGHT"),
+        ),
+        "height": _row(EAR_HEIGHT, "EarHeight", *_g("EAR_HEIGHT")),
+        "height_nominal": (EAR_HEIGHT, _g("EAR_HEIGHT")),
+        "height_from": ("base_underside", (_keep("EarHeight"),)),
+    },
+    precision={"height": _P["EarHeight"]},
+)
+requirement(
+    "ear_bend",
+    kind="bend",
+    faces=(CylinderFace(2.0 * INSIDE_BEND_R), CylinderFace(2.0 * OUTSIDE_BEND_R)),
+    requirements=("radius",),
+    fields={
+        "radius": _row(INSIDE_BEND_R, "InsideBendR", *_g("INSIDE_BEND_R")),
+        "radius_nominal": (INSIDE_BEND_R, _g("INSIDE_BEND_R")),
+        "angle": ([90.0 - BEND_TOL_DEG, 90.0 + BEND_TOL_DEG], ("BEND_TOL_DEG",)),
+        "angle_nominal": (90.0, _g("BEND_ALLOWANCE")),
+        "flat_centreline": (FLAT_BEND_C, (*_g("FLAT_BEND_C"), "BEND_LINE_DIMENSIONS")),
+    },
+    precision={"radius": _P["InsideBendR"]},
+)
+requirement(
+    "roll",
+    kind="bend",
+    faces=(CylinderFace(2.0 * INNER_ROLL_R), CylinderFace(2.0 * OUTER_ROLL_R)),
+    requirements=("radius", "start"),
+    fields={
+        "radius": _formed(INNER_ROLL_R, "RollR", *_g("INNER_ROLL_R")),
+        "radius_nominal": (INNER_ROLL_R, _g("INNER_ROLL_R")),
+        "angle": (ROLL_TURN_DEG, _g("ROLL_TURN_DEG")),
+        "start": _formed(-OUTER_ROLL_START[1], "RollStart", *_g("OUTER_ROLL_START")),
+        "start_nominal": (-OUTER_ROLL_START[1], _g("OUTER_ROLL_START")),
+        "start_from": ("low_edge", (_keep("RollStart"),)),
+        "flat_centreline": (DEV_ROLL_C, (*_g("DEV_ROLL_C"), "BEND_LINE_DIMENSIONS")),
+    },
+    precision={"radius": FORMED_PLACES, "start": FORMED_PLACES},
+)
+requirement(
+    "tab",
+    kind="bend",
+    faces=(CylinderFace(2.0 * OUTER_TAB_R), CylinderFace(2.0 * INNER_TAB_R)),
+    requirements=("radius", "end_x"),
+    fields={
+        "radius": _formed(OUTER_TAB_R, "TabR", *_g("OUTER_TAB_R")),
+        "radius_nominal": (OUTER_TAB_R, _g("OUTER_TAB_R")),
+        "angle": (TAB_TURN_DEG, _g("TAB_TURN_DEG")),
+        "end_x": _formed(-OUTER_TAB_END[0], "TabEndX", *_g("OUTER_TAB_END")),
+        "end_x_nominal": (-OUTER_TAB_END[0], _g("OUTER_TAB_END")),
+        "end_x_from": ("ear_face", (_keep("TabEndX"),)),
+        "flat_centreline": (DEV_TAB_C, (*_g("DEV_TAB_C"), "BEND_LINE_DIMENSIONS")),
+    },
+    precision={"radius": FORMED_PLACES, "end_x": FORMED_PLACES},
+)
+requirement(
+    "far_face",
+    kind="face",
+    faces=(
+        PlanarFace(_FAR_N, FAR_FACE_POINT[0] * ARM_U[0] + FAR_FACE_POINT[1] * ARM_U[1]),
+    ),
+    requirements=("x", "y"),
+    fields={
+        "x": _formed(-FAR_FACE_POINT[0], "FaceX", "FAR_FACE_POINT"),
+        "x_nominal": (-FAR_FACE_POINT[0], ("FAR_FACE_POINT",)),
+        "x_from": ("ear_face", (_keep("FaceX"),)),
+        "y": _formed(-FAR_FACE_POINT[1], "FaceY", "FAR_FACE_POINT"),
+        "y_nominal": (-FAR_FACE_POINT[1], ("FAR_FACE_POINT",)),
+        "y_from": ("low_edge", (_keep("FaceY"),)),
+        "straight_length": (
+            math.dist(OUTER_ROLL_END, OUTER_TAB_START),
+            (*_g("OUTER_ROLL_END", "OUTER_TAB_START"), "REFERENCE_DIMENSIONS"),
+        ),
+    },
+    precision={"x": FORMED_PLACES, "y": FORMED_PLACES},
+)
+requirement(
+    "screw_holes",
+    kind="hole",
+    faces=(CylinderFace(SCREW_HOLE_DIA, contains_z_mm=SHEET_T / 2.0),),
+    requirements=("dia", "x_near", "x_far", "y", "thru"),
+    fields={
+        "at": (
+            [SCREW_HOLE_X[1], SCREW_HOLE_Y, 0.0],
+            _g("SCREW_HOLE_X", "SCREW_HOLE_Y"),
+        ),
+        "axis": ([0.0, 0.0, 1.0], _g("SHEET_T")),
+        "dia": (
+            drilled_limits(SCREW_HOLE_DIA, _P["ScrewDia"], unit=UNIT),
+            (*_g("SCREW_HOLE_DIA"), "DRAWING_PRECISION_BY_NAME", "UNIT"),
+        ),
+        "dia_nominal": (SCREW_HOLE_DIA, _g("SCREW_HOLE_DIA")),
+        "x_near": _row(-SCREW_HOLE_X[1], "ScrewX2", *_g("SCREW_HOLE_X")),
+        "x_near_nominal": (-SCREW_HOLE_X[1], _g("SCREW_HOLE_X")),
+        "x_far": _row(-SCREW_HOLE_X[0], "ScrewX1", *_g("SCREW_HOLE_X")),
+        "x_far_nominal": (-SCREW_HOLE_X[0], _g("SCREW_HOLE_X")),
+        "x_near_from": ("ear_face", (_keep("ScrewX2"),)),
+        "y": _row(SCREW_HOLE_Y, "ScrewY", *_g("SCREW_HOLE_Y")),
+        "y_nominal": (SCREW_HOLE_Y, _g("SCREW_HOLE_Y")),
+        "y_from": ("low_edge", (_keep("ScrewY"),)),
+        "thru": (True, ("SCREW_HOLE_CALLOUT",)),
+        "process": ("drill", ("SCREW_HOLE_CALLOUT",)),
+        "count": (2, ((_SELF, "CALLOUTS_ABOVE"),)),
+        "callout": (SCREW_HOLE_CALLOUT, ("SCREW_HOLE_CALLOUT",)),
+        "mate": (SCREW_HOLE_MATE, ("SCREW_HOLE_MATE",)),
+        "wall": (SCREW_HOLE_WALL_TEXT, ("SCREW_HOLE_WALL_TEXT",)),
+    },
+    precision={
+        "dia": _P["ScrewDia"],
+        "x_near": _P["ScrewX2"],
+        "x_far": _P["ScrewX1"],
+        "y": _P["ScrewY"],
+    },
+)
+requirement(
+    "pin_hole",
+    kind="profile",
+    faces=(CylinderFace(PIN_HOLE_DIA, contains_z_mm=PIN_HOLE_ZL),),
+    requirements=("dia", "note"),
+    fields={
+        "dia": (
+            drilled_limits(PIN_HOLE_DIA, HOLE_PLACES, unit=UNIT),
+            (*_g("PIN_HOLE_DIA"), "HOLE_PLACES", "UNIT", (_SELF, "PIN_NOTE_XY")),
+        ),
+        "dia_nominal": (PIN_HOLE_DIA, _g("PIN_HOLE_DIA")),
+        "note": (PIN_NOTE, ("DRAWING_NOTES",)),
+        "callout": (PIN_HOLE_CALLOUT, ("PIN_HOLE_CALLOUT",)),
+    },
+    precision={"dia": HOLE_PLACES},
+)
+requirement(
+    "root_relief",
+    kind="profile",
+    faces=(CylinderFace(2.0 * ROOT_R),),
+    requirements=("radius",),
+    fields={
+        "radius": _row(ROOT_R, "RootR", *_g("ROOT_R")),
+        "radius_nominal": (ROOT_R, _g("ROOT_R")),
+    },
+    precision={"radius": _P["RootR"]},
+)
+requirement(
+    "tip_round",
+    kind="profile",
+    faces=(CylinderFace(2.0 * ROUND_R),),
+    requirements=("radius", "centre_station"),
+    fields={
+        "radius": (ROUND_R, (*_g("ROUND_R"), "ROUND_REFERENCE", (_SELF, "RIGHT_KEEP"))),
+        "dimension_type": ("reference", ("ROUND_REFERENCE",)),
+        "callout": (ROUND_CALLOUT, ("ROUND_CALLOUT",)),
+        "centre_station": _row(
+            DEV_TIP - ROUND_R, "DevRoundC", *_g("DEV_TIP", "ROUND_R")
+        ),
+        "centre_station_nominal": (DEV_TIP - ROUND_R, _g("DEV_TIP", "ROUND_R")),
+        "centre_station_from": ("low_edge", (_keep("DevRoundC"),)),
+        "overall_height": (
+            OVERALL_HEIGHT,
+            ("OVERALL_HEIGHT", (_SELF, "OVERALL_TEXT_XY")),
+        ),
+    },
+    precision={"centre_station": _P["DevRoundC"]},
+)
+requirement(
+    "arm_front",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -_ARM_FRONT_Z),),
+    requirements=("width",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": _ARM_FRONT_Z}, _g("ARM_W")),
+        "width": _row(ARM_W, "FlatArmW", *_g("ARM_W")),
+        "width_nominal": (ARM_W, _g("ARM_W")),
+        "width_from": ("ear_top", (_keep("FlatArmW"),)),
+    },
+    precision={"width": _P["FlatArmW"]},
+)
+requirement(
+    "arm_low_front",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -_ARM_LOW_Z),),
+    requirements=("width",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": _ARM_LOW_Z}, _g("LOW_W")),
+        "width": _row(LOW_W, "FlatLowW", *_g("LOW_W")),
+        "width_nominal": (LOW_W, _g("LOW_W")),
+        "width_from": ("ear_top", (_keep("FlatLowW"),)),
+    },
+    precision={"width": _P["FlatLowW"]},
+)
+requirement(
+    "taper",
+    kind="face",
+    faces=(
+        PlanarFace(_TAPER_N, _TAPER_N[1] * TAPER_L[0] + _TAPER_N[2] * _ARM_FRONT_Z),
+    ),
+    requirements=("start", "end"),
+    fields={
+        "start": _row(DEV_TAPER[0], "DevTaper1", *_g("DEV_TAPER")),
+        "start_nominal": (DEV_TAPER[0], _g("DEV_TAPER")),
+        "end": _row(DEV_TAPER[1], "DevTaper2", *_g("DEV_TAPER")),
+        "end_nominal": (DEV_TAPER[1], _g("DEV_TAPER")),
+        "start_from": ("low_edge", (_keep("DevTaper1"),)),
+    },
+    precision={"start": _P["DevTaper1"], "end": _P["DevTaper2"]},
+)
 
 
 def _pin_origin(
