@@ -168,7 +168,7 @@ blank_area_mm2 = 4645.152
 # of .6476 mm (.0255 in), as dt_cone_gear_tl_phasing_comb's outline runs two
 # levels with the same 1/16 downcut (#3740). The 0.6 MPa bond cap does
 # not bind: the cut uses a downcut helix (no tension) well within the shear
-# cap on the smallest piece (a male die half).
+# cap on the smallest piece (a female die half).
 sheet_tip_z_mm = -0.1016
 sheet_tip_into_plate_mm = 0.1016
 through_margin_min_mm = 0.2

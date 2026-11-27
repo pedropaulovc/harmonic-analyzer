@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 600" width="760" height="600" font-family="sans-serif" font-size="13">
-  <!-- Plan, fixed jaw at the top, 3 px/mm: X0 the plate's left end, Y0 the fixed jaw's face, +Y up. Plate 6 x 5 x 1/2 (plate_length_mm 152.4, plate_width_mm 127), blank 107.95 x 38.1 at blank_left_x_mm / blank_back_y_mm 12.7. The vise's jaw width 158.67 is on record; the jaws' thickness is not (drawn 24 px, schematic). The 1 in parallels lie under the plate's front and back edges against the jaws, hidden: 1/8 in thick (as dt_arbor_pedestal's parallel_thickness_mm states for the same set); their length is not on record (drawn the jaws' length, schematic). The cutter: 1/16 end mill, outline_cutter_dia_mm 1.5748 = 4.72 px here, at the end of its entry move (X66.675 Y-43.967, Z0.368, level 1 of 2). -->
+  <!-- Plan, fixed jaw at the top, 3 px/mm: X0 the plate's left end, Y0 the fixed jaw's face, +Y up. Plate 6 x 5 x 1/2 (plate_length_mm 152.4, plate_width_mm 127), blank 107.95 x 38.1 at blank_left_x_mm / blank_back_y_mm 12.7. The vise's jaw width 158.67 is on record; the jaws' thickness is not (drawn 24 px, schematic). The 1 in parallels lie under the plate's front and back edges against the jaws, hidden: 1/8 in thick (as dt_arbor_pedestal's parallel_thickness_mm states for the same set); their length is not on record (drawn the jaws' length, schematic). The cutter: 1/16 end mill, outline_cutter_dia_mm 1.5748 = 4.72 px here, at the end of its entry move (X66.675 Y-43.967, Z0.369, level 1 of 2). -->
   <rect class="paper" x="0" y="0" width="760" height="600"/>
   <text class="title" x="20" y="22">Setup 2: CB01_outline's first level reaches the comb (plan 3 px/mm; detail 20 px/mm)</text>
   <rect class="fixture-vise" x="30.59" y="68" width="476.02" height="24"/>
@@ -48,20 +48,20 @@
   <rect class="bond" x="544" y="244.4" width="186" height="5.6"/>
   <rect class="bond" x="530" y="247.2" width="14" height="2.8"/>
   <rect class="part-kept" x="544" y="234.24" width="186" height="10.16"/>
-  <rect class="part-removed" x="544" y="234.24" width="152.39" height="8.40"/>
-  <path class="cutter" d="M696.39 242.64L696.39 150L680.64 148L664.89 150L664.89 242.64A15.75 3.78 0 0 0 696.39 242.64Z"/>
+  <rect class="part-removed" x="544" y="234.24" width="152.39" height="8.38"/>
+  <path class="cutter" d="M696.39 238.84L696.39 150L680.64 148L664.89 150L664.89 238.84A15.75 3.78 0 0 0 696.39 238.84Z"/>
   <line class="arrow" x1="604" y1="168" x2="656" y2="168"/>
   <text class="label" x="600" y="172" text-anchor="end">+Y</text>
   <line class="datum" x1="726" y1="250" x2="752" y2="250"/>
   <text class="datum-label" x="655" y="296">Z0 plate top</text>
-  <text class="label" x="659" y="217.5" text-anchor="end">tip Z 0.368 mm (level 1)</text>
+  <text class="label" x="659" y="217.5" text-anchor="end">tip Z 0.369 mm (level 1)</text>
   <line class="leader" x1="560" y1="312" x2="538" y2="249.2"/>
   <circle class="leader-dot" cx="538" cy="249.2" r="2"/>
   <text class="label" x="564" y="322">tape, CA, tape: stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}};</text>
   <text class="label" x="564" y="338">in front, the plate's tape alone</text>
-  <line class="leader" x1="712" y1="224" x2="716" y2="236"/>
+  <line class="leader" x1="700" y1="224" x2="716" y2="236"/>
   <circle class="leader-dot" cx="716" cy="236" r="2"/>
-  <text class="label" x="702" y="218">blank {{cad.top_stock_thickness_mm:in.3dot}}</text>
+  <text class="label" x="690" y="218">blank {{cad.top_stock_thickness_mm:in.3dot}}</text>
   <text class="label" x="520" y="396">the 1/16 end mill to scale; its</text>
   <text class="label" x="520" y="412">collet stand-out {{process.em_sixteenth_projection_min_mm:in.2dot}}–{{process.em_sixteenth_projection_max_mm:in.2dot}}</text>
   <text class="label" x="520" y="428">drawn short (break). Each level</text>
