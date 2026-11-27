@@ -24,10 +24,12 @@
 # they are clear of the jaws) and carried to the left end with L. Setup 3
 # CNC teeth down, centred: Y0 the tap line from the front face, Z0 the flat
 # top; for each hole X0 = E + t (E the touched end's G54 X, read with $#),
-# entered with G10 L2 P1 X. FR03 spots, FR04 drills the 3/64 to .129, FR05
-# brings the tap guide over the hole (one Idle-ending file, the
-# pd_platen_bottom_guide precedent); each is a one-hole file at X0 Y0, run
-# once per hole. Setup 4 bench: deburr and check.
+# entered with G10 L2 P1 X. FR03 spots all four holes, then FR04 drills
+# each 3/64 to .129 from the same E + t in the same clamping; each is a
+# one-hole file at X0 Y0, run once per hole. FR05 loads the tap guide once
+# (one Idle-ending file, the pd_platen_bottom_guide precedent); the plug tap
+# then taps all four holes and the bottoming tap all four, the guide moved
+# between holes by MDI with no second M6. Setup 4 bench: deburr and check.
 #
 # The length's budget, FR02 from a fresh X0 on the milled left end: the
 # edge finder's .0002 plus the repeatability .0008 against ±.010.
@@ -55,10 +57,28 @@
 # The edge finder's .0002 is the usual figure, never measured in this shop
 # (as the dt_pinion_cam and pd_support_bar plans cite it). Measuring each
 # tooth removes the strip's accumulated pitch error and its lead from the
-# chain. Four checks with no extra setup back it: each t read twice from a
+# chain. Three checks with no extra setup back it: each t read twice from a
 # fresh end touch (agree within .004, else a third); each d - d1 inside its
-# printed station band; each spot looked at against its tooth before
-# drilling; each G10 read back with $#.
+# printed station band; each G10 read back with $#. Each hole is spotted and
+# drilled from the same E + t in one clamping (no re-clamp between them).
+#
+# The tap stop (W3B-Small ruling, 2026-11-27): .005 (0.127 mm) lies between
+# the tap's point at its stop, work Z -3.150 (tap_point_depth_mm, the drill
+# depth's minimum), and the 3/64's full diameter at -3.277. Each tap is
+# chucked in the wrench once, for all four holes, and its reference (Zp,
+# Zb) is taken on the flat top beside hole 1, where Z0 was touched, right
+# after; FR05's M6 T4 probes the guide once, before Zp, and nothing probes
+# it again until both taps are done, so each reference and its four stops
+# read through one chucking and one tool offset. The chain, in mm:
+#   the last turn in eighths, 1/80 in a turn         0.040  #0-80 pitch
+#   Z0 on the .002 feeler leaf (allowance)           0.013  author's
+#   tool setter, the T2 and the T3 probes, 2 x .002  0.004  fixtures.tool-setter-ets
+#   Z repeatability                                  0.020  cnc.pm-30mv (owner)
+#   worst                                            0.077  against 0.127
+#   unknown: the guide point's seating when pushed home, read the same way
+#     at the reference and at each stop.
+# A reference per hole per tap would take 8 chuckings, 8 references and 4
+# M6 probes; this takes 2, 2 and 1.
 #
 # Rod: the owned #49 drill (.073, tools.drill-49) seats on both flanks of a
 # space clear of the root: pd_feed_rack_spec.rack_gauge_pin_contact_mm(1.8542)
@@ -451,7 +471,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stack against the FIXED jaw. The strip teeth DOWN on it, flat top up, the front face toward you (the moving jaw), the LEFT end to the left, centred (both ends about 2.2 in out past the jaws). Tap it down onto the stack while closing the vise."
-datum = "Programs FR03_spot, FR04_drill, FR05_tap, each run once per hole. G54: X0 the hole's tooth, entered for each hole from the table (G10 L2 P1 X); Y0 the tap line, {{cad.tap_1_inset_in:.3dot}} in from the front face, +Y toward the back face; Z0 the flat top. Each file starts with an M6."
+datum = "Programs FR03_spot and FR04_drill, each run once per hole, and FR05_tap, run once at hole 1. G54: X0 the hole's tooth, entered for each hole from the table (G10 L2 P1 X); Y0 the tap line, {{cad.tap_1_inset_in:.3dot}} in from the front face, +Y toward the back face; Z0 the flat top. Each file starts with an M6."
 diagram = { file = "diagrams/drill.svg", alt = "To scale, from the front at tap 1 (the strip cut away on the tap line): the strip teeth down on the stack at the fixed jaw, flat top up; the 3/64 drill in hole 1 over its tooth's centre (X0), its full diameter {{cad.tap_1_drill_depth_in:.3dot}} under the flat top (Z0); the moving jaw, in front, not drawn." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", 3.175], y_span_mm = ["{{process.section_mm}}", 3.175], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.section_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.drill_tip_over_stack_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.spot_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.section_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.section_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.hole_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -466,52 +486,38 @@ instruction = "Stop check before clamping: each tap in the T-handle wrench measu
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Clamp as Holding says. G54 Y0 the tap line, Z0 the flat top: edge finder on the front face, the centre drill on the flat top."
-instruction_detailed = "Edge finder (900 rpm) on the front face left of the jaws, from your side: G10 L20 P1 Y-{{process.y_touch_mm:.3f}} (its .100 radius plus the {{cad.tap_1_inset_in:.3dot}} inset). Console M6 T2 (#1 centre drill in the drill chuck, at least {{process.spot_projection_min_mm:in.2dot}} out of it); spindle stopped, its tip just dragging a .002 feeler leaf on the flat top left of the jaws: G10 L20 P1 Z0.051."
+instruction = "Clamp as Holding says. Every edge-finder touch first: G54 Y0 the tap line, then E for each end into the table."
+instruction_detailed = "Edge finder (900 rpm): on the front face left of the jaws, from your side, G10 L20 P1 Y-{{process.y_touch_mm:.3f}} (its .100 radius plus the {{cad.tap_1_inset_in:.3dot}} inset). On the LEFT end, G10 L20 P1 X-2.540, send $#, write the G54 X as E for holes 1 and 2; on the RIGHT end, G10 L20 P1 X2.540, $#, E for holes 3 and 4. Copy each t used from Setup 2; write E + t."
 feed = "hand"
+table = { columns = ["Hole", "End", "t used (Setup 2)", "E", "E + t: spot, drill, taps"], rows = [
+  ["1", "LEFT", "t1 = ____", "____", "____"],
+  ["2", "LEFT", "t2 = ____", "____", "____"],
+  ["3", "RIGHT", "t3 = ____", "____", "____"],
+  ["4", "RIGHT", "t4 = ____", "____", "____"],
+] }
 
 [[setups.operations]]
-instruction = "E for each end, into the table: the edge finder on the LEFT end (G10 L20 P1 X-2.540), send $#, write the G54 X as E for holes 1 and 2; then on the RIGHT end (G10 L20 P1 X2.540), $#, E for holes 3 and 4. Copy each t used from Setup 2; write E + t."
+instruction = "G54 Z0 the flat top: the centre drill on a .002 feeler leaf left of the jaws."
+instruction_detailed = "Console M6 T2 (#1 centre drill in the drill chuck, at least {{process.spot_projection_min_mm:in.2dot}} out of it). Spindle stopped, its tip just dragging a .002 feeler leaf on the flat top left of the jaws: G10 L20 P1 Z0.051."
 feed = "hand"
-table = { columns = ["Hole", "End", "t used (Setup 2)", "E", "E + t: spot", "E again", "E again + t: drill, taps"], rows = [
-  ["1", "LEFT", "t1 = ____", "____", "____", "____", "____"],
-  ["2", "LEFT", "t2 = ____", "____", "____", "____", "____"],
-  ["3", "RIGHT", "t3 = ____", "____", "____", "____", "____"],
-  ["4", "RIGHT", "t4 = ____", "____", "____", "____", "____"],
-] }
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "For each hole: G10 L2 P1 X(its E + t: spot), send $# and check the G54 X reads it, run FR03_spot (M6 T2; set 2800): the #1 centre drill spots Ø{{process.spot_dia_mm:in.3dot}} at X0 Y0."
+instruction = "For each hole: G10 L2 P1 X(its E + t), send $# and check the G54 X reads it, run FR03_spot (M6 T2; set 2800): the #1 centre drill spots Ø{{process.spot_dia_mm:in.3dot}} at X0 Y0."
 settings = "rack-spot-brass"
 milling_cuts = [
   { name = "hole spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_mm_min}}", stations_mm = ["{{cad.tap_1_x_mm}}", "{{cad.tap_2_x_mm}}", "{{cad.tap_3_x_mm}}", "{{cad.tap_4_x_mm}}"] },
 ]
 
 [[setups.operations]]
-speed_kind = "other"
-tool = "rod"
-drilling = "none"
-sizing = "other"
-instruction = "Unclamp and look at each spot against its tooth: the #49 drill stood upright in the spot, shank down; seen square to the front face, its axis is over a tooth's crest, not over a space."
-diagram = { file = "diagrams/spotcheck.svg", alt = "To scale, square to the front face, the strip in the hand teeth down: the #49 drill's shank stood upright in a spot, its axis over the centre of the tooth below; a space's centre half a pitch ({{process.half_pitch_mm:in.3dot}} in) to either side." }
-inspection = "Every spot over its tooth. One over a space (half a pitch, about the rod's width, off): the piece is scrap (This job)."
-gauge_checks = "other"
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Clamp it again as Holding says and repeat the two zeroing ops above, Y0 and Z0, then E for each end into the table's E again column; write E again + t."
-feed = "hand"
-
-[[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-3-64"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-0-80-plug" }
-instruction = "For each hole: G10 L2 P1 X(its E again + t), $# check, run FR04_drill (M6 T3, the 3/64 at least {{process.drill_3_64_projection_min_mm:in.2dot}} out of the chuck; set 2800): pecks of {{process.peck_mm:in.3dot}}, full retract, to {{cad.tap_1_drill_depth_in:.3dot}} at full diameter. Dry."
+instruction = "Still clamped, for each hole: G10 L2 P1 X(the same E + t), $# check, run FR04_drill (M6 T3, the 3/64 at least {{process.drill_3_64_projection_min_mm:in.2dot}} out of the chuck; set 2800): pecks of {{process.peck_mm:in.3dot}}, full retract, to {{cad.tap_1_drill_depth_in:.3dot}} at full diameter. Dry."
 peck = { step_mm = "{{process.peck_mm}}", retract = "full" }
 peck_reason = "a 3/64 drill 2.8 diameters deep in brass: each retract clears the chips before they pack round so small a drill and snap it"
 hole_depth_mm = "{{cad.tap_1_drill_depth_mm}}"
@@ -525,20 +531,28 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Hole 1: G10 L2 P1 X(its E again + t), $# check, run FR05_tap: M6 T4, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole."
+instruction = "Hole 1: G10 L2 P1 X(its E + t), $# check, run FR05_tap once: M6 T4, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole. From here until both taps are done: no M6 and no other file (a probe of the guide moves the tool offset under Zp and Zb)."
 diagram = { file = "diagrams/tap.svg", alt = "To scale, from the front at tap 1 (the strip cut away on the tap line): the #0-80 tap in the T-handle wrench in hole 1, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to stop {{process.tap_point_depth_mm:in.3dot}} under the flat top. The wrench and the tap's length schematic." }
 
 [[setups.operations]]
-instruction = "Tap depth references, once, at hole 1: the DRO's work Z with each tap's point on the flat top beside the hole and the guide's point pushed home in the wrench. Write Zp (plug) and Zb (bottoming)."
-instruction_detailed = "MDI G91 G0 X3.810, G90 (beside the hole, on the flat top). The plug tap in its wrench, standing on its point: jog Z down until the guide's point is pushed fully home in the wrench's centre hole; write the DRO Z as Zp. The same with the bottoming tap: Zb. Jog Z up clear and MDI G91 G0 X-3.810, G90: back over the hole."
+instruction = "The plug tap in the wrench, chucked once for all four holes. Zp beside hole 1: the DRO's work Z with its point on the flat top and the guide's point pushed home in the wrench."
+instruction_detailed = "MDI G91 G0 X3.810, G90 (beside the hole, on the flat top). The plug tap in its wrench, standing on its point: jog Z down until the guide's point is pushed fully home in the wrench's centre hole; write the DRO Z as Zp. Jog Z up clear and MDI G91 G0 X-3.810, G90: back over hole 1."
 feed = "hand"
+table = { columns = ["Tap", "Reference, DRO Z", "Stop = reference − {{process.tap_point_depth_mm:.3f}}"], rows = [
+  ["Plug", "Zp = ____", "____"],
+  ["Bottoming", "Zb = ____", "____"],
+] }
 
 [[setups.operations]]
 speed_kind = "other"
 tool = "tap-0-80-plug"
 drilling = "none"
 sizing = "other"
-instruction = "Tap {{cad.tap_1_thread}} with the plug tap under the guide, spindle off, dry: a quarter turn at a time, backing off when it stiffens. Stop when the DRO Z reads Zp − {{process.tap_point_depth_mm:.3f}}, read with the point pushed home. Jog Z up clear; back the tap out by hand."
+instruction = "Plug-tap {{cad.tap_1_thread}} in all four holes under the guide, spindle off, dry: a quarter turn at a time, backing off when it stiffens, the last turn an eighth at a time. Stop at the plug's stop, read with the point pushed home. Jog Z up clear; back the tap out by hand. Holes 2, 3 and 4: G10 L2 P1 X(its E + t), $# check, MDI G53 G0 Z0 then G0 X0 Y0, and tap the same way."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The bottoming tap in the wrench, chucked once for all four holes. Hole 1 again: G10 L2 P1 X(its E + t), $# check, MDI G53 G0 Z0 then G0 X0 Y0; Zb beside it as Zp was."
 feed = "hand"
 
 [[setups.operations]]
@@ -546,18 +560,10 @@ speed_kind = "other"
 tool = "tap-0-80-bottoming"
 drilling = "none"
 sizing = "other"
-instruction = "The bottoming tap the same way, to Zb − {{process.tap_point_depth_mm:.3f}}: the full thread {{cad.tap_1_thread_depth_min_in:.3dot}}–{{cad.tap_1_thread_depth_max_in:.3dot}} deep. Back it out and blow the hole out."
+instruction = "Bottom-tap all four holes the same way, each to the bottoming tap's stop: the full thread {{cad.tap_1_thread_depth_min_in:.3dot}}–{{cad.tap_1_thread_depth_max_in:.3dot}} deep. Holes 2, 3 and 4: G10, $# check, MDI G53 G0 Z0 then G0 X0 Y0. Blow each hole out."
 feed = "hand"
-inspection = "A #0-80 screw (the MHA-PD-VN-55 fillister on hand) runs in by hand to the bottom of the thread. Binds: run the bottoming tap again; still binds: stop and tell the owner."
+inspection = "In each hole a #0-80 screw (the MHA-SH-VN-59 fillister on hand) runs in by hand to the bottom of the thread. Binds: run the bottoming tap again; still binds: stop and tell the owner."
 gauge_checks = "other"
-
-[[setups.operations]]
-speed_kind = "other"
-tool = "tap-guide"
-drilling = "none"
-sizing = "other"
-instruction = "Holes 2, 3 and 4 the same way, each: G10 L2 P1 X(its E again + t), $# check, run FR05_tap, plug to Zp − {{process.tap_point_depth_mm:.3f}}, bottoming to Zb − {{process.tap_point_depth_mm:.3f}}, blow out, screw check."
-feed = "hand"
 
 [[setups]]
 machine_kind = "other"

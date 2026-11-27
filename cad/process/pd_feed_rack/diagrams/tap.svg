@@ -25,5 +25,5 @@
   <text class="label" x="30" y="406">flat top; the full thread {{cad.tap_1_thread_depth_min_in:.3dot}}–{{cad.tap_1_thread_depth_max_in:.3dot}} deep</text>
   <line class="leader" x1="28" y1="376" x2="391.23" y2="344"/>
   <circle class="leader-dot" cx="391.23" cy="344" r="2"/>
-  <text class="label" x="20" y="546">Plug tap first, then the bottoming tap, each to its noted Z less the depth, read with the point pushed home.</text>
+  <text class="label" x="20" y="546">The plug tap in all four holes, then the bottoming tap in all four, each to its stop, read with the point pushed home.</text>
 </svg>

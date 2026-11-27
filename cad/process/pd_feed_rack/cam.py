@@ -27,8 +27,10 @@ strip is re-gripped twice more and each tap's tooth is measured from an
 end with a rod in the space beside it and the edge finder (no program).
 Setup 3, teeth down: each hole is zeroed in X on its own tooth (``G10 L2
 P1 X`` from the end the tooth was measured from, as the plan's table
-writes it), so FR03 (spot), FR04 (drill) and FR05 (tap guide) are
-one-hole files at X0 Y0, each run once per hole.
+writes it), so FR03 (spot) and FR04 (drill) are one-hole files at X0 Y0,
+each run once per hole, all spots then all drills from the same zeros in
+one clamping. FR05 loads the tap guide once, at hole 1; the guide reaches
+holes 2-4 by MDI with no second M6, so the taps' depth references hold.
 
 Work frames (G54):
 - FR01, FR02: X0 the finished left end (the sawn end less the skim), +X
@@ -41,7 +43,9 @@ Work frames (G54):
 The taps are tapped by hand under the Fisher spring tap guide in the 1/2 in
 R8 collet (owner, Pedro, 2026-11-21): FluidNC refuses jogs in the Hold an M0
 leaves, so the tap stop is a file of its own that ends M30 over its hole
-(the pd_platen_bottom_guide precedent).
+(the pd_platen_bottom_guide precedent). It is run once: a second M6 would
+probe the spring-loaded guide again and move the tool offset under the
+plan's Zp and Zb.
 """
 
 from __future__ import annotations
@@ -60,8 +64,8 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("FR04_drill", ("drill",)),
     ("FR05_tap", ("tap",)),
 )
-# Every program loads its own first tool (M6, the tool setter): FR03-FR05 run
-# once per hole and each starts on whatever the mill last held.
+# Every program loads its own first tool (M6, the tool setter): FR03 and FR04
+# run once per hole and each starts on whatever the mill last held.
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (the saw, the rod, the taps and the files are not).
@@ -455,8 +459,11 @@ def context(
         - g["station_nominals"][2]
         + half_pitch
     )
-    for far in (far_left, far_right):
-        if far - half_pitch + rod / 2 + 2 * FINDER_R_MM > reach:
+    # The rod sits in the space on its tooth's left: away from the jaws in
+    # hold A (tap 2, the jaws on its right), toward them in hold B (tap 3,
+    # the jaws on its left). Its middle's distance from the measured end:
+    for middle in (far_left - half_pitch, far_right + half_pitch):
+        if middle + rod / 2 + 2 * FINDER_R_MM > reach:
             raise ValueError(
                 "process.measure_overhang_mm: the edge finder would reach the jaws"
             )
@@ -689,8 +696,8 @@ def context(
         },
     ]
 
-    # The tap stop (one file, run once per hole): the tap guide loaded by its
-    # own M6, Z to the machine's top before any XY, over X0 Y0, M30: the
+    # The tap stop (one file, run once, at hole 1): the tap guide loaded by
+    # its own M6, Z to the machine's top before any XY, over X0 Y0, M30: the
     # controller ends Idle for the operator's jog.
     thread = features["features"]["tap_1"]["thread"].split()[0]
     manual = {
@@ -701,9 +708,9 @@ def context(
             "gcode": [
                 f"G53 G0 Z{MACHINE_Z_TOP_MM:.3f}",
                 "G0 X0.000 Y0.000",
-                f"({thread} PLUG TAP, THEN THE BOTTOMING TAP, IN THE HOLE AT X0 Y0. JOG Z DOWN"
+                f"({thread} PLUG TAP IN THE HOLE AT X0 Y0. JOG Z DOWN"
                 " TO PUSH THE GUIDE POINT HOME IN THE WRENCH. TAP BY HAND TO THE NOTED DRO Z,"
-                " READ WITH THE POINT PUSHED HOME. JOG Z UP CLEAR)",
+                " READ WITH THE POINT PUSHED HOME. JOG Z UP CLEAR. NO M6 UNTIL BOTH TAPS ARE DONE)",
                 "M30",
             ],
             "at": [0.0, 0.0],
@@ -883,12 +890,13 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
 
 
 # The as-machined report (``cad/scripts/_as_machined.py``) cannot take this
-# part: FR03-FR05 are one-hole files at X0 Y0, each run four times with X0
-# moved onto a tooth measured in Setup 2 (G10 L2 P1 X), and the report runs
-# each file once in one frame.
+# part: FR03 and FR04 are one-hole files at X0 Y0, each run four times with
+# X0 moved onto a tooth measured in Setup 2 (G10 L2 P1 X), and the report
+# runs each file once in one frame.
 AS_MACHINED_NOT_COVERED = (
-    "FR03_spot, FR04_drill and FR05_tap are one-hole files at X0 Y0, each run"
-    " once per hole with X0 moved by hand onto a tooth measured in Setup 2"
-    " (G10 L2 P1 X); the report runs each file once in one frame, and where"
-    " the teeth fall on a sawn piece is known only at the machine"
+    "FR03_spot and FR04_drill are one-hole files at X0 Y0, each run once per"
+    " hole with X0 moved by hand onto a tooth measured in Setup 2 (G10 L2 P1"
+    " X), and FR05_tap's guide reaches holes 2-4 by MDI; the report runs each"
+    " file once in one frame, and where the teeth fall on a sawn piece is"
+    " known only at the machine"
 )

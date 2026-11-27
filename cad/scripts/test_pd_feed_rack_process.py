@@ -163,6 +163,9 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("end_overhang_mm", 3.0, "left_clamp_end_mm"),
         ("right_hold_overhang_mm", 100.0, "right_hold_overhang_mm"),
         ("measure_overhang_mm", 101.6, "measure_overhang_mm"),
+        # Hold B's rod sits toward the jaws (the space on tap 3's tooth's
+        # left): 119.0 clears hold A but not hold B.
+        ("measure_overhang_mm", 119.0, "the edge finder would reach the jaws"),
         ("y_touch_mm", 5.0, "y_touch_mm"),
         ("spot_dia_mm", 2.0, "spot"),
         ("peck_mm", 1.5, "peck_mm"),

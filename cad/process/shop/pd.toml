@@ -372,10 +372,10 @@ feed_unit = "in/min"
 #   the first column take it): 2800 × .001 = 2.8 in/min.
 # - 1/4 in carbide end mill, the ends' side passes: The Carbide End Mill
 #   Store's Brass/Bronze row (the platen block above): 400 SFM (6112 rpm, so
-#   2800) and 1/4 in .0022 in/tooth. The rack plan takes half of it, .0011:
-#   each end stands 2.2-2.3 in out past the jaws on a 3/16 square section, so
-#   the strip's own stiffness, not the cutter's, limits the cut (author's
-#   choice; the plan's beam check carries it).
+#   2800) and 1/4 in .0022 in/tooth. The rack plan takes half of it, .0011
+#   (author's choice, kept conservative): each end is milled .30 in past
+#   its jaw side, one hold per end, a cantilever of about 7 mm on the 3/16
+#   square strip; the plan's beam check (prechips milling_deflection) passes.
 [settings.rack-spot-brass]
 tool = "centre-drills-carbide-60"
 material = "rack-brass"
