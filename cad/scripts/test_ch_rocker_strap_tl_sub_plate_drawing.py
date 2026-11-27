@@ -128,7 +128,7 @@ def test_the_hub_tap_states_its_worst_case_engagement() -> None:
     screw", whose acceptance of the .23 in of thread stands), through from
     the counterbore floor; full thread after the .010 edge break at both tap
     mouths (Codjiflo review of #3056) is .21 nominal (1.11D). At the worst
-    case it is .186 (0.98D; the 1/4-20 had .76D), the counterbore's depth
+    case it is .186 (0.979D; the 1/4-20 had .76D), the counterbore's depth
     taken at its wizard callout's .XX (#3622), stated as a fact floored to
     two places."""
     assert spec.HUB_TAP_THREAD == "#10-32"
@@ -144,7 +144,7 @@ def test_the_hub_tap_states_its_worst_case_engagement() -> None:
     assert spec.CLAMP_THREAD_LENGTH_MIN == pytest.approx(
         spec.CLAMP_THREAD_LENGTH - XX - XXX - XXX - 2.0 * spec.TAP_MOUTH_BREAK
     )
-    assert spec.HUB_ENGAGEMENT_STATEMENT == "ENGAGEMENT .18 MIN (.98D)"
+    assert spec.HUB_ENGAGEMENT_STATEMENT == "ENGAGEMENT .18 MIN (.97D)"
     assert spec.HUB_THREAD_LENGTH_MIN < spec.HUB_THREAD_REQUIRED
     exception = _config.parts(spec.PART_NAME)["machinist_exceptions"][0]
     assert exception["id"] == "RV-01" and "(1.01D)" in exception["finding"]
@@ -153,14 +153,9 @@ def test_the_hub_tap_states_its_worst_case_engagement() -> None:
     for word in ("ACCEPT", "RULING", "RULE", "OWNER"):
         assert word not in spec.HUB_ENGAGEMENT_STATEMENT
     # At the shallowest wizard depth the drill and reamer tips stay clear of
-    # the floor by more than the tool-length reading; at the nominal depth
-    # they keep the plan's relief clearance.
+    # the floor by more than the tool-length reading.
     assert spec.HUB_CBORE_TIP_CLEARANCE_MIN == pytest.approx(0.445, abs=1e-9)
     assert spec.HUB_CBORE_TIP_CLEARANCE_MIN > 0.001 * INCH
-    assert (
-        spec.HUB_CBORE_DEPTH + max(spec.PLAN_DRILL_TIP_Z, spec.PLAN_REAM_TIP_Z)
-        >= spec.PLAN_RELIEF_FLOOR_CLEARANCE
-    )
 
 
 def test_the_counterbore_is_what_the_plug_mirrors() -> None:
@@ -233,7 +228,7 @@ def test_printed_dimensions_sit_on_their_inch_grid() -> None:
 def test_explicit_bands_are_the_only_model_tolerances() -> None:
     bands = model_toleranced_dimensions(part)
     assert bands == {
-        # #3713: the pocket's back wall takes the title block's .XXX.
+        ("spec.SECTION_A_REFERENCE", "PocketBackWallY"): "spec.POCKET_BACK_WALL_TOL",
         ("HubHole", "HubX"): "spec.HUB_LOCATION_TOL",
         ("HubHole", "HubY"): "spec.HUB_LOCATION_TOL",
     }
@@ -1251,7 +1246,7 @@ def test_the_hub_hole_callout_prints_drill_thread_counterbore_and_shortfall() ->
         "Ø.159 DRILL THRU ALL",
         "10-32 UNF THRU ALL",
         "⌴Ø.500 ↧.185 FOR TL-02",
-        "ENGAGEMENT .18 MIN (.98D)",
+        "ENGAGEMENT .18 MIN (.97D)",
     ]
     assert len(_hub_callout_rows()) <= TEXT_ROW_LIMIT
     assert drawing.hub_hole_precision(hub) == {
@@ -1325,8 +1320,8 @@ def test_feature_export_names_every_requirement_the_plate_program_reads() -> Non
     pocket = features["clamp_pocket_1"]
     assert pocket["back_wall_y"] == pytest.approx(
         [
-            -spec.POCKET_BACK_WALL_Y - XXX,
-            -spec.POCKET_BACK_WALL_Y + XXX,
+            -spec.POCKET_BACK_WALL_Y - spec.POCKET_BACK_WALL_TOL,
+            -spec.POCKET_BACK_WALL_Y + spec.POCKET_BACK_WALL_TOL,
         ]
     )
     assert pocket["corner_radius_max"] == spec.CORNER_RADIUS

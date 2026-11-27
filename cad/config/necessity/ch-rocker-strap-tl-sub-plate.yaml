@@ -17,10 +17,26 @@
 # 0.029 mm past the keep-out; at the title block's +/-.005 it reaches 7.381 mm
 # from the hub, past the program's 7.358 mm keep-out
 # (ch_rocker_strap_tl_vn_hub_washer_spec, counterfactual sweep 2026-11-26).
-# Kept by delegated ruling 2026-11-26 (Main), D55; owner review #2144.
+# Kept by delegated ruling 2026-11-26 (Main); precedent: the owner's washer
+# ruling of 2026-11-24 quoted above; owner review #2144 (D55).
+#
+# N-02: the clamp pockets' back wall. Each Mitee-Bite Pitbull 26000
+# (TL-VN-50) sits with its heel on the wall and its knife C = .375 from it
+# (ch_rocker_strap_tl_vn_edge_clamp_spec, catalogue C); it fits over a
+# seated blank and grips it only while the wall less the blank's width lies
+# between C and C plus the clamp's .0075 total throw (Mitee-Bite
+# PITBULL-INST-0426, which gives no slot tolerance). The wall's band alone
+# spends .004 of that .0075 at +/-.002; at the title block's +/-.005 it is
+# .010, more than the whole throw, so a plate in print can block the blank
+# or leave the knife short of it. Codjiflo review of #3727 round 1 (P1).
 necessity:
   - id: N-01
     feature: "sheet 1, front view, hub hole location 6.000 ±.002 and 1.000 ±.002"
     kind: gap
     reason: "tap off the program closes the cutter-to-washer air"
     source: "ch_rocker_strap_tl_vn_hub_washer_spec.WORST_CLEARANCE"
+  - id: N-02
+    feature: "sheet 1, SECTION A-A, pocket back wall location 4X 1.875 ±.002"
+    kind: gap
+    reason: "clamp's .0075 throw must take up wall band and blank"
+    source: "ch_rocker_strap_tl_vn_edge_clamp_spec catalogue C (.375) and the Pitbull 26000's .0075 total throw: a .004 band at +/-.002, .010 at the title block's +/-.005"

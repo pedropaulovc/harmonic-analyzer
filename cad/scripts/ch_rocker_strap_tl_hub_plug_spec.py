@@ -12,7 +12,8 @@ hole was drilled (the strap traveler's RS03 and RS04), not by the plug: a
 plug that also located it would set the hole against the fence through the
 counterbore's position band and the plug's play together, and could hold
 the blank off the fence (#3713). So the plug floats: every size is the title
-block's, and nothing on it is a fit.
+block's, and nothing on it is a fit (delegated ruling 2026-11-26 (Main), no
+precedent; owner review #2144 (D55)).
 
 - Body: Ø.47 at the title block's .XX (.46-.48) in the counterbore's Hole
   Wizard Ø.500 at .XX (.490-.510): it drops in with .010 or more, and with

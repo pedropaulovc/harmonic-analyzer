@@ -127,12 +127,13 @@ end_stop_height_mm = 2.0066
 clamp_height_mm = 1.905
 # The fence face swept along X with the lever indicator once per vise setup:
 # the source of the reading (the fixture sheet MHA-CH-13-TL-00's step
-# mirrors it, ch_rocker_strap_tl_fixture_spec.FENCE_READING_IN). Every file
-# runs in the one G54 the fence and end stop set, so the sweep only catches a
-# plate set crooked in the vise: .010 over the 12 in turns the blank 0.05°,
-# well inside its stock round the outline (#3713; delegated ruling
-# 2026-11-26, Main).
-fence_sweep_max_in = 0.010
+# mirrors it, ch_rocker_strap_tl_fixture_spec.FENCE_READING_IN). Y0 is
+# touched on the fence at the hub station (Op 30), so the plate's hub tap
+# sits on the program's hub; its notch ends lie 5.9 in either side: a
+# fence out by the reading over the 12 in moves each notch that much x
+# 5.9/12 off the program's, against .0025 in of spare notch depth (the
+# fixture's necessity register, N-01).
+fence_sweep_max_in = 0.001
 # Under the hub the plate has a Ø1/2 in counterbore .185 in deep with a
 # #10-32 tapped hole through its floor. In RS03 it is the relief the drill
 # and reamer run into: their tips stop relief_floor_clearance_mm above its
@@ -408,7 +409,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (the 1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
+instruction = "Console M6 T1 (the 1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the end stop's face: G10 L20 P1 X2.540; then at X {{cad.hub_x_in:.3f}} (the hub station), on the fence face: G10 L20 P1 Y-2.540 (its 2.540 mm radius each time)."
 feed = "hand"
 
 # Owner ruling 2026-11-23: "Pick one washer from the pack of 100 by
@@ -521,8 +522,9 @@ feed = "hand"
 
 # The hub hole is drilled where the fence and end stop put the blank, and
 # RS04 puts it back there to cut the outline round it (the plug only floats,
-# #3713): both seats are proved by the same .002 leaf, so the hole sits on
-# the outline's centre within .002 each way (the outline's profile band is
+# #3713; delegated ruling 2026-11-26 (Main), no precedent; owner review
+# #2144 (D55)): both seats are proved by the same .002 leaf, so the hole sits
+# on the outline's centre within .002 each way (the outline's profile band is
 # +/-.010).
 [[setups.operations]]
 steps = [

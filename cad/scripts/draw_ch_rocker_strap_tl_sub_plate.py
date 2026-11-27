@@ -400,6 +400,7 @@ _TOP = (_SELF, "TOP_KEEP")
 _SEC_A = (_SELF, "SECTION_A_KEEP")
 _SEC_B = (_SELF, "SECTION_B_KEEP")
 _HUB_CALLOUT = (_SELF, "HUB_TAP_CALLOUT_XY")
+_BAND = (spec.POCKET_BACK_WALL_TOL, -spec.POCKET_BACK_WALL_TOL)
 _HUB_BAND = (spec.HUB_LOCATION_TOL, -spec.HUB_LOCATION_TOL)
 
 
@@ -586,8 +587,10 @@ for _index, _station in enumerate(_STATIONS, 1):
                 ("POCKET_BACK_WALL_Y", "POCKET_NEAR_WALL_Y"),
             ),
             "back_wall_y": (
-                limits(-spec.POCKET_BACK_WALL_Y, _P["PocketBackWallY"], unit=UNIT),
-                ("POCKET_BACK_WALL_Y", _SEC_A),
+                limits(
+                    -spec.POCKET_BACK_WALL_Y, _P["PocketBackWallY"], _BAND, unit=UNIT
+                ),
+                ("POCKET_BACK_WALL_Y", "POCKET_BACK_WALL_TOL", _SEC_A),
             ),
             "near_wall_y": (
                 limits(-spec.POCKET_NEAR_WALL_Y, _P["PocketNearWallY"], unit=UNIT),

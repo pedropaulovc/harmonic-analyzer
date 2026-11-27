@@ -103,10 +103,13 @@ if CORNER_CUTTER_RADIUS > CORNER_RADIUS:
 CLAMP_STATIONS: tuple[float, ...] = (25.4, 107.95, 196.85, 279.4)
 POCKET_LENGTH = 14.224  # .56 along X
 # The pocket's back wall seats the clamp's heel; its knife reaches the blank's
-# edge at C = .375 from it. At the title block's .XXX (#3713): the clamp's
-# throw (.0075, Mitee-Bite PITBULL-INST-0426) takes up the wall's band, and
-# the maker states no slot tolerance ("Mill a slot using B and C").
+# edge at C = .375 from it. Explicit band (shop table: a milled step <= 6 in
+# from its datum, +/-.002): the clamp fits and grips only while the wall less
+# the blank's width lies within its .0075 total throw of C (Mitee-Bite
+# PITBULL-INST-0426), which the title block's +/-.005 alone overruns
+# (necessity register N-02).
 POCKET_BACK_WALL_Y = -47.625  # 1.875 from Y0
+POCKET_BACK_WALL_TOL = 0.0508  # +/-.002
 # The near wall: the blank's edge line (the 1.50 in blank against the fence).
 BLANK_EDGE_Y = -38.1  # 1.50
 POCKET_NEAR_WALL_Y = BLANK_EDGE_Y
@@ -272,26 +275,27 @@ HUB_THREAD_MAJOR = THREAD_MAJOR_MM[HUB_TAP_THREAD]
 HUB_THREAD_REQUIRED = 1.5 * HUB_THREAD_MAJOR  # .285
 # Owner ruling 2026-11-17 (registry RV-01) accepts the .23 in of thread in
 # the plate; under the #10-32 of 2026-11-23 it is .21 of full thread nominal
-# (1.11D), .186 at the worst case (0.98D; the 1/4-20 had .76D).
+# (1.11D), .186 at the worst case (0.979D; the 1/4-20 had .76D).
 # The sheet states the worst case as a plain fact (rule 20), on the tap's
-# callout, its length floored to two places: a stated minimum is never
-# rounded up past what the bands leave.
+# callout, its length and its diameters each floored to two places: a stated
+# minimum is never rounded up past what the bands leave.
 HUB_ENGAGEMENT_DIAMETERS = HUB_THREAD_LENGTH_MIN / HUB_THREAD_MAJOR
 if not HUB_THREAD_LENGTH_MIN < HUB_THREAD_REQUIRED:
     raise AssertionError("the hub tap now meets 1.5D: drop the shortfall statement")
 _ENGAGEMENT_FLOOR_IN = math.floor(round(HUB_THREAD_LENGTH_MIN / INCH * 100, 6)) / 100
+_ENGAGEMENT_FLOOR_D = math.floor(round(HUB_ENGAGEMENT_DIAMETERS * 100, 6)) / 100
 HUB_ENGAGEMENT_STATEMENT = (
     f"ENGAGEMENT {inch_text(_ENGAGEMENT_FLOOR_IN * INCH, 2)} MIN "
-    f"({HUB_ENGAGEMENT_DIAMETERS:.2f}D)".replace("(0.", "(.")
+    f"({_ENGAGEMENT_FLOOR_D:.2f}D)".replace("(0.", "(.")
 )
 
 # The counterbore is the relief the strap's hub drill and reamer run into
 # (the plan's tips at drill_tip_z_mm / ream_tip_z_mm). At its shallowest
-# (the wizard depth's .XX) the tips still stop 0.445 mm above its floor. The
-# plan's relief_floor_clearance_mm (0.5, "the author's allowance, no source")
-# is the clearance its program keeps at the nominal depth (cam.py); what
+# (the wizard depth's .XX) the tips still stop 0.445 mm above its floor. What
 # fails is a tip that reaches the floor, so the worst case is checked
-# against the tool-length reading, .001 (tolerance-policy.md).
+# against the tool-length reading, .001 (tolerance-policy.md; check register
+# C-01). The plan's relief_floor_clearance_mm (0.5, "the author's allowance,
+# no source") gates nothing here.
 HUB_CBORE_TIP_CLEARANCE_MIN = (HUB_CBORE_DEPTH + HUB_CBORE_BAND[1]) + max(
     PLAN_DRILL_TIP_Z, PLAN_REAM_TIP_Z
 )
@@ -299,13 +303,6 @@ TIP_FLOOR_READING = 0.001 * INCH
 if HUB_CBORE_TIP_CLEARANCE_MIN <= TIP_FLOOR_READING:
     raise AssertionError(
         "the strap's hub drill or reamer tip can reach the counterbore floor"
-    )
-if (
-    HUB_CBORE_DEPTH + max(PLAN_DRILL_TIP_Z, PLAN_REAM_TIP_Z)
-    < PLAN_RELIEF_FLOOR_CLEARANCE
-):
-    raise AssertionError(
-        "at the nominal depth the tips break the plan's relief clearance"
     )
 
 # --- Printed grid (rule 3) ------------------------------------------------------------
@@ -488,6 +485,7 @@ if set(DIMENSION_VALUES) != set(DRAWING_PRECISION_BY_NAME):
 # everything else is the title block's row for its places. The build sets
 # each one (build_ch_rocker_strap_tl_sub_plate).
 SYMMETRIC_BANDS: dict[tuple[str, str], float] = {
+    (SECTION_A_REFERENCE, "PocketBackWallY"): POCKET_BACK_WALL_TOL,
     ("HubHole", "HubX"): HUB_LOCATION_TOL,
     ("HubHole", "HubY"): HUB_LOCATION_TOL,
 }
@@ -536,14 +534,14 @@ STRAP_NUMBER = "MHA-CH-13"
 FENCE_TOP_LIMIT = 0.079 * INCH
 if not FENCE_HEIGHT + XXX <= FENCE_TOP_LIMIT + 1e-9 < FENCE_HEIGHT + XX:
     raise AssertionError("the fence height's third place is not what holds .079")
-# The pocket's back-wall location (1.875) and its depth both serve the
-# clamp's seat, so the clamp is named once, on one numbered note both
-# dimensions flag (rule 4: one feature with several dimensions names its
-# mate once; rule 7: SEE NOTE n links it; machinist review mr7: named only on
-# the depth, the 1.875's mate read as missing). Rule 4 names the fit: the
-# back wall locates the clamp's heel and the floor its height, so the clamp
-# sits on a locating fit (machinist review r23: "SEAT" is no standard fit
-# name).
+# The pocket's tight back-wall location (1.875 +/-.002) and its depth both
+# serve the clamp's seat, so the clamp is named once, on one numbered note
+# both dimensions flag (rule 4: one feature with several tight dimensions
+# names its mate once; rule 7: SEE NOTE n links it; machinist review mr7:
+# named only on the depth, the 1.875's mate read as missing). Rule 4 names
+# the fit: the back wall locates the clamp's heel and the floor its height,
+# so the clamp sits on a locating fit (machinist review r23: "SEAT" is no
+# standard fit name).
 POCKET_SEAT_NOTE_NUMBER = 1
 POCKET_SEAT_NOTE = f"{POCKET_SEAT_NOTE_NUMBER}. LOCATING FIT ON {CLAMP_NUMBER}."
 POCKET_SEAT_FLAG = f"SEE NOTE {POCKET_SEAT_NOTE_NUMBER}"

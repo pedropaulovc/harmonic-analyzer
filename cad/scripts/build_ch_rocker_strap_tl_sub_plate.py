@@ -843,11 +843,21 @@ def build(adapter: Any) -> dict[str, str]:
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
 
-    # Explicit bands, each with its necessity entry: the hub hole's position
-    # places the hub screw that centres the washer TL-VN-52 clear of the
-    # outline cutter (N-01). A milled step within 6 in of its datum holds
-    # +/-.002 (drawing-guidelines.md, "What the shop holds"); the tolerance
-    # carries the nominal's three places.
+    # Explicit bands, each with its necessity entry: the clamp pocket's back
+    # wall seats the TL-VN-50 heel so its knife reaches the blank's edge
+    # within the clamp's throw (N-02); the hub hole's position places the hub
+    # screw that centres the washer TL-VN-52 clear of the outline cutter
+    # (N-01). A milled step within 6 in of its datum holds +/-.002
+    # (drawing-guidelines.md, "What the shop holds"); the tolerance carries
+    # the nominal's three places.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        spec.SECTION_A_REFERENCE,
+        "PocketBackWallY",
+        spec.POCKET_BACK_WALL_TOL,
+        places=spec.DRAWING_PRECISION_BY_NAME["PocketBackWallY"],
+        display_unit=spec.UNIT,
+    )
     set_dimension_symmetric_tolerance(
         adapter,
         "HubHole",

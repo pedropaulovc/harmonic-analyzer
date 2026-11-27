@@ -116,12 +116,12 @@ if CLAMP_TORQUE_FT_LB >= clamp.MAX_TORQUE_FT_LB:
 # Printed in in-lb, the unit a torque screwdriver for a #4-40 reads.
 CLAMP_TORQUE_IN_LB = CLAMP_TORQUE_FT_LB * 12.0
 # The fence is swept along the table's X travel with a test indicator in the
-# spindle, over the fence face between its notches. The reading mirrors the
-# strap plan's fence_sweep_max_in, its source (asserted in the pytest):
-# WITHIN .010 (#3713; delegated ruling 2026-11-26, Main): every program runs
-# in the one G54 the fence and end stop set, so the sweep only catches a
-# plate set crooked in the vise.
-FENCE_READING_IN = 0.010
+# spindle (rule 22: a setting finer than .XXX names its indicator), over the
+# fence face between its notches. The reading mirrors the strap plan's
+# fence_sweep_max_in, its source (asserted in the pytest); why it stays at
+# .001 is the necessity register's N-01
+# (cad/config/necessity/ch-rocker-strap-tl-fixture-assembly.yaml).
+FENCE_READING_IN = 0.001
 
 SCREW_TABLE_TITLE = "SCREW SCHEDULE"
 SCREW_TABLE_HEADER = ("ITEM", "NUMBER", "DESCRIPTION", "QTY", "THREAD", "TORQUE")
@@ -213,8 +213,8 @@ _CHECK_STEP = len(_STEPS)
 _STEPS += (
     f"IF STEP {_CHECK_STEP} FAILS, LOOSEN THE VISE, TAP ITEM {_P} ROUND AND "
     "REPEAT FROM STEP 2.",
-    "SET THE WORK ZERO: X0 ON THE END-STOP FACE, Y0 ON THE FENCE FACE, Z0 ON "
-    "THE PLATE TOP.",
+    "SET THE WORK ZERO: X0 ON THE END-STOP FACE, Y0 ON THE FENCE FACE OPPOSITE "
+    "THE HUB HOLE, Z0 ON THE PLATE TOP.",
     f"SET EACH ITEM {_C} IN ITS POCKET, CLAMPING EDGE TOWARD THE FENCE, BACK "
     "FACE ON THE POCKET WALL FARTHEST FROM THE FENCE.",
     f"RUN EACH ITEM {_C} SCREW IN FINGER TIGHT.",
