@@ -48,35 +48,29 @@ class ExplodeStep:
     instances: tuple[str, ...] = ()
 
 
-# The purchased #0-80 fillister's two members (MHA-SH-VN-59) share one file
-# stem; each is its own family, keyed as its BOM row is (stem--member): the
-# four RackScrews hold the MHA-PD-26 feed rack to the MHA-PD-27 bottom guide
-# (platen sheet), the three DiscScrews the MHA-PD-06 disc to its hub
-# (transgear sheet), so neither moves with the other's group.
-FILLISTER = _rack_screw.STEM
-RACK_SCREW = f"{FILLISTER}--{_rack_screw.CONFIGURATION}"
-DISC_SCREW = f"{_disc_screw.STEM}--{_disc_screw.CONFIGURATION}"
-if _disc_screw.STEM != FILLISTER:
-    raise AssertionError("the rack and disc screws are members of one shared stem")
+# The four rack screws (MHA-PD-VN-72, 91794A060) hold the MHA-PD-26 feed rack
+# to the MHA-PD-27 bottom guide (platen sheet); the three disc screws
+# (MHA-SH-VN-59, 91794A055) hold the MHA-PD-06 disc to its hub (transgear sheet).
+RACK_SCREW = _rack_screw.STEM
+DISC_SCREW = _disc_screw.STEM
+if DISC_SCREW == RACK_SCREW:
+    raise AssertionError("the rack and disc screws must have distinct stems")
 
 
 def member_family(stem: str, configuration: str) -> str:
-    """A component's family key: the shared fillister's per member, else its stem."""
-    return f"{stem}--{configuration}" if stem == FILLISTER else stem
+    """A component's family key in the paper-drive explode."""
+    del configuration
+    return stem
 
 
 # The bottom guide MHA-PD-27 no longer rises with the top guide: the rack
 # hangs from its underside on the four rack screws, so the three drop below
 # the platen together, the rack then drops clear of the guide and the screws
 # rise out of their counterbores, standing above the guide's top face in the
-# order they go in. The screw heads' front lies 6.0 behind the platen's front
-# face, and the isometric's line of sight rises as it comes forward, so seen
-# past the platen's bottom edge (machine y 273.2) a head's top must stay
-# under 267.2. At 45 down the guide's top stands at 246.2 and the screws,
-# 25 up, span 253.0 (tip) to 260.8 (head top): 6.8 clear of the guide and
-# 6.4 under that sight line. At 35 down (the old rack's throw) the heads
-# stood at 270.8, behind the platen. The rack's top face, 20 under the
-# guide's underside, shows its four taps.
+# order they go in. With 1/2 in screws on the .405 floor (#3738), at 45 down
+# the guide's top stands at 246.3 and the screws, 21 up, span 249.1 (tip) to
+# 263.1 (head top): clear above the guide and under the platen sight line
+# (267.0). The rack's top face, 20 under the guide's underside, shows its taps.
 PLATEN_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep(
         "bottom guide, rack and rack screws below the platen",
@@ -85,7 +79,7 @@ PLATEN_STEPS: tuple[ExplodeStep, ...] = (
         -45.0,
     ),
     ExplodeStep("rack below the bottom guide", ("pd-feed-rack",), "y", -20.0),
-    ExplodeStep("rack screws above the bottom guide", (RACK_SCREW,), "y", 25.0),
+    ExplodeStep("rack screws above the bottom guide", (RACK_SCREW,), "y", 21.0),
     ExplodeStep("guide screws forward", ("sh-vn-brass-fillister-screw",), "z", -45.0),
     ExplodeStep(
         "clips and paper forward",

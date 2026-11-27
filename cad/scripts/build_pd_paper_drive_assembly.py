@@ -3118,18 +3118,16 @@ def build(adapter) -> dict[str, str]:
     for index, x in enumerate(RACK_TAP_X, start=1):
         rack_screw = place_component(
             adapter,
-            "sh-vn-fillister-screw-91794a055",
+            "pd-vn-feed-rack-screw",
             [RACK_X0 + x, RACK_SCREW_FLOOR_Y, RACK_TEETH_FRONT_Z + RACK_TAP_Z],
             [0.0, 0.0, 0.0],
             IDENTITY,
             ground=False,
-            configuration="RackScrew",
             label=f"feed-rack screw (x{RACK_X0 + x:+.1f})",
         )
-        if rack_screw != f"sh-vn-fillister-screw-91794a055-{index}":
+        if rack_screw != f"pd-vn-feed-rack-screw-{index}":
             raise RuntimeError(
-                f"rack screw {index} is {rack_screw!r}: the interference contract "
-                "numbers the RackScrew members first"
+                f"rack screw {index} is {rack_screw!r}: expected pd-vn-feed-rack-screw-{index}"
             )
         _lock_to_platen(rack_screw, f"feed-rack screw x{RACK_X0 + x:+.1f}")
     # Lock plates on the guide backs, bridging BEHIND the bar (clear of its
@@ -3537,11 +3535,13 @@ def build(adapter) -> dict[str, str]:
         label="hub key pin locked to the disc hub",
     )
     # Rx(-90): heads on the flange's front face, shanks to +Z through the disc.
-    for index, angle, (x, y) in zip(
-        range(len(RACK_TAP_X) + 1, len(RACK_TAP_X) + 1 + len(DISC_SCREW_XY)),
-        DISC_HUB_GEOM.SCREW_ANGLES_DEG,
-        DISC_SCREW_XY,
-        strict=True,
+    for index, (angle, (x, y)) in enumerate(
+        zip(
+            DISC_HUB_GEOM.SCREW_ANGLES_DEG,
+            DISC_SCREW_XY,
+            strict=True,
+        ),
+        start=1,
     ):
         disc_screw = place_component(
             adapter,
@@ -3550,13 +3550,12 @@ def build(adapter) -> dict[str, str]:
             [-90.0, 0.0, 0.0],
             ROT_X_NEG90,
             ground=False,
-            configuration="DiscScrew",
             label=f"transgear-disc-screw ({angle:.0f} deg)",
         )
         if disc_screw != f"sh-vn-fillister-screw-91794a055-{index}":
             raise RuntimeError(
-                f"disc screw at {angle:.0f} deg is {disc_screw!r}: the interference "
-                "contract numbers the DiscScrew members after the rack screws"
+                f"disc screw at {angle:.0f} deg is {disc_screw!r}: expected "
+                f"sh-vn-fillister-screw-91794a055-{index}"
             )
         lock_mate(
             adapter,

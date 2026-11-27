@@ -113,8 +113,8 @@ def _depth_limits(adapter) -> None:
 
 
 def _band_rack_screw_counterbores(adapter) -> None:
-    """Put the counterbore's printed bands (owner ruling 2026-11-25, #3620:
-    Ø.110 +.004/-.000 and depth .469 ±.005; SCREW_CBORE_DIA_BAND,
+    """Put the counterbore's printed bands (owner ruling 2026-11-26, #3738:
+    Ø.125 +.005/-.000 and depth .219 ±.005; SCREW_CBORE_DIA_BAND,
     SCREW_CBORE_DEPTH_BAND) on the RackScrewHoles Hole Wizard feature's
     counterbore diameter and depth IN THE PART, so the sheet's native callout
     displays them (build_ch_fulcrum_keeper._band_foot_counterbore); the

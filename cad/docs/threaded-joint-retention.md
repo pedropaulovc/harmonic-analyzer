@@ -161,7 +161,7 @@ Why each row is classified so, and how it is held axially:
 | `guide-screw-in-bottom-guide` | MHA-SH-VN-51 `sh-vn-brass-fillister-screw` → MHA-PD-27 `pd-platen-bottom-guide` | #4-40 UNC | 5 | static clamp | none | guides-screwed |
 | `lock-screw-in-guide` | MHA-PD-VN-60 `pd-vn-guide-lock-screw` → MHA-PD-11 `pd-platen-guide` | #4-40 UNC | 4 | static clamp | none | platen-hung |
 | `lock-screw-in-bottom-guide` | MHA-PD-VN-60 `pd-vn-guide-lock-screw` → MHA-PD-27 `pd-platen-bottom-guide` | #4-40 UNC | 4 | static clamp | none | platen-hung |
-| `rack-screws` | MHA-SH-VN-59 `sh-vn-fillister-screw-91794a055` → MHA-PD-26 `pd-feed-rack` | #0-80 UNF | 4 | static clamp | none | rack-screwed |
+| `rack-screws` | MHA-PD-VN-72 `pd-vn-feed-rack-screw` → MHA-PD-26 `pd-feed-rack` | #0-80 UNF | 4 | static clamp | none | rack-screwed |
 | `arm-plate-screws` | MHA-PD-VN-56 `pd-vn-transgear-arm-plate-screw` → MHA-PD-18 `pd-transgear-arm` | #8-32 UNC | 2 | static clamp | none | arm-plate-fitted |
 | `pivot-screw-in-bar` | MHA-PD-VN-57 `pd-vn-transgear-pivot-screw` → MHA-PD-07 `pd-support-bar` | #8-32 UNC | 1 | oscillating | none; ruling `U-MHA-PD-VN-57-no-lock` | hanger-pivoted |
 | `disc-screws` | MHA-SH-VN-59 `sh-vn-fillister-screw-91794a055` → MHA-PD-06 `pd-rack-pinion` | #0-80 UNF | 3 | static clamp | none | disc-taps-transferred |

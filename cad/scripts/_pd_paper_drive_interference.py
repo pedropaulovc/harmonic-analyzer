@@ -108,16 +108,15 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         "pd-platen-guide",
         smooth_annulus_limit_mm3(2.8448, 2.261, 7.9375),
     ),
-    # The RackScrew members (-1..-4, placed before the disc screws) of
-    # MHA-SH-VN 91794A055 #0-80 x 1/4 (pd_feed_rack_screw_spec), heads on
-    # MHA-PD-27's counterbore floors 3.937 (.155) above the strip, through the
-    # rail's #51 clearance into the MHA-PD-26 strip's taps drilled 1.191:
-    # 6.35 - 3.937 = 2.413 in the strip.
+    # MHA-PD-VN-72 91794A060 #0-80 x 1/2 (pd_feed_rack_screw_spec, #3738),
+    # heads on MHA-PD-27's counterbore floors 10.287 (.405) above the strip,
+    # through the rail's #51 clearance into the MHA-PD-26 strip's taps drilled
+    # 1.191: 12.7 - 10.287 = 2.413 in the strip.
     **numbered_pairs(
-        "sh-vn-fillister-screw-91794a055",
+        "pd-vn-feed-rack-screw",
         range(1, 5),
         "pd-feed-rack",
-        smooth_annulus_limit_mm3(1.524, 1.191, 6.35 - 3.937),
+        smooth_annulus_limit_mm3(1.524, 1.191, 12.7 - 10.287),
     ),
     # MHA-PD-VN-56 #8-32 x 5/8 (pd_vn_transgear_arm_plate_screw_spec; from the top of the
     # oval head's bevel, flush in the plate's countersink) through the 5.0038
@@ -175,14 +174,13 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(
         ("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")
     ): _RING_PRONG_SHARE * smooth_annulus_limit_mm3(2.413, 2.3876, 0.381),
-    # The DiscScrew members (-5..-7) of MHA-SH-VN 91794A055 #0-80 x 1/4
-    # (pd_transgear_disc_screw_spec) through the hub flange's #51 (.067)
-    # clearance into the disc's 3/64 taps (pd_rack_pinion_spec), cut at
-    # assembly (R9-47) to 5.2832 under the head: 5.2832 - 2.3876 = 2.8956
-    # (.114) of the .118 face.
+    # MHA-SH-VN-59 91794A055 #0-80 x 1/4 (pd_transgear_disc_screw_spec)
+    # through the hub flange's #51 (.067) clearance into the disc's 3/64 taps
+    # (pd_rack_pinion_spec), cut at assembly (R9-47) to 5.2832 under the head:
+    # 5.2832 - 2.3876 = 2.8956 (.114) of the .118 face.
     **numbered_pairs(
         "sh-vn-fillister-screw-91794a055",
-        range(5, 8),
+        range(1, 4),
         "pd-rack-pinion",
         smooth_annulus_limit_mm3(1.524, 1.191, 5.2832 - 2.3876),
     ),

@@ -661,15 +661,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.261,
                 7.9375,
             ),
-            # #2410: the RackScrew members, under-head on MHA-PD-27's .155
-            # floor, 6.35 - 3.937 in the MHA-PD-26 strip's 1.191 tap drills.
+            # #3738: MHA-PD-VN-72 1/2 in rack screws, under-head on MHA-PD-27's
+            # .405 floor, 12.7 - 10.287 in the MHA-PD-26 strip's 1.191 tap drills.
             **_expected_numbered_pairs(
-                "sh-vn-fillister-screw-91794a055",
+                "pd-vn-feed-rack-screw",
                 range(1, 5),
                 "pd-feed-rack",
                 1.524,
                 1.191,
-                6.35 - 3.937,
+                12.7 - 10.287,
             ),
             # Round 10 transgear: stock #8-32 / #4-40 / #0-80 screws, the
             # MHA-PD-23 pin's press in the arm, and the MHA-PD-13 1/4-20 nut.
@@ -725,9 +725,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             )
             * _annulus_limit(2.413, 2.3876, 0.381),
             **_expected_numbered_pairs(
-                # The DiscScrew members follow the four RackScrew instances.
                 "sh-vn-fillister-screw-91794a055",
-                range(5, 8),
+                range(1, 4),
                 "pd-rack-pinion",
                 1.524,
                 1.191,

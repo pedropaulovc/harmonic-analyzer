@@ -49,8 +49,9 @@ _STOCK_REQUIREMENTS = {
     "pd-vn-transgear-knob-drive-pin": (("98381A433",), "MHA-PD-VN-54", 2),
     "pd-vn-transgear-collar-flat-pin": (("90145A414",), "MHA-PD-VN-70", 1),
     "pd-vn-transgear-hub-key-pin": (("98381A416",), "MHA-PD-VN-69", 1),
+    "pd-vn-feed-rack-screw": (("91794A060",), "MHA-PD-VN-72", 4),
     "pd-vn-transgear-knob-cup-screw": (("91794A079",), "MHA-PD-VN-71", 1),
-    "sh-vn-fillister-screw-91794a055": (("91794A055",), "MHA-SH-VN-59", 7),
+    "sh-vn-fillister-screw-91794a055": (("91794A055",), "MHA-SH-VN-59", 3),
     "pd-vn-transgear-latch-pin": (("98381A474",), "MHA-PD-VN-58", 1),
     "pd-vn-transgear-pivot-screw": (("90325A174",), "MHA-PD-VN-57", 1),
     "pd-vn-transgear-retaining-ring": (("97431A240",), "MHA-PD-VN-61", 1),
@@ -100,10 +101,6 @@ _SHARED_MEMBERS = {
     "sh-vn-pivot-pin": (
         "McMaster-Carr", "90145A299", "MHA-SH-VN-58",
         {"RodPin": 20, "BarPin": 20},
-    ),
-    "sh-vn-fillister-screw-91794a055": (
-        "McMaster-Carr", "91794A055", "MHA-SH-VN-59",
-        {"DiscScrew": 3, "RackScrew": 4},
     ),
 }
 

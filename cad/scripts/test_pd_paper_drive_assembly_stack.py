@@ -63,9 +63,9 @@ def _platen(paper) -> None:
     ), "MHA-PD-27's underside is off the MHA-PD-26 strip's flat top"
     # The placement below names the member literally (the build graph reads it).
     assert (RACK_SCREW.STEM, RACK_SCREW.CONFIGURATION) == (
-        "sh-vn-fillister-screw-91794a055",
-        "RackScrew",
-    ), "the rack-screw placement names another member"
+        "pd-vn-feed-rack-screw",
+        None,
+    ), "the rack-screw placement names another part"
     # BOTTOM_RAIL_CLEARANCE is derived (the bar hangs from the top rail's
     # underside, MHA-PD-27 sits at its own y), so hold the gap it leaves
     # against a running floor stated here, rebuilt from the parts' own

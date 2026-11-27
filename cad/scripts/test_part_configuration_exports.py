@@ -14,13 +14,12 @@ import _part_configuration_exports as exports
 import _preferences
 
 
-# These are the eight physical members of the four heterogeneous shared SKUs,
-# not eight separate native parts. Keep the registry real throughout these tests.
+# These are the six physical members of the three heterogeneous shared SKUs,
+# not six separate native parts. Keep the registry real throughout these tests.
 _MEMBERS = {
     "sh-vn-chain-link": ("InnerLink", "OuterLink"),
     "sh-vn-music-wire": ("LeverWire", "PenWire"),
     "sh-vn-pivot-pin": ("RodPin", "BarPin"),
-    "sh-vn-fillister-screw-91794a055": ("RackScrew", "DiscScrew"),
 }
 _MEMBER_CASES = [
     (stem, member) for stem, members in _MEMBERS.items() for member in members

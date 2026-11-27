@@ -129,7 +129,7 @@ _INSERTED_SOURCES = {
     "pd_paper_drive": "pd_vn_chain_connecting_link sh_vn_chain_link sh_vn_clamp_screw "
     "sh_column_clamp_back sh_column_clamp_front sh_vn_brass_fillister_screw pd_guide_lock pd_vn_guide_lock_screw pd_latch_hook "
     "sh_vn_fillister_screw_90280a108 pd_vn_platen_clip_screw "
-    "pd_feed_rack pd_platen pd_platen_bottom_guide pd_platen_clip pd_platen_guide pd_platen_paper pd_rack_pinion pd_support_bar "
+    "pd_feed_rack pd_vn_feed_rack_screw pd_platen pd_platen_bottom_guide pd_platen_clip pd_platen_guide pd_platen_paper pd_rack_pinion pd_support_bar "
     "pd_transgear_arm pd_transgear_arm_plate pd_transgear_knob_bush "
     "pd_vn_transgear_arm_plate_locating_pin pd_vn_transgear_arm_plate_screw "
     "pd_transgear_disc_hub pd_vn_transgear_hub_key_pin sh_vn_fillister_screw_91794a055 "

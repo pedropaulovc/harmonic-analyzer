@@ -917,9 +917,7 @@ BOM_PART_NUMBERS = {
     "pd-feed-rack": _config.parts("pd-feed-rack")["number"],
     "pd-platen-bottom-guide": _config.parts("pd-platen-bottom-guide")["number"],
     "pd-platen-guide": _config.parts("pd-platen-guide")["number"],
-    "sh-vn-fillister-screw-91794a055--RackScrew": _config.parts(
-        "sh-vn-fillister-screw-91794a055"
-    )["number"],
+    "pd-vn-feed-rack-screw": _config.parts("pd-vn-feed-rack-screw")["number"],
     "pd-guide-lock": _config.parts("pd-guide-lock")["number"],
     "pd-platen-clip": _config.parts("pd-platen-clip")["number"],
     "pd-platen-paper": _config.parts("pd-platen-paper")["number"],
@@ -951,7 +949,7 @@ BOM_PART_NUMBERS = {
     "pd-vn-transgear-retaining-ring": _config.parts("pd-vn-transgear-retaining-ring")["number"],
     "pd-vn-transgear-cluster-shim": _config.parts("pd-vn-transgear-cluster-shim")["number"],
     "pd-rack-pinion": _config.parts("pd-rack-pinion")["number"],
-    "sh-vn-fillister-screw-91794a055--DiscScrew": _config.parts(
+    "sh-vn-fillister-screw-91794a055": _config.parts(
         "sh-vn-fillister-screw-91794a055"
     )["number"],
     "pd-transgear-knob-shaft": _config.parts("pd-transgear-knob-shaft")["number"],
@@ -1021,6 +1019,12 @@ _SKU = {
     "pd-vn-transgear-collar-flat-pin": _config.parts("pd-vn-transgear-collar-flat-pin")[
         "supplier_skus"
     ][0],
+    "pd-vn-feed-rack-screw": _config.parts("pd-vn-feed-rack-screw")[
+        "supplier_skus"
+    ][0],
+    "sh-vn-fillister-screw-91794a055": _config.parts(
+        "sh-vn-fillister-screw-91794a055"
+    )["supplier_skus"][0],
     "pd-vn-transgear-knob-cup-screw": _config.parts("pd-vn-transgear-knob-cup-screw")[
         "supplier_skus"
     ][0],
@@ -1174,10 +1178,9 @@ TRANSGEAR_QUANTITIES = {
 PLATEN_QUANTITIES = {explode.RACK_SCREW: len(feed_rack.TAP_X)}
 
 
-# The builder names each instance ``<file stem>-<n>`` in placement order and
-# proves the shared fillister's names as it places them: the platen's
-# RackScrews first, then the transgear's DiscScrews after them.
-_FIRST_INSTANCE = {explode.DISC_SCREW: PLATEN_QUANTITIES[explode.RACK_SCREW] + 1}
+# Each BOM row's instances start at 1 (the rack screws are MHA-PD-VN-72 and
+# the disc screws MHA-SH-VN-59, separate files since #3738).
+_FIRST_INSTANCE: dict[str, int] = {}
 
 
 def row_instance_names(key: str, count: int) -> tuple[str, ...]:
@@ -1195,13 +1198,10 @@ CHAIN_QUANTITIES = {
     "sh-vn-chain-link--OuterLink": chain.LINK_COUNT // 2 - 1,
     "pd-vn-chain-connecting-link": 1,
 }
-# MHA-SH-VN-59 numbers two BOM rows (the rack screw and the disc screw) and
-# MHA-SH-VN-50 two more (the chain's inner and outer links), so the sheet
-# wording adds the BOM item to those four (#3106, rule 22: the number alone
-# named either row); _validate_bom reads each item back.
+# MHA-SH-VN-50 numbers two BOM rows (the chain's inner and outer links), so
+# the sheet wording adds the BOM item to those two (#3106, rule 22: the number
+# alone named either row); _validate_bom reads each item back.
 SHARED_NUMBER_ITEMS = {
-    explode.RACK_SCREW: 9,
-    explode.DISC_SCREW: 34,
     "sh-vn-chain-link--InnerLink": 46,
     "sh-vn-chain-link--OuterLink": 47,
 }
@@ -2069,8 +2069,7 @@ LOCTITE_638_SUB_STEPS = tuple(
 )
 _LOCTITE_638_HEADS = [sub_step(key, index) for key, index in LOCTITE_638_SUB_STEPS]
 BOM_EXPENDABLES_NOTE = (
-    f"ALSO ORDER {RACK_SCREWS} MORE {BOM_PART_NUMBERS[explode.RACK_SCREW]}\n"
-    f"(ITEM {SHARED_NUMBER_ITEMS[explode.RACK_SCREW]}): "
+    f"ALSO ORDER {RACK_SCREWS} MORE {BOM_PART_NUMBERS[explode.RACK_SCREW]}:\n"
     f"{sub_step('rack-screwed', 0)}-{sub_step('rack-screwed', 2)} MAKE THEM TRANSFER\n"
     f"SCREWS, AND 1 MORE {BOM_PART_NUMBERS['pd-vn-chain-connecting-link']} TO\n"
     f"CLOSE THE SPARE'S LOOP. {sub_step('platen-hung', 0)} USES {LOCK_TRANSFER_SCREWS}\n"

@@ -28,7 +28,8 @@ The screws, and the small parts that do not belong anywhere else.
 | `dt-vn-cylinder-bank-spring` | TODO | TODO | TODO |
 | `pd-vn-transgear-latch-pin` | TODO | TODO | TODO |
 | `sh-vn-fillister-screw-90280a108` (latch-hook screw role; shared with the drive train's foot and swing-stop screws) | TODO | TODO | TODO |
-| `sh-vn-fillister-screw-91794a055` (MHA-SH-VN-59: `DiscScrew` disc screws and `RackScrew` feed-rack screws) | TODO | TODO | TODO |
+| `sh-vn-fillister-screw-91794a055` (MHA-SH-VN-59: cut-to-fit disc screws) | TODO | TODO | TODO |
+| `pd-vn-feed-rack-screw` (MHA-PD-VN-72) | 4 | 18-8 stainless steel, passivated | McMaster 91794A060 slotted fillister head machine screw, #0-80 × 1/2 in, ASME B18.6.3; screws the feed rack (MHA-PD-26) to the bottom guide rail (MHA-PD-27) on .219 in deep Ø.125 in counterbores (owner ruling 2026-11-26, #3738); dimensions: `pd_feed_rack_screw_spec.py` |
 | `pd-vn-transgear-knob-drive-pin` | TODO | TODO | TODO |
 | `pd-vn-transgear-knob-cup-screw` (MHA-PD-VN-71) | 1 | 18-8 stainless steel, passivated | McMaster 91794A079 slotted fillister head machine screw, #2-56 × 3/8 in, ASME B18.6.3; through the knob cup's (MHA-PD-16) web into the knob shaft's (MHA-PD-08) rear tap, the cup bonded on the journal with LOCTITE 641 (owner ruling 2026-11-20 (Pedro), #2425; replaces the MHA-PD-VN-62 spring pin); dimensions: `pd_vn_transgear_knob_cup_screw_spec.py` |
 | `fr-vn-gooseneck-set-screw` | TODO | TODO | TODO |

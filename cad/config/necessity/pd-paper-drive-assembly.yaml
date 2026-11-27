@@ -7,7 +7,7 @@ necessity:
     feature: "sheet 13 DETAIL J and step 3B, rack crests .100 ±.002 below the platen's bottom edge"
     kind: gap
     reason: "keeps the MHA-PD-27 platen-tap top wall over its .060 floor"
-    source: "pd_platen_bottom_guide_spec.CREST_SET_BAND in PLATEN_TAP_Y_BAND: the taps are spotted through the platen at this set, so the band moves the tap row; at .624 high the top wall is 1.540 mm over 1.524 (PLATEN_TAP_TOP_WALL_MIN), and at ±.005 it would be 1.464 (or the owner-ruled .469 counterbore moves). The mesh depth is felt at step 24, not set by this band"
+    source: "pd_platen_bottom_guide_spec.CREST_SET_BAND in PLATEN_TAP_Y_BAND: the taps are spotted through the platen at this set, so the band moves the tap row; at .624 high the top wall is 1.540 mm over 1.524 (PLATEN_TAP_TOP_WALL_MIN), and at ±.005 it would be 1.464 (or the owner-ruled .219 counterbore moves). The mesh depth is felt at step 24, not set by this band"
   - id: N-02
     feature: "steps 3B and 26P and setting table row 18, rack crests at the two ends WITHIN .001 of each other"
     kind: mesh
@@ -59,7 +59,7 @@ necessity:
     reason: "a prouder tip closes the latched hanger's sweep clearance"
     source: "transgear_hanger_joints.PLATE_SCREW_CUT_PROUD_MAX; build_pd_paper_drive_assembly lock sweep, plate-screw tip"
   - id: N-13
-    feature: "step 16 and setting table row 14, MHA-SH-VN-59 (item 34) tips dressed FLUSH with the disc rear face, a straightedge lies flat"
+    feature: "step 16 and setting table row 14, MHA-SH-VN-59 tips dressed FLUSH with the disc rear face, a straightedge lies flat"
     kind: gap
     reason: "a proud tip strikes the platen behind the disc"
     source: "pd_transgear_disc_screw_spec.TIP_BELOW_REAR_FACE (R9-47): flush is the window's .000 end; its .008 end is the unprinted dressing allowance the disc tap's worst engagement charges (ENGAGEMENT_WORST, 1.5D by .001)"

@@ -18,7 +18,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _gtol_face import FaceGeometry
 from _hole_spec import THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM
-from _mcmaster_91794a055 import HEAD_DIA, SHANK_DIA
+from _mcmaster_91794a060 import HEAD_DIA, SHANK_DIA
 from pd_platen_spec import GUIDE_HOLE_X, GUIDE_HOLE_Y, PLATE_WIDTH
 
 
@@ -180,16 +180,16 @@ def test_right_view_dimensions_stand_clear_of_the_front_view() -> None:
 
 
 def test_the_height_band_names_its_screw_by_number() -> None:
-    assert drawing.HEIGHT_CALLOUT.splitlines() == ["SETS ENGAGEMENT", "OF MHA-SH-VN-59"]
+    assert drawing.HEIGHT_CALLOUT.splitlines() == ["SETS ENGAGEMENT", "OF MHA-PD-VN-72"]
 
 
 def test_the_counterbore_prints_the_owners_bands_in_two_word_lines() -> None:
-    # Owner ruling 2026-11-25 (#3620): "b: Ø.110 +.004/−0 and depth .469
-    # ±.005". Without them the wizard pocket's ±.01 (rule 3) fails the head
-    # entry, the tap lead, the printed engagement and the printed wall.
-    assert spec.SCREW_CBORE_DIA == pytest.approx(_in(0.110))
-    assert spec.SCREW_CBORE_DIA_BAND == pytest.approx((_in(0.004), 0.0))
-    assert spec.SCREW_CBORE_DEPTH == pytest.approx(_in(0.469))
+    # Owner ruling 2026-11-26 (#3738): Ø.125 +.005/−0 and depth .219 ±.005.
+    # Without them the wizard pocket's ±.01 (rule 3) fails the tap lead, the
+    # printed engagement and the printed wall.
+    assert spec.SCREW_CBORE_DIA == pytest.approx(_in(0.125))
+    assert spec.SCREW_CBORE_DIA_BAND == pytest.approx((_in(0.005), 0.0))
+    assert spec.SCREW_CBORE_DEPTH == pytest.approx(_in(0.219))
     assert spec.SCREW_CBORE_DEPTH_BAND == pytest.approx((_in(0.005), -_in(0.005)))
     # The part bands the Hole Wizard feature; the sheet prints both bands at
     # the callout's three places.
@@ -202,8 +202,8 @@ def test_the_counterbore_prints_the_owners_bands_in_two_word_lines() -> None:
     ]
     assert "ENGAGEMENT" in drawing.HEIGHT_CALLOUT
     # The worst cases at the printed bands, inch. The tip margin is ZERO.
-    assert spec.SCREW_HEAD_ENTRY_MIN / 25.4 == pytest.approx(0.007, abs=1e-4)
-    assert rack.SCREW_TIP_MARGIN == 0.0
+    assert spec.SCREW_HEAD_ENTRY_MIN / 25.4 == pytest.approx(0.022, abs=1e-4)
+    assert rack.SCREW_TIP_MARGIN == pytest.approx(0.0, abs=1e-12)
     assert rack.ENGAGEMENT_WORST >= _in(0.032)
     assert rack.ENGAGEMENT_STATEMENT == "ENGAGEMENT .032 MIN (0.54D)"
     assert spec.SCREW_CBORE_FRONT_WALL_MIN >= _in(0.044)
@@ -330,8 +330,8 @@ def test_rail_feature_bands_are_the_printed_ones() -> None:
             assert feature["made_at"] == "assembly"
             assert "station" not in feature and "height" not in feature
     assert features["rack_screw_hole_1"]["cbore_depth"] == pytest.approx(
-        [_in(0.464), _in(0.474)], abs=1e-3
+        [_in(0.214), _in(0.224)], abs=1e-3
     )
     assert features["rack_screw_hole_1"]["cbore_dia"] == pytest.approx(
-        [_in(0.110), _in(0.114)], abs=1e-3
+        [_in(0.125), _in(0.130)], abs=1e-3
     )

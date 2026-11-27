@@ -34,7 +34,7 @@ import export_features
 import pd_feed_rack_spec as rack
 import pd_platen_bottom_guide_spec as guide
 import pd_platen_spec as platen
-from _mcmaster_91794a055 import HEAD_DIA as RACK_SCREW_HEAD_DIA
+from _mcmaster_91794a060 import HEAD_DIA as RACK_SCREW_HEAD_DIA
 from _wizard_pocket_band import WIZARD_POCKET_BAND_MM
 from sh_vn_brass_fillister_screw_spec import HEAD_DIA as GUIDE_SCREW_HEAD_DIA
 from sh_vn_brass_fillister_screw_spec import HEAD_H as GUIDE_SCREW_HEAD_H
@@ -156,7 +156,7 @@ def test_bottom_guide_guards_hold_at_the_printed_bands() -> None:
     # transfer the head follows).
     entry = dia_min - 2.0 * guide.SCREW_FLOAT_RADIAL - RACK_SCREW_HEAD_DIA
     assert guide.SCREW_HEAD_ENTRY_MIN <= entry + TOL
-    assert entry / INCH == pytest.approx(0.007, abs=1e-4)
+    assert entry / INCH == pytest.approx(0.022, abs=1e-4)
     # The floor between the pocket and the underside, both its printed ends.
     floor_min = height_min - depth_max
     floor_max = height_max - depth_min
@@ -169,7 +169,7 @@ def test_bottom_guide_guards_hold_at_the_printed_bands() -> None:
     tip_reach = rack.SCREW_LENGTH - floor_min
     assert rack.SCREW_TIP_REACH_MAX >= tip_reach - TOL
     assert tip_reach <= rack.TAP_THREAD_DEPTH_MIN + TOL
-    assert rack.SCREW_TIP_MARGIN == 0.0
+    assert rack.SCREW_TIP_MARGIN == pytest.approx(0.0, abs=1e-12)
     # The shortest screw on the thickest floor engages what MHA-PD-26 prints.
     engagement = (
         rack.SCREW_LENGTH_MIN
