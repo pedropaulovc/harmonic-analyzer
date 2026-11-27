@@ -1491,7 +1491,7 @@ _DEVELOPER_COMMANDS = {
 }
 
 
-def _developer_credential_notice(credential, elapsed, exc=None):
+def _developer_credential_notice(credential, elapsed, limit, exc=None):
     """Name a slow or timed-out developer credential's command, its measured
     wait and its limit (#3508): azure-identity reports only a generic
     CredentialUnavailableError for a process that ran out of time."""
@@ -1503,7 +1503,8 @@ def _developer_credential_notice(credential, elapsed, exc=None):
     telemetry = sys.modules.get("_telemetry")
     if telemetry is None:
         return
-    limit = cause.timeout if timed_out else _DEVELOPER_CREDENTIAL_TIMEOUT_S
+    if timed_out:
+        limit = cause.timeout
     outcome = "timeout" if timed_out else "failure" if exc is not None else "success"
     command = _DEVELOPER_COMMANDS[credential]
     with contextlib.suppress(Exception):
@@ -1547,19 +1548,25 @@ class _ObservedCredentialLink:
             credential = type(self._inner).__name__
             developer = credential in _DEVELOPER_COMMANDS
             started = time.monotonic()
+            # azure-identity keeps each developer credential's process limit
+            # in ``_process_timeout`` (1.25.3); without it, the backend's own.
+            limit = getattr(
+                self._inner, "_process_timeout", _DEVELOPER_CREDENTIAL_TIMEOUT_S
+            )
             try:
                 token = member(*args, **kwargs)
             except Exception as exc:
                 if developer:
                     elapsed = time.monotonic() - started
-                    _developer_credential_notice(credential, elapsed, exc)
+                    _developer_credential_notice(credential, elapsed, limit, exc)
                 if observations is not None:
                     observations.append(_credential_observation(
                         self._inner, exc, established=self._established,
                     ))
                 raise
             if developer:
-                _developer_credential_notice(credential, time.monotonic() - started)
+                elapsed = time.monotonic() - started
+                _developer_credential_notice(credential, elapsed, limit)
             self._established = True
             if observations is not None:
                 observations.append(_credential_observation(self._inner))

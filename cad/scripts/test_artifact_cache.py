@@ -2237,10 +2237,14 @@ def _fake_az(tmp_path, monkeypatch, *, seconds, token=False):
         encoding="utf-8",
     )
     (tmp_path / "az.cmd").write_text(
-        f'@"{sys.executable}" "{script}" %*\r\n', encoding="utf-8"
+        f'@"{sys.executable}" "{script}" %*\n', encoding="utf-8", newline="\r\n"
     )
     posix = tmp_path / "az"
-    posix.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n')
+    posix.write_text(
+        f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n',
+        encoding="utf-8",
+        newline="\n",
+    )
     posix.chmod(0o755)
     monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
 
@@ -2285,14 +2289,13 @@ def test_a_slow_cli_credential_that_succeeds_is_reported(
 
     monkeypatch.setattr(cache, "_DEVELOPER_CREDENTIAL_SLOW_S", 0.5)
     _fake_az(tmp_path, monkeypatch, seconds=1, token=True)
-    chain = ChainedTokenCredential(
-        AzureCliCredential(process_timeout=cache._DEVELOPER_CREDENTIAL_TIMEOUT_S)
-    )
+    # The notice reads the link's own limit, not the backend's constant.
+    chain = ChainedTokenCredential(AzureCliCredential(process_timeout=45))
     proxy = cache._SharedTokenInfoCredential(chain, attempts=1)
     assert proxy.get_token("https://storage.azure.com/.default").token == "fake"
     (line,) = [w for w in notices.warnings if "az account get-access-token" in w]
     assert line.startswith("[cache] az account get-access-token took ")
-    assert line.endswith(f" s (limit {cache._DEVELOPER_CREDENTIAL_TIMEOUT_S} s)")
+    assert line.endswith(" s (limit 45 s)")
     ((_, event),) = [e for e in notices.events if e[0] == "cache.credential.slow"]
     assert event["outcome"] == "success"
 
@@ -2301,6 +2304,8 @@ def test_backend_gives_developer_credentials_room_on_a_loaded_box(monkeypatch):
     from azure.identity import AzureCliCredential
 
     monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
+    # A host that narrows DefaultAzureCredential's chain must not hide the CLI.
+    monkeypatch.delenv("AZURE_TOKEN_CREDENTIALS", raising=False)
     backend = cache._make_backend()
     try:
         (cli,) = [
