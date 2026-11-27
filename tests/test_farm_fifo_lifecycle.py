@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 import textwrap
+import time
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1421,18 +1422,14 @@ def test_reserved_leaf_reconciliation_never_retries_definitive_errors_after_an_o
     fake.assert_dispatch_safety()
 
 
-@pytest.mark.parametrize("outage", ["repeated-failure", "hung-query"])
-def test_reserved_leaf_read_outage_budget_bounds_retries_and_inflight_query(
-    leaf_control, monkeypatch, outage
+def test_reserved_leaf_hung_read_is_cancelled_at_its_monotonic_budget(
+    leaf_control, monkeypatch
 ):
     fake = leaf_control
     gate = _AsyncGate()
     monkeypatch.setattr(_farm, "FIFO_LEAF_STATUS_RETRY_S", 0.05)
     monkeypatch.setattr(_farm, "FIFO_RPC_TIMEOUT_S", 4)
-    if outage == "hung-query":
-        fake.query_hook = gate.wait
-    else:
-        fake.fallback = ConnectionError("frontend remains unavailable")
+    fake.query_hook = gate.wait
 
     async def exercise():
         with pytest.raises(TimeoutError, match="accepted work remains under the coordinator"):
@@ -1442,13 +1439,74 @@ def test_reserved_leaf_read_outage_budget_bounds_retries_and_inflight_query(
             )
 
     asyncio.run(exercise())
-    if outage == "hung-query":
-        assert gate.entered.is_set()
-        assert gate.cancelled.is_set(), "in-progress read exceeded its monotonic budget"
-        assert not gate.released.is_set()
-        assert len(fake.queries) == 1
-    else:
-        assert len(fake.queries) > 1
+    assert gate.entered.is_set()
+    assert gate.cancelled.is_set(), "in-progress read exceeded its monotonic budget"
+    assert not gate.released.is_set()
+    assert len(fake.queries) == 1
+    fake.assert_dispatch_safety()
+
+
+class _SleepClock:
+    """``_farm``'s monotonic clock, moved only by ``_farm``'s own sleeps.
+
+    The read-outage loop's retry count then follows from its budget and poll
+    interval alone, not from how much CPU the test process gets (#3643).
+    """
+
+    def __init__(self):
+        self.now = 0.0
+        self.sleeps = []
+
+    def monotonic(self):
+        return self.now
+
+    async def sleep(self, seconds):
+        self.sleeps.append(seconds)
+        self.now += seconds
+        await asyncio.sleep(0)
+
+
+class _Proxy:
+    def __init__(self, module, **overrides):
+        self._module = module
+        self.__dict__.update(overrides)
+
+    def __getattr__(self, name):
+        return getattr(self._module, name)
+
+
+def test_reserved_leaf_repeated_read_failures_retry_until_the_budget_is_spent(
+    leaf_control, monkeypatch
+):
+    fake = leaf_control
+    clock = _SleepClock()
+    monkeypatch.setattr(_farm, "time", _Proxy(time, monotonic=clock.monotonic))
+    monkeypatch.setattr(_farm, "asyncio", _Proxy(asyncio, sleep=clock.sleep))
+    monkeypatch.setattr(_farm, "FIFO_LEAF_STATUS_RETRY_S", 1.0)
+    monkeypatch.setattr(_farm, "STATUS_POLL_INTERVAL_S", 0.25)
+    monkeypatch.setattr(_farm, "FIFO_RPC_TIMEOUT_S", 4)
+    fake.fallback = ConnectionError("frontend remains unavailable")
+
+    async def starved_query():
+        # The read #3643 lost: on a starved box one read outlasted the old
+        # 50 ms budget. Real time in a read does not move this clock.
+        if len(fake.queries) == 1:
+            time.sleep(0.06)
+
+    fake.query_hook = starved_query
+
+    async def exercise():
+        with pytest.raises(
+            TimeoutError, match="accepted work remains under the coordinator"
+        ):
+            # This outer bound makes a missing independent budget fail quickly.
+            await asyncio.wait_for(
+                _farm._dispatch(fake.request, fake.workflow_id), timeout=WAIT_S
+            )
+
+    asyncio.run(exercise())
+    # Reads at 0, .25, .5 and .75 of the loop's budget; it is spent at 1.0.
+    assert len(fake.queries) == 4
     fake.assert_dispatch_safety()
 
 
