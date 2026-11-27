@@ -335,3 +335,36 @@ range_mm = [3.9878, 4.064]
 resolution_mm = 0.00508
 [tools.zz-pins-1570-1600]
 description = "Class ZZ pins for .157-.160: GO .157 plus (single), NO-GO .160 minus (the .061-.500 box)"
+
+# --- MHA-DT-24 pinion return leaf spring (cad/process/dt_pinion_spring/plan.toml)
+# The strip as bought. Ownership: stock-to-order.toml
+# stock.ss177-c-roll-015x6, same key.
+[stock.ss177-c-roll-015x6]
+description = "17-7 PH stainless steel shim stock, full hard (Condition C), .015 x 6 x 50 in roll"
+# The #2 of the owned 115-piece index: its plain shank is the mandrel both
+# bends are formed over, never cut with (inventory tools-drills.toml
+# tools.drill-2). Nominal .2210 in x 25.4.
+[tools.drill-2]
+description = "#2 (.2210 in) drill, 115-piece index"
+diameter_mm = 5.6134
+# Shop-made from the owned 1/2 x 3/4 in 6061 bar; ownership:
+# shop-equipment/ fixtures.dt-pinion-spring-drill-cover.
+[tools.dt-pinion-spring-drill-cover]
+description = "Drill cover: a 1 in length of the 1/2 x 3/4 in 6061 bar, bonded on its 1/2 in face over the strip"
+# The #30 hole through the full-hard strip under its 6061 cover (program
+# PS01_hole). Machinery's Handbook 27th ed. Table 19, Feeds and Speeds for
+# Drilling, Reaming, and Threading Stainless Steels (PDF1388/p1067), row
+# Precipitation hardening (15-5PH, 17-4PH, 17-7PH, ...), 375-450 HB: HSS
+# drilling 20 ft/min. The strip is full hard, Rockwell C41 minimum
+# (McMaster-Carr 2325K19, read live 2026-11-27), about 380 HB, so that row.
+# 20 x 3.82 / .1285 = 595, set 600. Feed: the handbook's twist-drill feeds
+# (PDF1381/p1060), 1/8-1/4 in .002-.006 in/rev, "the lower values ... for
+# hard materials": half the low end, .001 in/rev, for the full-hard strip.
+# The 6061 cover above it drills at the same setting.
+[settings.dt-pinion-spring-drill-30]
+tool = "riser-drill-30"
+material = "mill-17-7-ph-c"
+rpm = 600
+chip_load_mm_per_tooth = 0.0127  # .0005 in/lip; 600 × 2 × .0005 = .6 in/min
+flutes = 2
+feed_unit = "in/min"

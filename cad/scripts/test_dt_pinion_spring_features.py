@@ -129,17 +129,26 @@ def _inch(values: list[float], places: int = 4) -> list[float]:
     return [round(value / IN, places) for value in values]
 
 
-def test_the_blank_is_the_rolled_strip_and_its_developed_mid_surface() -> None:
+def test_the_blank_is_the_rolled_strip_and_its_free_mid_surface() -> None:
     strip = _features()["strip"]
     assert strip["kind"] == "blank"
     assert strip["section"] == "strip"
     assert round(strip["width"] / IN, 4) == 0.25
     # McMaster-Carr 2325K19: .015 +/-.00075 as bought.
     assert _inch(strip["thickness"], 5) == [0.01425, 0.01575]
-    arcs = math.radians(90.0 - geom.BLADE_LEAN_DEG + geom.KINK_DEG)
-    assert strip["developed_length"] == pytest.approx(
-        geom.PATH_LEN + arcs * geom.THICK / 2.0
+    # The FREE profile walked piece by piece on the mid-surface: the foot, the
+    # formed bend, the straight blade between the FREE tangents, the kink and
+    # the flat.
+    free_blade = _heading(geom.FREE_BEND_EXIT, geom.FREE_KINK_START)
+    mid = geom.THICK / 2.0
+    walked = (
+        geom.FOOT_LEN
+        + (geom.R_BEND + mid) * math.radians(180.0 - free_blade)
+        + math.dist(geom.FREE_BEND_EXIT, geom.FREE_KINK_START)
+        + (geom.R_KINK + mid) * math.radians(geom.KINK_DEG)
+        + geom.FLAT_LEN
     )
+    assert strip["developed_length"] == pytest.approx(walked)
     assert strip["note"].startswith("CUT BLANK ALONG ROLL LENGTH")
 
 

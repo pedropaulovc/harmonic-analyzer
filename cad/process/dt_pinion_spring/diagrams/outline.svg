@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="560"/>
+  <text class="title" x="20.00" y="22.00">Setup 3: the outline to saw, from above, pad end left, and its first cut (to scale, 200 px/in)</text>
+  <rect class="part-waste" x="60.00" y="80.00" width="500.00" height="120.00"/>
+  <path class="datum" fill="none" d="M77.75 95.75 L156.25 95.75 L156.25 121.75 L502.21 121.75 L502.21 184.25 L77.75 184.25 Z"/>
+  <path class="part-kept" d="M84.00 102.00 L150.00 102.00 L150.00 128.00 L495.96 128.00 L495.96 178.00 L84.00 178.00 Z"/>
+  <circle class="holes" cx="120.00" cy="140.00" r="12.85"/>
+  <text class="label" x="568.00" y="92.00">waste</text>
+  <text class="label" x="335.96" y="224.25">marker lines 1/32 outside, from the hole's centre</text>
+  <line class="leader" x1="333.96" y1="220.25" x2="320.96" y2="185.25"/>
+  <circle class="leader-dot" cx="320.96" cy="185.25" r="2"/>
+  <text class="label" x="217.48" y="112.00">the spring's outline</text>
+  <text class="label" x="60.00" y="242.00">first cut: the aft edge's line, the whole length</text>
+  <line class="leader" x1="294.22" y1="230.00" x2="296.22" y2="185.25"/>
+  <circle class="leader-dot" cx="296.22" cy="185.25" r="2"/>
+  <text class="title" x="20.00" y="290.00">From the front, aft edge up: the piece between two wood blocks in the bench vise (blocks, jaw and blade schematic)</text>
+  <rect class="clamp" x="20.63" y="470.00" width="566.93" height="46.00"/>
+  <text class="label-on-clamp" x="30.63" y="498.00">bench vise jaw</text>
+  <rect class="fixture-support" x="20.63" y="400.00" width="566.93" height="70.00"/>
+  <text class="label" x="597.56" y="426.00">wood block (one each</text>
+  <text class="label" x="597.56" y="442.00">side of the piece)</text>
+  <rect class="part-waste" x="60.00" y="384.25" width="500.00" height="15.75"/>
+  <line class="active-face" x1="60.00" y1="400.00" x2="560.00" y2="400.00"/>
+  <circle class="hidden" cx="120.00" cy="444.25" r="12.85"/>
+  <path class="cutter" d="M12.76 390.00 L374.96 399.00 L374.96 403.00 L12.76 394.00 Z"/>
+  <line class="arrow" x1="138.74" y1="372.25" x2="493.07" y2="372.25"/>
+  <text class="label" x="138.74" y="364.25">saw along the line, kerf on the waste side</text>
+  <text class="label" x="60.00" y="536.00">junior hacksaw blade, seen edge on, low over the blocks (frame not drawn); the hole hidden</text>
+  <line class="leader" x1="296.22" y1="524.00" x2="217.48" y2="398.00"/>
+  <circle class="leader-dot" cx="217.48" cy="398.00" r="2"/>
+</svg>

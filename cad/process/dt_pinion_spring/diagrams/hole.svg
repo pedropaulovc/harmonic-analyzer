@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 650" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="840" height="650"/>
+  <text class="title" x="20.00" y="22.00">Setup 2, PS01 T1: section across the jaws through the hole, from the plate's left end (to scale, 3 px/mm)</text>
+  <rect class="clamp" x="60.00" y="209.46" width="76.20" height="134.84"/>
+  <rect class="clamp" x="517.20" y="209.46" width="76.20" height="134.84"/>
+  <text class="label-on-clamp" x="64.00" y="336.30">fixed jaw</text>
+  <text class="label-on-clamp" x="520.20" y="336.30">moving jaw</text>
+  <rect class="fixture-vise" x="60.00" y="344.30" width="533.40" height="14.00"/>
+  <rect class="fixture-support" x="136.20" y="268.10" width="9.52" height="76.20"/>
+  <rect class="fixture-support" x="507.67" y="268.10" width="9.52" height="76.20"/>
+  <rect class="fixture-plate" x="136.20" y="230.00" width="381.00" height="38.10"/>
+  <rect class="bond" x="136.20" y="229.16" width="107.44" height="0.84"/>
+  <rect class="part-kept" x="155.25" y="228.02" width="45.72" height="1.14"/>
+  <rect class="bond" x="155.25" y="227.18" width="45.72" height="0.84"/>
+  <rect class="fixture-plate" x="159.06" y="170.03" width="38.10" height="57.15"/>
+  <path class="cutter" d="M173.21 92.00 L175.66 98.00 L178.11 92.00 L180.56 98.00 L183.01 92.00 L183.01 230.75 L178.11 233.69 L173.21 230.75 Z"/>
+  <line class="arrow" x1="156.11" y1="101.00" x2="156.11" y2="141.00"/>
+  <text class="label" x="605.40" y="110.00">#30 drill at its last peck</text>
+  <text class="label" x="605.40" y="126.00">(break: it runs on to the chuck);</text>
+  <text class="label" x="605.40" y="142.00">pecks {{process.hole_peck_mm:in.3dot}}, full retract</text>
+  <line class="leader" x1="603.40" y1="106.00" x2="184.01" y2="140.00"/>
+  <circle class="leader-dot" cx="184.01" cy="140.00" r="2"/>
+  <text class="label" x="605.40" y="182.00">cover, on its 1/2 in face</text>
+  <line class="leader" x1="603.40" y1="178.00" x2="198.16" y2="194.00"/>
+  <circle class="leader-dot" cx="198.16" cy="194.00" r="2"/>
+  <text class="label" x="605.40" y="222.00">the piece, a tape stack under</text>
+  <text class="label" x="605.40" y="238.00">and over it (to scale)</text>
+  <line class="leader" x1="603.40" y1="218.00" x2="199.20" y2="228.59"/>
+  <circle class="leader-dot" cx="199.20" cy="228.59" r="2"/>
+  <text class="label" x="605.40" y="268.00">point at Z {{process.hole_tip_z_mm:in.3dot}}</text>
+  <line class="leader" x1="603.40" y1="264.00" x2="179.11" y2="234.69"/>
+  <circle class="leader-dot" cx="179.11" cy="234.69" r="2"/>
+  <text class="label-halo" x="226.20" y="265.00">spoil plate</text>
+  <text class="label" x="256.20" y="311.00">1 in parallels</text>
+  <line class="leader" x1="252.20" y1="307.00" x2="146.72" y2="302.00"/>
+  <circle class="leader-dot" cx="146.72" cy="302.00" r="2"/>
+  <line class="datum" x1="30.00" y1="230.00" x2="54.00" y2="230.00"/>
+  <text class="datum-label" x="8.00" y="235.00">Z0</text>
+  <text class="label" x="4.00" y="187.46">jaw tops</text>
+  <text class="label" x="4.00" y="203.46">{{process.jaw_top_over_plate_mm:in.3dot}} up</text>
+  <line class="axis" x1="151.20" y1="134.00" x2="70.20" y2="134.00"/>
+  <text class="label" x="70.20" y="126.00">+Y</text>
+  <text class="title" x="20.00" y="410.00">From above: the plate's left end (to scale, 3 px/mm)</text>
+  <rect class="clamp" x="70.00" y="428.00" width="240.00" height="12.00"/>
+  <path class="fixture-plate" d="M70.00 440.00 L310.00 440.00 L307.00 440.00 L313.00 462.50 L307.00 485.00 L313.00 507.50 L307.00 530.00 L313.00 552.50 L307.00 575.00 L70.00 575.00 Z"/>
+  <rect class="bond" x="70.00" y="440.00" width="228.60" height="107.44"/>
+  <rect class="part-kept" x="89.05" y="459.05" width="190.50" height="45.72"/>
+  <rect class="fixture-plate" x="89.05" y="462.86" width="76.20" height="38.10"/>
+  <circle class="cutter" cx="111.91" cy="481.91" r="4.90"/>
+  <line class="datum" x1="70.00" y1="581.00" x2="70.00" y2="602.00"/>
+  <text class="datum-label" x="62.00" y="618.00">X0</text>
+  <line class="datum" x1="62.00" y1="440.00" x2="50.00" y2="440.00"/>
+  <text class="datum-label" x="20.00" y="445.00">Y0</text>
+  <text class="label" x="322.00" y="428.00">fixed jaw</text>
+  <text class="label" x="355.00" y="476.00">hole: X {{process.hole_x_mm:in.3dot}}, Y {{process.hole_y_mm:in.3dot}}</text>
+  <line class="leader" x1="353.00" y1="472.00" x2="115.91" y2="479.91"/>
+  <circle class="leader-dot" cx="115.91" cy="479.91" r="2"/>
+  <text class="label" x="355.00" y="512.00">the piece, {{process.piece_x_mm:in.2dot}} in from the plate's end</text>
+  <text class="label" x="355.00" y="528.00">and {{process.piece_y_mm:in.2dot}} off the jaw; the cover on it,</text>
+  <text class="label" x="355.00" y="544.00">flush with its left end</text>
+  <line class="leader" x1="353.00" y1="508.00" x2="250.00" y2="494.00"/>
+  <circle class="leader-dot" cx="250.00" cy="494.00" r="2"/>
+</svg>

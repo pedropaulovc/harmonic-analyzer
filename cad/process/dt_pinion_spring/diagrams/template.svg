@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700" width="100mm" height="70mm" font-family="Arial, Helvetica, sans-serif" font-size="22">
+  <rect class="paper" x="0" y="0" width="1000" height="700"/>
+  <text class="title" x="20.00" y="34.00" font-size="22">Setup 5: TEMPLATE, FULL SIZE (print at 100 %)</text>
+  <path class="part-kept" d="M306.92 636.19 L211.20 636.19 L209.63 636.15 L208.07 636.04 L206.51 635.86 L204.97 635.60 L203.44 635.26 L201.92 634.86 L200.43 634.38 L198.96 633.84 L197.52 633.22 L196.11 632.54 L194.73 631.79 L193.39 630.98 L192.09 630.10 L190.83 629.16 L189.62 628.17 L188.46 627.11 L187.35 626.01 L186.29 624.85 L185.29 623.64 L184.35 622.39 L183.47 621.10 L182.65 619.76 L181.89 618.39 L181.21 616.98 L180.58 615.54 L180.03 614.07 L179.55 612.58 L179.14 611.07 L178.80 609.54 L178.53 607.99 L128.55 269.49 L128.49 269.02 L128.43 268.54 L128.37 268.06 L128.33 267.59 L128.29 267.11 L128.26 266.63 L128.23 266.15 L128.21 265.67 L128.20 265.19 L128.20 264.71 L128.20 264.23 L128.21 263.75 L128.23 263.27 L128.25 262.79 L128.28 262.31 L128.32 261.83 L128.37 261.35 L128.42 260.87 L128.48 260.40 L128.54 259.92 L128.61 259.45 L128.69 258.97 L128.78 258.50 L128.87 258.03 L128.97 257.56 L129.08 257.09 L129.19 256.63 L129.31 256.16 L129.44 255.70 L129.58 255.24 L135.38 235.76 L131.73 234.67 L125.92 254.15 L125.77 254.66 L125.63 255.18 L125.50 255.70 L125.37 256.22 L125.25 256.74 L125.14 257.26 L125.04 257.79 L124.94 258.32 L124.85 258.84 L124.77 259.37 L124.70 259.90 L124.63 260.44 L124.58 260.97 L124.53 261.50 L124.48 262.04 L124.45 262.57 L124.42 263.11 L124.40 263.64 L124.39 264.18 L124.39 264.71 L124.39 265.25 L124.41 265.78 L124.43 266.32 L124.45 266.85 L124.49 267.39 L124.53 267.92 L124.58 268.46 L124.64 268.99 L124.71 269.52 L124.78 270.05 L174.77 608.55 L175.06 610.27 L175.44 611.98 L175.90 613.67 L176.44 615.33 L177.05 616.97 L177.74 618.57 L178.51 620.14 L179.36 621.67 L180.27 623.16 L181.25 624.61 L182.30 626.01 L183.42 627.35 L184.60 628.64 L185.84 629.88 L187.13 631.05 L188.48 632.16 L189.89 633.21 L191.34 634.18 L192.83 635.09 L194.36 635.93 L195.94 636.69 L197.55 637.38 L199.18 637.99 L200.85 638.52 L202.54 638.97 L204.25 639.34 L205.97 639.63 L207.71 639.83 L209.45 639.96 L211.20 640.00 L306.92 640.00 Z"/>
+  <line class="datum" x1="80.00" y1="640.00" x2="360.00" y2="640.00"/>
+  <line class="centre-line" x1="261.20" y1="670.00" x2="261.20" y2="610.00"/>
+  <line class="centre-line" x1="231.20" y1="638.10" x2="291.20" y2="638.10"/>
+  <line class="datum" x1="216.28" y1="644.00" x2="216.28" y2="664.00"/>
+  <line class="datum" x1="206.12" y1="644.00" x2="206.12" y2="664.00"/>
+  <rect class="datum" fill="none" x="123.47" y="264.41" width="10.16" height="10.16" fill-opacity="0"/>
+  <line class="dims" x1="127.48" y1="262.25" x2="163.77" y2="147.87"/>
+  <line class="dims" x1="127.48" y1="262.25" x2="159.76" y2="146.67"/>
+  <line class="datum" x1="144.24" y1="241.05" x2="119.32" y2="233.63"/>
+  <line class="datum" x1="145.69" y1="236.19" x2="120.77" y2="228.76"/>
+  <text class="label" x="300.00" y="600.00" font-size="22">foot bend's tangent {{cad.bend_foot_len_min_in:.3dot}}–{{cad.bend_foot_len_max_in:.3dot}} from the hole</text>
+  <line class="leader" x1="296.00" y1="593.00" x2="211.20" y2="654.00"/>
+  <circle class="leader-dot" cx="211.20" cy="654.00" r="2"/>
+  <text class="label" x="300.00" y="660.00" font-size="22">hole mark; foot line: the foot's outside face</text>
+  <line class="leader" x1="296.00" y1="653.00" x2="261.20" y2="666.00"/>
+  <circle class="leader-dot" cx="261.20" cy="666.00" r="2"/>
+  <text class="label" x="300.00" y="180.00" font-size="22">kink's start: inside this box (FREE)</text>
+  <line class="leader" x1="296.00" y1="173.00" x2="133.63" y2="269.49"/>
+  <circle class="leader-dot" cx="133.63" cy="269.49" r="2"/>
+  <text class="label" x="300.00" y="100.00" font-size="22">flat {{cad.kink_included_angle_min_deg:.0f}}°–{{cad.kink_included_angle_max_deg:.0f}}° to the blade, between the lines</text>
+  <line class="leader" x1="296.00" y1="93.00" x2="143.20" y2="209.54"/>
+  <circle class="leader-dot" cx="143.20" cy="209.54" r="2"/>
+  <text class="label" x="300.00" y="140.00" font-size="22">flat's end between the ticks ({{cad.flat_length_min_in:.2dot}}–{{cad.flat_length_max_in:.2dot}})</text>
+  <line class="leader" x1="296.00" y1="133.00" x2="114.21" y2="229.78"/>
+  <circle class="leader-dot" cx="114.21" cy="229.78" r="2"/>
+  <line class="dims" x1="300.00" y1="400.00" x2="554.00" y2="400.00"/>
+  <line class="dims" x1="300.00" y1="388.00" x2="300.00" y2="412.00"/>
+  <line class="dims" x1="554.00" y1="388.00" x2="554.00" y2="412.00"/>
+  <text class="label" x="427.00" y="382.00" text-anchor="middle" font-size="22">1.000 in</text>
+  <text class="label" x="300.00" y="440.00" font-size="22">read it with the calipers: .995–1.005</text>
+  <text class="label" x="300.00" y="470.00" font-size="22">stand the spring on its aft edge here,</text>
+  <text class="label" x="300.00" y="498.00" font-size="22">the foot's outside face on the foot line</text>
+</svg>

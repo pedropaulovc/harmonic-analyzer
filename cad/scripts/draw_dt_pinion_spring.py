@@ -401,8 +401,9 @@ TOP_HOLE_AXIS_ENDS = (
 # checks the FREE one, everything past the bend turned PRESET_DEG further
 # toward the strap about the bend's centre, so the foot bend's formed angle
 # is the installed 90 - BLADE_LEAN_DEG less the preset, and the kink's is the
-# same on either form. The developed length is the mid-surface's: the
-# model's wall lies outside its inside-surface path, so each arc adds its
+# same on either form. The developed length is the FREE form's mid-surface:
+# the installed inside-surface path less the arc the preset takes off the
+# foot bend, the model's wall lying outside that path, so each arc adds its
 # angle times half the thickness. The declarations print nothing.
 _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_dt_pinion_spring"
@@ -459,8 +460,13 @@ requirement(
         ),
         "thickness_nominal": (THICK, ((_SECTION, "THICK"),)),
         "developed_length": (
-            PATH_LEN + math.radians(_INSTALLED_BEND_DEG + KINK_DEG) * THICK / 2.0,
-            (*_g("PATH_LEN", "BLADE_LEAN_DEG", "KINK_DEG"), (_SECTION, "THICK")),
+            PATH_LEN
+            - math.radians(PRESET_DEG) * R_BEND
+            + math.radians(_FREE_BEND_DEG + KINK_DEG) * THICK / 2.0,
+            (
+                *_g("PATH_LEN", "PRESET_DEG", "R_BEND", "BLADE_LEAN_DEG", "KINK_DEG"),
+                (_SECTION, "THICK"),
+            ),
         ),
         "note": (_NOTE_LINES[0], ((_SPEC, "DRAWING_NOTES"),)),
     },

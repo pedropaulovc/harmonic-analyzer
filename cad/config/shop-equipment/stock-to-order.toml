@@ -349,6 +349,16 @@ length_mm = 1828.8
 status = "to_order"
 cite = ["McMaster-Carr 7702N136 https://www.mcmaster.com/product/7702N136/ read 2026-11-22 (search summary; the page blocks scripted reads): Low-Carbon Steel Bar, 1018, 1/16 in thick x 5/8 in wide, 6 ft, cold drawn, square edge, ASTM A108", "cad/config/parts/pd-guide-lock.yaml material_specification", "cad/scripts/pd_guide_lock_spec.py LOCK_WIDTH, LOCK_HEIGHT, LOCK_THICK"]
 
+[stock.ss177-c-roll-015x6]
+form = "strip"
+material = "17-7 PH stainless steel (UNS S17700), full hard (Condition C), ASTM A693"
+note = "To order: McMaster-Carr 2325K19, high-strength 17-7 PH stainless steel shim stock, 6 x 50 in roll, .015 thick (-.00075 to +.00075), full hard, ASTM A693, Rockwell C41 minimum, $44.53 each; buy one. Allocation: dt-pinion-spring (MHA-DT-24), a .60 x 2.50 in piece hacksawed off a corner of the roll for each spring, cut along the roll's length (the drawing's note): the strip's developed length, 2.060 in from the pad's end (draw_dt_pinion_spring strip.developed_length), and the pad's .38 width with filing allowances. The rest of the roll is spare: a piece that fails a check is replaced from it. No shear is owned (#2381): the piece is sawn and filed. Not owned."
+section_mm = [152.4, 0.381]
+length_mm = 1270.0
+pieces = 1
+status = "to_order"
+cite = ["McMaster-Carr 2325K19 https://www.mcmaster.com/2325K19/ read live 2026-11-27: High-Strength 17-7 PH Stainless Steel Shim Stock, 6\" x 50\" Roll, 0.015\" Thick, $44.53 each; width 6\" (-0.015\" to 0.015\"), length 50\" (0\" to 0.5\"), thickness 0.015\" (-0.00075\" to 0.00075\"), temper Full Hard, ASTM A693, minimum hardness Rockwell C41, roll form", "cad/config/parts/dt-pinion-spring.yaml material_specification", "cad/scripts/dt_pinion_spring_section.py THICK, THICK_BAND"]
+
 [stock.sdp-rack-a-1b12-y324]
 form = "gear_rack"
 material = "Brass, 32 DP 20° PA commercial gear rack (SDP/SI A 1B12-Y324)"
