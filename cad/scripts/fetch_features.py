@@ -400,22 +400,48 @@ def _rebind_staged(stem: str, out: Path) -> None:
         partial.replace(manifest)
 
 
+def _binds_a_recorded_step(stem: str, out: Path, table: dict) -> bool:
+    """Does ``stem``'s manifest ``table`` still record the bytes of one of the
+    checkout's STEPs under ``out``: the primary, or a current member under its
+    ``member_steps`` entry? Only the checkout's own STEP paths are read, so a
+    member STEP left behind by a since-removed configuration says nothing."""
+    if table.get("part") != stem.replace("_", "-"):
+        return False
+    step = export_features.bundle_paths(stem, out)[1]
+    candidates = [(step, table)]
+    members = table.get("member_steps")
+    if isinstance(members, dict):
+        for cfg, path in export_features.member_step_paths(stem, out).items():
+            if isinstance(members.get(cfg), dict):
+                candidates.append((path, members[cfg]))
+    for path, entry in candidates:
+        if entry.get("step") != path.name:
+            continue
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            continue
+        if digest == entry.get("step_sha256"):
+            return True
+    return False
+
+
 def _bound_to_other_geometry(stem: str, out: Path) -> list[str]:
-    """What proves ``stem``'s STEP under ``out`` was built from other geometry:
-    its ``features.toml`` binds that very STEP and records geometry inputs that
-    differ from this checkout's. Empty for no manifest, an unstamped one, or a
-    STEP replaced since the manifest was bound."""
+    """What proves a STEP of ``stem`` under ``out`` was built from other
+    geometry: its ``features.toml`` still binds that very STEP (the primary or
+    any member, #3737) and records geometry inputs that differ from this
+    checkout's. Empty for no manifest, an unstamped one, or every STEP
+    replaced since the manifest was bound."""
     manifest = export_features.bundle_paths(stem, out)[0]
     if not manifest.is_file():
         return []
     try:
-        check_binding(stem, out)
-    except FetchError:
+        table = tomllib.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError):
         return []
-    recorded = tomllib.loads(manifest.read_text(encoding="utf-8")).get(
-        _features_provenance.TABLE
-    )
-    if not isinstance(recorded, dict):
+    if not isinstance(table.get(_features_provenance.TABLE), dict):
+        return []
+    if not _binds_a_recorded_step(stem, out, table):
         return []
     return _features_provenance.features_current(stem, out)
 

@@ -14,7 +14,7 @@ import _features_provenance
 import export_features
 import fetch_features
 from _export_feature_faces import inventory_path
-from _test_feature_bundles import bind_manifest, write_bundle
+from _test_feature_bundles import bind_manifest, rewrite_step, write_bundle
 
 UNDECLARED = "ch_amplitude_bar"
 DECLARED = "ch_pivot_shaft"
@@ -307,6 +307,61 @@ def test_trust_step_stamps_a_bundle_restored_from_a_farm_run(
     assert not (out / "features" / DECLARED).exists()
     with pytest.raises(SystemExit):
         fetch_features.main(["--trust-step", "--check", UNDECLARED, "--out", str(out)])
+
+
+MEMBERED = "dt_cone_gear_tl_arbor_collar"
+
+
+def test_trust_step_refuses_while_a_member_step_is_still_bound_to_other_geometry(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    # #3737: a two-member part restored whole, stamped, then the geometry moves
+    # and only the primary STEP is restored from a newer farm run.
+    _release(monkeypatch, tmp_path, MEMBERED)
+    published = tmp_path / "published"
+    out = tmp_path / "restored"
+    manifest, step = export_features.bundle_paths(MEMBERED, out)
+    members = export_features.member_step_paths(MEMBERED, out)
+    assert len(members) == 2
+    step.parent.mkdir(parents=True)
+    for restored in export_features.exported_steps(MEMBERED, out):
+        source = published / "features" / MEMBERED / restored.name
+        restored.write_bytes(source.read_bytes())
+        inventory_path(restored).write_bytes(inventory_path(source).read_bytes())
+    assert fetch_features.main(["--trust-step", MEMBERED, "--out", str(out)]) == 0
+    stamped = manifest.read_bytes()
+    monkeypatch.setattr(
+        _features_provenance,
+        "geometry_inputs",
+        lambda selected: {f"cad/scripts/build_{selected}.py": "d2"},
+    )
+    rewrite_step(step, step.read_bytes() + b"\n/* rebuilt */")
+    capsys.readouterr()
+    assert fetch_features.main(["--trust-step", MEMBERED, "--out", str(out)]) == 2
+    err = capsys.readouterr().err
+    assert "binds this STEP to other geometry inputs" in err
+    assert "TRUSTING" not in err
+    assert manifest.read_bytes() == stamped
+    # One member restored too: the other still binds, still refused.
+    (kept, first), (_, second) = members.items()
+    rewrite_step(first, first.read_bytes() + b"\n/* rebuilt */")
+    assert fetch_features.main(["--trust-step", MEMBERED, "--out", str(out)]) == 2
+    assert manifest.read_bytes() == stamped
+    # Were the untouched member no longer one of the part's (a configuration
+    # dropped by the geometry change), its leftover file proves nothing.
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            export_features, "member_step_paths", lambda *_args: {kept: first}
+        )
+        assert fetch_features._bound_to_other_geometry(MEMBERED, out) == []
+    # Every STEP restored: nothing binds the old geometry, so it is trusted.
+    rewrite_step(second, second.read_bytes() + b"\n/* rebuilt */")
+    capsys.readouterr()
+    assert fetch_features.main(["--trust-step", MEMBERED, "--out", str(out)]) == 0
+    assert f"{MEMBERED}: TRUSTING the STEP" in capsys.readouterr().err
+    assert manifest.read_text(encoding="utf-8").endswith(
+        f'"cad/scripts/build_{MEMBERED}.py" = "d2"\n'
+    )
 
 
 def test_a_bundle_that_does_not_bind_its_step_is_refused(
