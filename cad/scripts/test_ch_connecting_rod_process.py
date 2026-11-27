@@ -320,6 +320,23 @@ def test_the_top_views_draw_the_support_plate_at_its_size(picture) -> None:
     assert (y0 + y1) / 2 == pytest.approx(load_middle, abs=0.05)
 
 
+def test_each_setup_places_the_pair_by_blank_number() -> None:
+    """#3728: loads are paired by thickness and all wait between Setups 2
+    and 3, so each holding names which number goes against the fixed jaw:
+    the lower in Setups 2 and 4, the higher in Setup 3 (the pair turned over
+    as one stack), and Setup 2's unclamp step repeats it for the next pair."""
+    face_f, face_d, finish_f = PLAN["setups"][1:4]
+    assert "the lower number against the fixed jaw" in face_f["holding"]
+    assert "the higher number against the fixed jaw" in face_d["holding"]
+    assert "the lower number against the fixed jaw" in finish_f["holding"]
+    unclamp = next(
+        op["instruction"]
+        for op in face_f["operations"]
+        if op["instruction"].startswith("Unclamp the load")
+    )
+    assert "lower number against the fixed jaw" in unclamp
+
+
 @pytest.mark.parametrize(
     ("changes", "detail"),
     [
