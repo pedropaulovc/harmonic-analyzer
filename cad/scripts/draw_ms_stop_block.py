@@ -94,7 +94,7 @@ RIGHT_KEEP = {
     "BackWall": (0.345, 0.224),
     # Outside the open rebate mouth, its straight radial leader entering
     # through the open mouth below the Ra 63 finish symbol to the R.003 arc.
-    "RebateCornerR": (0.242, 0.186),
+    "RebateCornerR": (0.240, 0.187),
 }
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.031), "ThumbFromPlate": (0.090, 0.073),
@@ -146,7 +146,7 @@ THUMB_TAP_PRECISION = {"hw-tapdrldia": part.HOLE_CALLOUT_PRECISION}
 # Ra 63 uin symbol left of the right view's open rebate mouth, below the mating
 # face label and above the RebateCornerR leader; its leader enters the mouth to
 # the ceiling's mouth-side quarter.
-SLIDE_FINISH_OFFSET = (-0.022, -0.004)
+SLIDE_FINISH_OFFSET = (-0.030, -0.012)
 
 # Feature-export declarations (export_features; cad/docs/pipeline/
 # features-travelers.md): what this sheet prints, beside the constants of the
