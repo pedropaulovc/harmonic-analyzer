@@ -292,14 +292,6 @@ tap_drill_mm = 2.2606
 range_mm = [0.0, 222.25]
 resolution_mm = 0.005
 
-# The .1260 reams' go/no-go pair (pd transgear arm and bushings) (cad/config/shop-equipment/
-# gauges.plug-gauges-1260-1265, to buy): GO .1260 and NO-GO .1265 in =
-# 3.2004 and 3.2131 mm. A fixed-limit pair reads no scale; its resolution is
-# each member's Class X tolerance, .000040 in = 0.001016 mm.
-[gauges.plug-gauges-1260-1265]
-range_mm = [3.2004, 3.2131]
-resolution_mm = 0.001016
-
 # Riser (MHA-CH-06-TL-24) plan: the v49 notes.process names the #30 screw and
 # stop holes, the #9 CL/CR clearances and the 12 mm HUB relief; the 1/4 in
 # drill pilots the 12 mm and the 82° countersink cuts the Ø.25 × 82° seats.

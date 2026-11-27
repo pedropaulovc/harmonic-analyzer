@@ -235,23 +235,6 @@ status = "on_hand"
 pieces = 1
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 51: \"Precision Lathe Alignment Bar\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
 
-# --- .1260 reams (cad/process/pd_transgear_*) --------------------------------
-
-# Acceptance for the Ø.1260-.1265 reamed bores of the transgear arm and
-# bushings: a fixed-limit pair (Vermont Gage standard Class X, .000040 in, GO
-# plus and NO-GO minus). The pin-gauge sets to buy (gauges.pin-gauges) step by
-# .001 in and hold no .1265. MHA-PN-05's pivot bore no longer uses it: drilled
-# #30 (owner ruling 2026-11-24, fit audit question 20). Range and tolerance:
-# cad/process/shop/ gauges.plug-gauges-1260-1265.
-[gauges.plug-gauges-1260-1265]
-name = "Plug gauge pair, .1260 GO and .1265 NO-GO, Class X"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .1260 in GO (plus tolerance) and .1265 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
-note = "Not owned: to buy. MHA-PD transgear arm and bushings Ø.1260-.1265 reamed bores (after the ream): GO enters, NO-GO does not."
-cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages"]
-
 [gauges.gauge-pin-0625]
 make = "Vermont Gage"
 sku = "88906250"

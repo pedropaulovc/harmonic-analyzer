@@ -75,8 +75,6 @@ description = "1/4-28 UNF plug hand tap (OSG 1120408)"
 description = "Broach bushing 3/8 style A collared"
 [tools.cylinder-notch-saw]  # F-notch-saw
 description = "Screw-slotting saw 2-3/4 x .014 x 1"
-[tools.endmill-7-32]  # C-endmill-7-32
-description = "7/32 in (.2188) square end mill, centre cutting"
 [tools.gear-cutters-24dp-20pa]  # F-gear-cutter-10-289-242, F-gear-cutter-10-289-247
 description = "24DP 20PA involute gear cutters #2 and #7"
 [tools.keyseat-endmill-1-16]  # F-keyseat-endmill
