@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 11.0 px/mm: a section across the rod at X40 seen from its tip end (looking -X: +Y right toward the fixed jaw, +Z up), the frame's sides running on to break lines at Y±21.0. Setup 2's frame, Z0 face B. After DT16_top_rough the window (half 13.462) is cleared to Z-8.509 (top_floor_depth_mm) beside the rod and under it only outside the rod's shadow (|Y| under 3.302, rod R3.048 + stock 0.254); the rod's axis at Z-5.08. The ball end mill (shop Ø6.35) on the finishing pass 5 of 19 (-50° round the rod, rod_step_deg 10.5058): its centre Y4.767 Z-1.080, a ball's radius off the rod; tip Z-4.255; posted G0 X90.281 Y4.767 (L124), then G1 X8.413 (L127): -X, toward the hub, into the page. The .010 semi-finish stock left on the rest of the rod (2.8 px) is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 2, DT16_top_rod T2: the ball on finishing pass 5 of 19, Y4.767 tip Z-4.255, travelling −X (to scale, 11 px/mm)</text>
+  <path class="section" d="M60 192L142.92 192L142.92 285.6L254.68 285.6L254.68 247.88L257.47 247.88L257.66 244.38L258.2 240.91L259.11 237.52L260.37 234.24L261.96 231.12L263.88 228.17L266.08 225.45L268.57 222.96L271.29 220.76L274.24 218.84L277.36 217.25L280.64 215.99L284.03 215.08L287.5 214.54L291 214.35L294.5 214.54L297.97 215.08L301.36 215.99L304.64 217.25L307.76 218.84L310.71 220.76L313.43 222.96L315.92 225.45L318.12 228.17L320.04 231.12L321.63 234.24L322.89 237.52L323.8 240.91L324.34 244.38L324.53 247.88L327.32 247.88L327.32 285.6L439.08 285.6L439.08 192L522 192L519 199.35L522 206.71L519 214.06L522 221.41L519 228.76L522 236.12L519 243.47L522 250.82L519 258.17L522 265.53L519 272.88L522 280.23L519 287.58L522 294.94L519 302.29L522 309.64L519 316.99L522 324.35L522 331.7L60 331.7L63 324.35L60 316.99L63 309.64L60 302.29L63 294.94L60 287.58L63 280.23L60 272.88L63 265.53L60 258.17L63 250.82L60 243.47L63 236.12L60 228.76L63 221.41L60 214.06L63 206.71L60 199.35Z"/>
+  <circle class="hidden" cx="291" cy="247.88" r="33.53"/>
+  <line class="centre-line" x1="153.92" y1="247.88" x2="428.08" y2="247.88"/>
+  <line class="centre-line" x1="291" y1="170" x2="291" y2="348.2"/>
+  <path class="cutter" d="M378.36 203.88L378.36 76.5L370.6 73.5L362.84 76.5L355.08 73.5L347.32 76.5L339.56 73.5L331.8 76.5L324.04 73.5L316.27 76.5L308.51 76.5L308.51 203.88A34.92 34.92 0 0 0 378.36 203.88Z"/>
+  <circle class="leader" cx="398.36" cy="126" r="7"/>
+  <line class="leader" x1="393.46" y1="121.1" x2="403.26" y2="130.9"/>
+  <line class="leader" x1="393.46" y1="130.9" x2="403.26" y2="121.1"/>
+  <line class="datum" x1="30" y1="192" x2="52" y2="192"/>
+  <text class="datum-label" x="26" y="197" text-anchor="end">Z0</text>
+  <text class="datum-label" x="297" y="349.7">Y0</text>
+  <text class="label" x="538" y="93">ball, pass 5 of 19: Y4.767,</text>
+  <text class="label" x="538" y="109">tip Z-4.255, −X: into</text>
+  <text class="label" x="538" y="125">the page (L124–127)</text>
+  <line class="leader" x1="534" y1="89" x2="405.36" y2="126"/>
+  <circle class="leader-dot" cx="405.36" cy="126" r="2"/>
+  <text class="label" x="538" y="225">rod Ø.240, its axis .200</text>
+  <text class="label" x="538" y="241">below Z0 (face B)</text>
+  <line class="leader" x1="534" y1="221" x2="316.15" y2="225.75"/>
+  <circle class="leader-dot" cx="316.15" cy="225.75" r="2"/>
+  <text class="label" x="538" y="280.1">window floor Z-8.509</text>
+  <text class="label" x="538" y="296.1">(.335 below face B)</text>
+  <line class="leader" x1="534" y1="276.1" x2="406.08" y2="285.6"/>
+  <circle class="leader-dot" cx="406.08" cy="285.6" r="2"/>
+  <text class="label" x="60" y="357.7">the rod's shadow: left for Setup 3</text>
+  <line class="leader" x1="290" y1="353.7" x2="258.68" y2="269.1"/>
+  <circle class="leader-dot" cx="258.68" cy="269.1" r="2"/>
+  <line class="axis" x1="8" y1="258" x2="38" y2="258"/>
+  <line class="axis" x1="8" y1="258" x2="8" y2="228"/>
+  <text class="label" x="18" y="274">+Y</text>
+  <text class="label" x="4" y="222">+Z</text>
+</svg>

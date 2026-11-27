@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 10 px/mm: a section along the rod through the hub's axis (Y0), seen from the front (looking +Y toward the fixed jaw: +X right, the rod toward -X on the left, +Z up). Setup 3's frame: X0 the hub's axis, Z0 the stacks' top (face B, down). At Y0 after DT16_crown_rough: the frame's end X13.462 to 20.32 (full height 12.70 nominal; between X13.081 and the window's end the last raster floor Z8.255 stands); behind the hub the back tab's column, from Setup 2's Z3.782 (its lowest level clearing Y0, below face B) to Z6.540 (the lowest crown contour round the hub at Y0, out to X13.081); the hub R6.477 to its rim Z10.160, the SR10.319 crown (its centre Z2.127) to the apex Z12.446; the bore Ø6.5786 to Z8.128 (open to the air between the stacks); the rod (axis Z5.08, R3.048) still rough on its crown half up to Z9.154 (the lowest raster level clear over it), its finished top dashed. Behind the plane: the fixed jaw's stack under the piece and the fixed jaw past its right end (top Z6.8453), to breaks; the rod runs on to a break. The ball end mill (shop Ø6.35) on finishing ring 6 of 11 after the apex plunge (dome_step_deg 3.8898): out to X0 Y-4.881 (L72), down to Z11.532 at the plunge feed (L73), G3 round X0 Y0 (L74-75); drawn where the ring crosses Y0 behind the hub, X4.881, its centre Z14.707 (a ball's radius off the sphere), moving +Y: into the page. The semi-finish stock outside this ring (2.5 px) is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Setup 3, DT16_crown_dome_rod T2: the ball on finishing ring 6 of 11 over the crown, tip Z11.532 (to scale, 10 px/mm)</text>
+  <path class="clamp" d="M533.2 166.55L550 166.55L547 173.68L550 180.82L547 187.96L550 195.09L547 202.23L550 209.36L547 216.5L550 223.64L547 230.77L550 237.91L547 245.05L550 252.18L547 259.32L550 266.45L547 273.59L550 280.73L547 287.86L550 295L533.2 295Z"/>
+  <path class="fixture-support" d="M70 235L533.2 235L533.2 295L526.18 292L519.16 295L512.15 292L505.13 295L498.11 292L491.09 295L484.07 292L477.05 295L470.04 292L463.02 295L456 292L448.98 295L441.96 292L434.95 295L427.93 292L420.91 295L413.89 292L406.87 295L399.85 292L392.84 295L385.82 292L378.8 295L371.78 292L364.76 295L357.75 292L350.73 295L343.71 292L336.69 295L329.67 292L322.65 295L315.64 292L308.62 295L301.6 292L294.58 295L287.56 292L280.55 295L273.53 292L266.51 295L259.49 292L252.47 295L245.45 292L238.44 295L231.42 292L224.4 295L217.38 292L210.36 295L203.35 292L196.33 295L189.31 292L182.29 295L175.27 292L168.25 295L161.24 292L154.22 295L147.2 292L140.18 295L133.16 292L126.15 295L119.13 292L112.11 295L105.09 292L98.07 295L91.05 292L84.04 295L77.02 292L70 295Z"/>
+  <path class="section" d="M464.62 235L533.2 235L533.2 108L464.62 108L464.62 152.45L460.81 152.45L460.81 169.59L464.62 169.59Z"/>
+  <path class="section" d="M394.77 197.18L464.62 197.18L464.62 169.59L394.77 169.59Z"/>
+  <path class="section" d="M265.23 235L394.77 235L394.77 133.4L394.77 133.4L392.01 131.25L389.17 129.19L386.27 127.23L383.31 125.38L380.28 123.62L377.19 121.96L374.05 120.42L370.86 118.98L367.62 117.64L364.34 116.42L361.02 115.31L357.67 114.32L354.28 113.44L350.86 112.67L347.42 112.02L343.96 111.49L340.49 111.07L337 110.78L333.5 110.6L330 110.54L326.5 110.6L323 110.78L319.51 111.07L316.04 111.49L312.58 112.02L309.14 112.67L305.72 113.44L302.33 114.32L298.98 115.31L295.66 116.42L292.38 117.64L289.14 118.98L285.95 120.42L282.81 121.96L279.72 123.62L276.69 125.38L273.73 127.23L270.83 129.19L267.99 131.25L265.23 133.4L265.23 143.46L70 143.46L67 150.58L70 157.7L67 164.82L70 171.95L67 179.07L70 186.19L67 193.31L70 200.44L67 207.56L70 214.68L265.23 214.68Z"/>
+  <rect class="holes" x="297.11" y="153.72" width="65.79" height="81.28"/>
+  <line class="hidden" x1="70" y1="153.72" x2="265.23" y2="153.72"/>
+  <line class="centre-line" x1="80" y1="184.2" x2="255.23" y2="184.2"/>
+  <line class="centre-line" x1="330" y1="55" x2="330" y2="275"/>
+  <path class="cutter" d="M410.56 87.93L410.56 55L403.5 52L396.45 55L389.39 52L382.34 55L375.28 52L368.23 55L361.17 52L354.12 55L347.06 55L347.06 87.93A31.75 31.75 0 0 0 410.56 87.93Z"/>
+  <circle class="leader" cx="428.56" cy="75" r="7"/>
+  <line class="leader" x1="423.66" y1="70.1" x2="433.46" y2="79.9"/>
+  <line class="leader" x1="423.66" y1="79.9" x2="433.46" y2="70.1"/>
+  <line class="datum" x1="66" y1="235" x2="48" y2="235"/>
+  <text class="datum-label" x="44" y="240" text-anchor="end">Z0</text>
+  <text class="datum-label" x="325" y="51" text-anchor="end">X0</text>
+  <text class="label" x="566" y="60">ball, finishing ring 6:</text>
+  <text class="label" x="566" y="76">tip Z11.532, G3 round</text>
+  <text class="label" x="566" y="92">X0 Y0: into the page</text>
+  <text class="label" x="566" y="108">here, X4.881 (L73–75)</text>
+  <line class="leader" x1="562" y1="56" x2="435.56" y2="75"/>
+  <circle class="leader-dot" cx="435.56" cy="75" r="2"/>
+  <text class="label" x="566" y="145">fixed jaw (behind)</text>
+  <line class="leader" x1="562" y1="141" x2="544" y2="172.55"/>
+  <circle class="leader-dot" cx="544" cy="172.55" r="2"/>
+  <text class="label" x="566" y="190">back tab: the lever</text>
+  <text class="label" x="566" y="206">hangs on it and the</text>
+  <text class="label" x="566" y="222">tip's tab</text>
+  <line class="leader" x1="562" y1="186" x2="435" y2="183.39"/>
+  <circle class="leader-dot" cx="435" cy="183.39" r="2"/>
+  <text class="label" x="566" y="250">Z0: the stacks' top</text>
+  <text class="label" x="566" y="266">(face B); the fixed</text>
+  <text class="label" x="566" y="282">jaw's stack behind</text>
+  <line class="leader" x1="562" y1="246" x2="490" y2="265"/>
+  <circle class="leader-dot" cx="490" cy="265" r="2"/>
+  <text class="label" x="70" y="80">rod: its crown half rough</text>
+  <text class="label" x="70" y="96">to Z9.154 (passes follow),</text>
+  <text class="label" x="70" y="112">finished top dashed</text>
+  <line class="leader" x1="200" y1="110" x2="170" y2="141.46"/>
+  <circle class="leader-dot" cx="170" cy="141.46" r="2"/>
+  <line class="axis" x1="270" y1="76" x2="300" y2="76"/>
+  <text class="label" x="304" y="80">+X</text>
+</svg>

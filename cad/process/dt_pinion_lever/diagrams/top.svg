@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 545" width="760" height="545" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale: plan from above at 3.4 px/mm (+X right along the jaws, +Y up toward the fixed jaw), below it a section across the rod at X30.000 seen from the piece's right end (looking -X: +Y right, +Z up) at 4.6 px/mm. Setup 2's frame (cam.py, the top frame): X0 Y0 the hub's axis, 20.32 mm (hub_from_end_mm) from the piece's left end and 28.575 mm (half_width_mm) from the fixed jaw, +X toward the rod's tip; Z0 face B, up. The window (window_half/back/tip_mm 13.462/13.462/93.98, corners R3.175) and the lever (features: hub R6.477, rod R3.048 to 86.106, tabs 3.048 x 2.032) dashed: not cut yet. The piece drawn at its nominal 120.65 x 57.15 x 12.70 mm, centred on the 158.6738 mm jaws (vise_jaw_width_mm), edge F at the fixed jaw; jaw thickness (7.0 mm) schematic; jaw tops 6.8453 mm (lying_grip_mm) above the stacks' top; the 1 in + 1/2 in stacks 3.175 mm thick (parallel_thickness_mm) under both edges, drawn to a break. The 1/4 in end mill (shop Ø6.35) on DT16_top_rough's first slot of its first level: G0 X90.805 Y10.287 (L26), down to Z-0.945 (L28), G1 to X-10.287 (L29); drawn on its way at X30.000, the slot behind it hatched. -->
+  <rect class="paper" x="0" y="0" width="760" height="545"/>
+  <text class="title" x="20" y="22">Setup 2, DT16_top_rough T1: the 1/4 end mill's first slot, Y10.287 Z-0.945, travelling −X (to scale, 3.4 and 4.6 px/mm)</text>
+  <rect class="clamp" x="30" y="52" width="539.49" height="23.8"/>
+  <rect class="clamp" x="30" y="270.11" width="539.49" height="23.8"/>
+  <text class="label-on-clamp" x="38" y="68.8">fixed jaw</text>
+  <text class="label-on-clamp" x="38" y="286.91">moving jaw</text>
+  <rect class="part-kept" x="94.64" y="75.8" width="410.21" height="194.31"/>
+  <line class="hidden" x1="94.64" y1="86.6" x2="504.85" y2="86.6"/>
+  <line class="hidden" x1="94.64" y1="259.31" x2="504.85" y2="259.31"/>
+  <path class="part-removed" d="M472.47 148.77L475.8 148.25L478.81 146.71L481.2 144.32L482.73 141.32L483.26 137.98L482.73 134.64L481.2 131.63L478.81 129.25L475.8 127.71L472.47 127.18L265.73 127.18L265.73 148.77Z"/>
+  <path class="hidden" d="M483.26 137.98L482.89 135.19L481.81 132.58L480.1 130.35L477.86 128.63L475.26 127.55L472.47 127.18L128.75 127.18L125.96 127.55L123.36 128.63L121.12 130.35L119.4 132.58L118.33 135.19L117.96 137.98L117.96 207.93L118.33 210.72L119.4 213.33L121.12 215.56L123.36 217.28L125.96 218.36L128.75 218.73L472.47 218.73L475.26 218.36L477.86 217.28L480.1 215.56L481.81 213.33L482.89 210.72L483.26 207.93Z"/>
+  <path class="hidden" d="M456.49 162.59L456.49 167.77L483.26 167.77L483.26 178.14L456.49 178.14L456.49 183.32L183.16 183.32L182.38 184.67L181.5 185.96L180.53 187.19L179.48 188.35L178.35 189.43L177.14 190.42L175.87 191.33L174.53 192.14L173.14 192.86L171.71 193.48L170.23 193.99L168.72 194.4L167.19 194.7L165.64 194.89L164.08 194.97L162.51 194.94L160.96 194.8L159.41 194.55L157.89 194.19L156.4 193.72L154.95 193.15L153.54 192.48L152.18 191.7L150.87 190.84L149.64 189.88L148.47 188.84L147.39 187.72L146.38 186.52L145.46 185.25L144.63 183.93L143.9 182.54L143.27 181.11L142.75 179.64L142.32 178.14L117.96 178.14L117.96 167.77L142.32 167.77L142.75 166.27L143.27 164.8L143.9 163.37L144.63 161.98L145.46 160.66L146.38 159.39L147.39 158.19L148.47 157.07L149.64 156.03L150.87 155.07L152.18 154.21L153.54 153.43L154.95 152.76L156.4 152.19L157.89 151.72L159.41 151.36L160.96 151.11L162.51 150.97L164.08 150.94L165.64 151.02L167.19 151.21L168.72 151.51L170.23 151.92L171.71 152.43L173.14 153.05L174.53 153.77L175.87 154.58L177.14 155.49L178.35 156.48L179.48 157.56L180.53 158.72L181.5 159.95L182.38 161.24L183.16 162.59Z"/>
+  <circle class="cutter" cx="265.73" cy="137.98" r="10.79"/>
+  <line class="arrow" x1="248.93" y1="137.98" x2="198.93" y2="137.98"/>
+  <circle class="datum" cx="163.73" cy="172.96" r="2.5"/>
+  <text class="datum-label" x="163.73" y="212.96" text-anchor="middle">X0 Y0</text>
+  <line class="axis" x1="40" y1="256.11" x2="66" y2="256.11"/>
+  <line class="axis" x1="40" y1="256.11" x2="40" y2="230.11"/>
+  <text class="label" x="44" y="226.11">+Y</text>
+  <text class="label" x="68" y="250.11">+X</text>
+  <text class="label" x="581.49" y="73.8">edge F at the FIXED jaw</text>
+  <line class="leader" x1="577.49" y1="69.8" x2="492.85" y2="76.8"/>
+  <circle class="leader-dot" cx="492.85" cy="76.8" r="2"/>
+  <text class="label" x="581.49" y="111.98">first slot: Y10.287 Z-0.945,</text>
+  <text class="label" x="581.49" y="127.98">travelling −X (L28–29)</text>
+  <line class="leader" x1="577.49" y1="123.98" x2="273.28" y2="130.42"/>
+  <circle class="leader-dot" cx="273.28" cy="130.42" r="2"/>
+  <text class="label" x="581.49" y="160.96">X0 Y0 the hub's axis:</text>
+  <text class="label" x="581.49" y="176.96">.800 from the left end,</text>
+  <text class="label" x="581.49" y="192.96">1.1250 from the fixed jaw</text>
+  <line class="leader" x1="577.49" y1="156.96" x2="166.73" y2="170.96"/>
+  <circle class="leader-dot" cx="166.73" cy="170.96" r="2"/>
+  <text class="label" x="581.49" y="226.96">+X toward the rod's tip,</text>
+  <text class="label" x="581.49" y="242.96">+Y toward the fixed jaw</text>
+  <path class="clamp" d="M415.09 418.04L447.29 418.04L447.29 490.93L439.24 487.93L431.19 490.93L423.14 487.93L415.09 490.93Z"/>
+  <path class="clamp" d="M120 418.04L152.2 418.04L152.2 490.93L144.15 487.93L136.1 490.93L128.05 487.93L120 490.93Z"/>
+  <path class="fixture-support" d="M400.48 449.53L415.09 449.53L415.09 490.93L407.79 487.93L400.48 490.93Z"/>
+  <path class="fixture-support" d="M152.2 449.53L166.81 449.53L166.81 490.93L159.5 487.93L152.2 490.93Z"/>
+  <rect class="section" x="152.2" y="391.11" width="262.89" height="58.42"/>
+  <circle class="hidden" cx="283.64" cy="414.48" r="14.02"/>
+  <path class="hidden" d="M221.72 391.11L221.72 430.25L345.57 430.25L345.57 391.11"/>
+  <path class="cutter" d="M345.57 391.95L345.57 335.91L338.27 332.91L330.97 335.91L323.66 332.91L316.36 335.91L316.36 391.95A14.6 3.51 0 0 0 345.57 391.95Z"/>
+  <circle class="leader" cx="300.36" cy="363.51" r="7"/>
+  <line class="leader" x1="295.46" y1="358.61" x2="305.26" y2="368.41"/>
+  <line class="leader" x1="295.46" y1="368.41" x2="305.26" y2="358.61"/>
+  <line class="centre-line" x1="283.64" y1="377.31" x2="283.64" y2="463.33"/>
+  <line class="datum" x1="94" y1="391.11" x2="114" y2="391.11"/>
+  <text class="datum-label" x="90" y="396.11" text-anchor="end">Z0</text>
+  <text class="datum-label" x="288.64" y="475.33">Y0</text>
+  <text class="label" x="463.29" y="349.71">T1 end Z-0.945 (.037 below face B),</text>
+  <text class="label" x="463.29" y="365.71">−X: into the page (section at X30)</text>
+  <text class="label" x="463.29" y="400.31">Z0 face B (the bar's top);</text>
+  <text class="label" x="463.29" y="416.31">the rod's axis .200 below,</text>
+  <text class="label" x="463.29" y="432.31">the window (dashed) to come</text>
+  <line class="leader" x1="459.29" y1="396.31" x2="345.57" y2="423.35"/>
+  <circle class="leader-dot" cx="345.57" cy="423.35" r="2"/>
+  <line class="leader" x1="459.29" y1="345.71" x2="345.57" y2="372.71"/>
+  <circle class="leader-dot" cx="345.57" cy="372.71" r="2"/>
+  <text class="label" x="463.29" y="466.31">gripped on the edges, jaw tops .270</text>
+  <text class="label" x="463.29" y="482.31">above the stacks</text>
+  <line class="leader" x1="459.29" y1="462.31" x2="431.19" y2="422.04"/>
+  <circle class="leader-dot" cx="431.19" cy="422.04" r="2"/>
+  <text class="label" x="463.29" y="514.31">1 in + 1/2 in parallels,</text>
+  <text class="label" x="463.29" y="530.31">a stack against each jaw</text>
+  <line class="leader" x1="459.29" y1="510.31" x2="407.79" y2="477.13"/>
+  <circle class="leader-dot" cx="407.79" cy="477.13" r="2"/>
+</svg>

@@ -32,17 +32,8 @@ description = "Digital angle gauge"
 description = "Shop-made two-plate 6061 bend form for the MHA-SM-01 gooseneck tube: a closed half-round channel holding the tail, a quarter cove round the R3 arc"
 
 # --- MHA-SM-01 gooseneck (cad/process/sm_gooseneck/plan.toml) -----------------
-# The bend form's groove is cut with the owned 1/4 in ball end mill (owner
-# ruling 2026-11-22, option A). Ownership: cad/config/shop-equipment/
-# tools-cutting.toml, same key (McMaster 8878A17, on hand). diameter_mm: the
-# nominal 1/4 in × 25.4. flute_length_mm: McMaster's 8878A17 page, read
-# 2026-11-22 (https://www.mcmaster.com/8878A17/): "Length of Cut 3/4"", 2
-# flutes, centre cutting, 30° helix, mill diameter tolerance -0.002 to 0.
-[tools.ball-endmill-carbide-2fl-1-4]
-description = "1/4 in 2-flute uncoated carbide ball end mill, 3/4 in length of cut, 2-1/2 in OAL (McMaster 8878A17)"
-diameter_mm = 6.35
-flute_length_mm = 19.05
-helix_deg = 30
+# The bend form's groove: the owned 1/4 in ball end mill (common.toml
+# tools.ball-endmill-carbide-2fl-1-4; MHA-DT-16 runs it too), on 6061.
 # 6G Tools, "Carbide End Mill Speeds and Feeds, General Purpose, Uncoated"
 # (https://www.6gtools.com/uploaded/files/feedsandspeeds/Carbide_End_Mill_Feeds_And_Speeds_General_Purpose_Uncoated.pdf,
 # read 2026-11-22): Non-Ferrous, aluminium and aluminium alloys, 500 SFM,
