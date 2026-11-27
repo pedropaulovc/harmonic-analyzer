@@ -189,11 +189,11 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: line.split(" Y")[0] + " Y-15.000",
             "face",
         ),
-        # A step pass run back along −Y: conventional with M3.
+        # A step pass run back along +Y: climb with M3.
         (
             "step",
             lambda line: line.startswith("G1 Y"),
-            lambda line: "G1 Y-60.000 F{feed}",
+            lambda line: "G1 Y60.000 F{feed}",
             "passes",
         ),
         # The step's last pass moved into the foot.
