@@ -4,23 +4,23 @@ The 6 in 4-jaw closes no smaller than Ø.2865 (the owner's least grip,
 2026-11-24; ``cad/process/shop/common.toml`` ``workholding.chuck-4jaw-6``)
 and the rod's square is .1950-.1970 across its flats (#3495), so each jaw
 bears on a soft packing strip on its flat (delegated ruling 2026-11-27
-(Main); owner review #2144 (D57)). These tests hold the plan's strip
-thickness and width to the chuck and the drawing's square.
+(Main), precedent: the transgear pin's split bush, #3494; owner review
+#2144 (D57)). These tests hold the plan's strip thickness and width to the
+chuck and the drawing's square.
 """
 
 from __future__ import annotations
 
 import tomllib
-from pathlib import Path
 
 import pytest
 
 import _process_plans
+import _shop_equipment
 import export_features
 
 STEM = "pn_pen_rod"
 IN = 25.4
-EQUIPMENT = Path(__file__).resolve().parents[2] / "cad" / "config" / "shop-equipment"
 
 
 @pytest.fixture(scope="module")
@@ -59,9 +59,7 @@ def test_a_strip_is_narrower_than_a_flat_and_lies_flat(
 
 
 def test_the_offcut_example_lies_in_the_range(plan: dict) -> None:
-    stock = tomllib.loads(
-        (EQUIPMENT / "stock-bought.toml").read_text(encoding="utf-8")
-    )["stock"]["c260-sheet-063-6x6"]
+    stock = _shop_equipment.load()["stock"]["c260-sheet-063-6x6"]
     thickness_in = stock["section_mm"][1] / IN
     parameters = plan["parameters"]
     assert parameters["packing_min_in"] <= thickness_in <= parameters["packing_max_in"]

@@ -57,7 +57,7 @@ standing = true
 title = "This job"
 rows = [
   ["Square", "The square is the bar as bought: never cut it."],
-  ["Packing", "Four soft packing strips, one between each jaw and its flat (the jaws cannot close on the bare square): brass, copper or aluminium, any thickness {{process.packing_min_in:.3dot}}–{{process.packing_max_in:.3dot}}, no wider than {{process.packing_width_max_in:.2dot}} (narrower than a flat, so neighbouring strips never touch), about {{process.packing_length_in:.2dot}} long. For example, four strips sawn with the junior hacksaw from the offcut of the .063 brass sheet, about .80 x .50 of it in all; file the burrs off so each lies flat. The same four strips serve Setups 2 and 3."],
+  ["Packing", "Four soft strips, one between each jaw and its flat: brass, copper or aluminium, {{process.packing_min_in:.3dot}}–{{process.packing_max_in:.3dot}} thick, no wider than {{process.packing_width_max_in:.2dot}} (so neighbouring strips never touch), about {{process.packing_length_in:.2dot}} long. For example, sawn with the junior hacksaw from the .063 brass sheet's offcut (about .80 x .50 in all), burrs filed off."],
 ]
 
 [cad]
