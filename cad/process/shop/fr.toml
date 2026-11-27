@@ -12,6 +12,22 @@
 description = "8-32 UNC bottoming tap (1–2 chamfered threads); T-handle wrench"
 tap_drill_mm = 3.4544
 
+# MHA-FR-05's chamfers on 1018 cold-finished (cad/process/fr_rocker_arm_support):
+# the 1/4 in 90° chamfer mill (common.toml tools.chamfer-mill-carbide-1-4-90;
+# McMaster 3073A46, 2 flutes, its 45° cone to a point within 1/8 in). Speed
+# and chip load from the same 6G table as the 1018 end-mill settings
+# (common.toml, "Carbide End Mill Speeds and Feeds, General Purpose,
+# Uncoated", read 2026-11-17), row Mild - 1018: 350 SFM is 5348 rpm on 1/4
+# in, over the spindle's 2800 (183 ft/min on the body); 1/4 in .0017
+# in/tooth, the chip-load factor left at 1.0. 2800 × 2 × .0017 = 9.5 in/min.
+[settings.fr-chamfer-mill-1018-cf]
+tool = "chamfer-mill-carbide-1-4-90"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.04318  # .0017 in; 2800 × 2 × .0017 = 9.5 in/min
+flutes = 2
+feed_unit = "in/min"
+
 # --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
 # The tools the placeholder plans name (cad/process/<stem>/plan.toml with
 # revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the

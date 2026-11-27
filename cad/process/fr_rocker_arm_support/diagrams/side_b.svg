@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="18">Side B: section along X at Y 0, FR08's cavity cut, before its M6 T5 stop (1 px = 1/1.5 mm)</text>
+  <rect class="fixture-table" x="0" y="343.35" width="760" height="30"/>
+  <!-- Middle blocks (behind the section) under the boss. -->
+  <rect class="fixture-support" x="322.85" y="267.15" width="114.3" height="76.2"/>
+  <!-- Screw jacks under the posts' side-A slants, at Y ±2.5 in: in front of
+       and behind the section, drawn where they stand along X. -->
+  <rect class="fixture-support" x="504" y="240.1" width="20" height="103.25"/>
+  <rect class="fixture-support" x="236" y="240.1" width="20" height="103.25"/>
+  <!-- The boss and its web flange (free after FR08), the frame: web, posts. -->
+  <rect class="part-rest" x="303.8" y="152.85" width="152.4" height="114.3"/>
+  <rect class="part-rest" x="456.2" y="200.5" width="4.4" height="19.05"/>
+  <rect class="part-rest" x="299.4" y="200.5" width="4.4" height="19.05"/>
+  <rect class="part-kept" x="475.25" y="200.5" width="28.55" height="19.05"/>
+  <rect class="part-kept" x="256.2" y="200.5" width="28.55" height="19.05"/>
+  <rect class="part-kept" x="503.8" y="179.9" width="20.2" height="60.2"/>
+  <rect class="part-kept" x="236" y="179.9" width="20.2" height="60.2"/>
+  <!-- Studs and flange nuts. -->
+  <rect class="clamp" x="325.25" y="133.8" width="14.3" height="209.55"/>
+  <rect class="clamp" x="420.45" y="133.8" width="14.3" height="209.55"/>
+  <rect class="clamp" x="313.4" y="137.85" width="38" height="15"/>
+  <rect class="clamp" x="408.6" y="137.85" width="38" height="15"/>
+  <!-- FR08's post straps, toes on the posts at Y 0, midway between the jacks. -->
+  <rect class="clamp" x="495" y="164.9" width="265" height="15"/>
+  <rect class="clamp" x="0" y="164.9" width="265" height="15"/>
+  <line class="datum" x1="230" y1="210" x2="530" y2="210"/>
+  <text class="datum-label" x="534" y="214">Z0</text>
+  <line class="datum" x1="380" y1="200" x2="380" y2="220"/>
+  <text class="datum-label" x="384" y="196">X0</text>
+  <line class="leader" x1="560" y1="148" x2="580" y2="166"/>
+  <circle class="leader-dot" cx="580" cy="166" r="2"/>
+  <text class="label" x="520" y="144">post strap</text>
+  <text class="label" x="530" y="300">screw jacks (two per post,</text>
+  <text class="label" x="530" y="316">at Y ±2.5, off this section)</text>
+  <text class="label-halo" x="358" y="300">middle</text>
+  <text class="label-halo" x="358" y="316">blocks</text>
+  <line class="leader" x1="190" y1="146" x2="291" y2="208"/>
+  <circle class="leader-dot" cx="291" cy="208" r="2"/>
+  <text class="label" x="110" y="142">cavity slot</text>
+  <text class="label" x="300" y="110">studs from the middle T-slot</text>
+  <line class="leader" x1="330" y1="114" x2="332" y2="134"/>
+  <circle class="leader-dot" cx="332" cy="134" r="2"/>
+  <text class="label" x="20" y="390">side B milled as side A; FR08 slots the cavity through the web round the boss</text>
+</svg>

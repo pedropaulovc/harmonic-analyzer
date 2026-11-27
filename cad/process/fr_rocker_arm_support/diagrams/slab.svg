@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="640" height="400"/>
+  <text class="title" x="20" y="18">Bench: the 3 x 8 x 8 slab, side A up (1 px = 1/1.5 mm)</text>
+  <!-- The slab, 203.2 mm square, side A, kept whole by this setup. -->
+  <rect class="part-kept" x="40" y="40" width="304.8" height="304.8"/>
+  <!-- Hidden: where Setups 2-3 put the part's outline (192.0 x 177.8),
+       pocket 6.50 SQ R.25, cavity 5.00 SQ R.50 and the stud holes. -->
+  <rect class="hidden" x="48.48" y="58.95" width="288.04" height="266.7"/>
+  <rect class="hidden" x="68.57" y="68.57" width="247.65" height="247.65" rx="9.53"/>
+  <rect class="hidden" x="97.15" y="97.15" width="190.5" height="190.5" rx="19.05"/>
+  <circle class="hidden" cx="144.77" cy="192.4" r="7.74"/>
+  <circle class="hidden" cx="240.02" cy="192.4" r="7.74"/>
+  <line class="datum" x1="192.4" y1="182" x2="192.4" y2="202"/>
+  <line class="datum" x1="182" y1="192.4" x2="202" y2="192.4"/>
+  <text class="datum-label" x="198" y="186">X0 Y0</text>
+  <line class="arrow" x1="370" y1="330" x2="370" y2="60"/>
+  <text class="label" x="378" y="200">+Y (7.00 high)</text>
+  <line class="arrow" x1="48" y1="365" x2="336" y2="365"/>
+  <text class="label" x="150" y="385">+X, the sawn 8 in length (7.56 long)</text>
+  <text class="label" x="400" y="60">A: this face up</text>
+  <text class="label" x="400" y="80">FOOT: the bar edge nearest you</text>
+  <text class="label" x="400" y="110">dashed: the part's outline,</text>
+  <text class="label" x="400" y="130">pocket, cavity and stud holes,</text>
+  <text class="label" x="400" y="150">milled in Setups 2-3</text>
+  <text class="label-halo" x="120" y="340">foot edge (-Y)</text>
+</svg>

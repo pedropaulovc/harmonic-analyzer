@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="18">Foot holes: the frame on its top face, the foot up; front view (1 px = 1/1.4 mm)</text>
+  <rect class="fixture-table" x="0" y="400" width="760" height="30"/>
+  <!-- The frame, 7.56 x 7.00, foot at the top: the pocket's floor (the web)
+       seen through the pocket, the cavity through the web. -->
+  <rect class="part-kept" x="245.6" y="151.1" width="268.8" height="248.9"/>
+  <rect class="part-kept" x="264.4" y="160" width="231.2" height="231.1" rx="8.9"/>
+  <rect class="holes" x="291.1" y="186.66" width="177.8" height="177.8" rx="17.8"/>
+  <!-- Step clamps across the foot at the end posts (X ±3.25 in, seen end-on). -->
+  <rect class="clamp" x="246.6" y="131" width="35.6" height="20"/>
+  <rect class="clamp" x="477.8" y="131" width="35.6" height="20"/>
+  <!-- The four holes (two behind two) at X ±2.375 in, through the foot into
+       the pocket; the drill over the west pair. -->
+  <rect class="part-removed" x="292.8" y="151.1" width="5.6" height="8.9"/>
+  <rect class="part-removed" x="461.6" y="151.1" width="5.6" height="8.9"/>
+  <rect class="cutter" x="292.8" y="96" width="5.6" height="55.1"/>
+  <line class="datum" x1="380" y1="126" x2="380" y2="161"/>
+  <line class="datum" x1="370" y1="151.1" x2="390" y2="151.1"/>
+  <text class="datum-label" x="330" y="118">X0, Z0 the foot face</text>
+  <text class="label" x="520" y="140">step clamp, toe on the foot</text>
+  <text class="label" x="520" y="160">(one from the front T-slot,</text>
+  <text class="label" x="520" y="178">one from the back)</text>
+  <text class="label" x="520" y="395">top face on paper on the table</text>
+  <text class="label" x="40" y="100">5/16 drill: A1-A4 thru</text>
+  <text class="label" x="40" y="118">the foot into the pocket</text>
+  <line class="leader" x1="190" y1="104" x2="292" y2="112"/>
+  <circle class="leader-dot" cx="292" cy="112" r="2"/>
+  <line class="leader" x1="200" y1="122" x2="292" y2="156"/>
+  <circle class="leader-dot" cx="292" cy="156" r="2"/>
+  <text class="label-halo" x="320" y="280">cavity (through the web)</text>
+  <text class="label-halo" x="300" y="176">pocket floor (the web)</text>
+</svg>

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 470" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="820" height="470"/>
+  <text class="title" x="20" y="18">Side A: plan (left) and section at X 0 (right), 1 px = 1/1.5 mm</text>
+  <rect class="fixture-table" x="0" y="30" width="420" height="420"/>
+  <!-- Plan, centre (200, 230), +Y up, the FOOT edge at the bottom. -->
+  <rect class="fixture-support" x="333.35" y="172.85" width="38.1" height="114.3"/>
+  <rect class="fixture-support" x="28.55" y="172.85" width="38.1" height="114.3"/>
+  <rect class="fixture-support" x="142.85" y="172.85" width="114.3" height="38.1"/>
+  <rect class="fixture-support" x="142.85" y="249.05" width="114.3" height="38.1"/>
+  <rect class="part-arriving" x="47.6" y="77.6" width="304.8" height="304.8"/>
+  <rect class="part-kept" x="56" y="96.65" width="288" height="266.7"/>
+  <rect class="part-removed" x="76.2" y="106.2" width="247.6" height="247.6" rx="9.53"/>
+  <rect class="part-rest" x="123.8" y="153.8" width="152.4" height="152.4"/>
+  <!-- FR01's end straps (off after the studs are on). -->
+  <rect class="clamp" x="314.3" y="210.95" width="105.7" height="38.1"/>
+  <rect class="clamp" x="0" y="210.95" width="85.7" height="38.1"/>
+  <!-- Studs and flange nuts on the boss. -->
+  <circle class="clamp" cx="152.4" cy="230" r="19"/>
+  <circle class="clamp" cx="247.6" cy="230" r="19"/>
+  <circle class="hole" cx="152.4" cy="230" r="7.7"/>
+  <circle class="hole" cx="247.6" cy="230" r="7.7"/>
+  <line class="datum" x1="200" y1="220" x2="200" y2="252"/>
+  <line class="datum" x1="190" y1="230" x2="210" y2="230"/>
+  <text class="datum-label" x="182" y="268">X0 Y0</text>
+  <text class="label-halo" x="150" y="400">FOOT edge, toward you</text>
+  <text class="label-halo" x="262" y="200">end strap: FR01 only</text>
+  <!-- Section along Y at X 0, centre (610, 230): Z up, the foot at the left. -->
+  <rect class="fixture-table" x="430" y="363.35" width="380" height="20"/>
+  <rect class="fixture-support" x="629.05" y="287.15" width="38.1" height="76.2"/>
+  <rect class="fixture-support" x="552.95" y="287.15" width="38.1" height="76.2"/>
+  <rect class="part-removed" x="457.6" y="172.85" width="304.8" height="114.3"/>
+  <polygon class="part-kept" points="457.6,287.15 457.6,233.8 476.65,233.8 476.65,182.4 486.2,183.6 486.2,220.5 533.8,220.5 533.8,172.85 686.2,172.85 686.2,220.5 733.8,220.5 733.8,216.2 743.35,217.4 743.35,233.8 762.4,233.8 762.4,287.15"/>
+  <line class="datum" x1="450" y1="230" x2="770" y2="230"/>
+  <text class="datum-label" x="772" y="234">Z0</text>
+  <text class="label" x="440" y="160">foot rim</text>
+  <text class="label" x="560" y="160">boss (studs, nuts)</text>
+  <text class="label" x="700" y="160">top rim</text>
+  <text class="label" x="490" y="255">outline .100 under Z0</text>
+  <text class="label" x="520" y="410">pocket ring down to the web face, Z 6.350</text>
+  <text class="label" x="520" y="430">slant: 1.25 at the foot to .33 at the top</text>
+</svg>
