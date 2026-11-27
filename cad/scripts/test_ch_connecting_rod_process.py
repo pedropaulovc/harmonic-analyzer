@@ -384,6 +384,30 @@ def test_the_top_views_label_the_pair_by_its_numbers(picture, at_fixed_jaw) -> N
     assert nearer == at_fixed_jaw
 
 
+def test_the_plate_is_faced_on_the_stacked_pairs_above_the_jaws() -> None:
+    """#3732, D58: Setup 2 faces the support plate alone on the 1 in pair
+    stacked on the 1/2 in pair, its top over the jaws, so the cutter runs off
+    both long edges; on the 1 in pair alone the jaws stood over its top and
+    left a proud strip along each. The stack's numbers against the shop's
+    vise and the floor are cam.py's (the refusals below)."""
+    p = PLAN["parameters"]
+    (facing,) = [
+        op["instruction"]
+        for op in PLAN["setups"][1]["operations"]
+        if "face the support plate's top" in op["instruction"]
+    ]
+    # Each batch saws a new plate (Setup 1) and mills its width: it is faced
+    # every batch too, or its strips come back.
+    assert facing.startswith("Once per batch")
+    assert "the 1 in pair stacked on the 1/2 in pair, its top above the jaws" in facing
+    assert "running off both long edges" in facing
+    assert "{{process.support_plate_face_mm:in.3dot}}" in facing
+    jaw = SHOP["workholding"]["vise-pm-6"]["jaw_height_mm"]
+    assert jaw - p["facing_stack_mm"] >= SHOP["limits"]["vise_grip_min_mm"]
+    faced_top = p["facing_stack_mm"] + p["support_plate_thickness_mm"]
+    assert faced_top - p["support_plate_face_mm"] - jaw >= cam_nc.jaw_clearance_min_mm()
+
+
 @pytest.mark.parametrize(
     ("changes", "detail"),
     [
@@ -428,6 +452,21 @@ def test_the_top_views_label_the_pair_by_its_numbers(picture, at_fixed_jaw) -> N
             "misses the moving parallel",
         ),
         ({"edge_shim_height_mm": 12.7}, "less than the shop's fraction"),
+        # The plate faced alone on the 1 in pair stacked on the 1/2 in pair
+        # (#3732, D58): the stack is those two pairs, the jaws grip the plate
+        # the shop's 6 mm, and its faced top stands the 1.0 mm floor over them.
+        ({"facing_stack_mm": 25.4}, "process.facing_stack_mm"),
+        (
+            {
+                "parallel_height_mm": 27.0,
+                "facing_stack_mm": 39.7,
+                "support_plate_thickness_mm": 11.4,
+                "support_height_mm": 38.4,
+                "jaw_top_mm": 6.5453,
+            },
+            "grip the support plate on its stack less than the shop's minimum",
+        ),
+        ({"support_plate_face_mm": 5.0}, "faced top does not stand clear"),
         # The blanks' width gate: 1.992 leaves the outer frame 1.38 mm.
         ({"blank_width_min_mm": 50.5968}, "blank 2's frame beside the ring"),
         ({"ring_from_end_mm": 22.0}, "left end by its margin"),

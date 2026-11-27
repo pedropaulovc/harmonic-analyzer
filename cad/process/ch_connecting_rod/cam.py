@@ -628,6 +628,21 @@ def context(
         )
     if p["support_plate_width_min_mm"] - edge_grip < cam_nc.jaw_clearance_min_mm():
         raise ValueError("the support plate's edge does not stand clear over the jaws")
+    # Setup 2 faces the plate alone on the 1 in pair stacked on the 1/2 in
+    # pair (#3732, D58): the jaws grip it at least the shop's minimum and its
+    # faced top stands the jaw-clearance floor over them, so the cutter runs
+    # off both long edges and leaves no proud strip along the jaws.
+    stack = p["facing_stack_mm"]
+    _agree(plan, "facing_stack_mm", p["parallel_height_mm"] + 0.5 * IN)
+    if p["vise_jaw_height_mm"] - stack < shop["limits"]["vise_grip_min_mm"]:
+        raise ValueError(
+            "the jaws grip the support plate on its stack less than the shop's minimum"
+        )
+    faced_top = stack + p["support_plate_thickness_mm"] - p["support_plate_face_mm"]
+    if faced_top - p["vise_jaw_height_mm"] < cam_nc.jaw_clearance_min_mm():
+        raise ValueError(
+            "the support plate's faced top does not stand clear over the jaws on its stack"
+        )
     jaw_w = p["vise_jaw_width_mm"]
     jaw_x0 = p["jaw_start_mm"]
     _agree(plan, "jaw_end_mm", jaw_x0 + jaw_w)

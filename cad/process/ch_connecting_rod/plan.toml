@@ -231,6 +231,16 @@ parallel_height_mm = 25.4
 parallel_thickness_mm = 3.175
 edge_shim_height_mm = 3.96875
 support_plate_thickness_mm = 12.7
+# Setup 2 faces the plate's top (support_plate_face_mm, .010) alone on the
+# set's 1 in pair stacked on its 1/2 in pair (facing_stack_mm), its top above
+# the jaws, so the cutter runs off both long edges and leaves no proud strip
+# where the jaws grip it (#3732). cam.py checks the jaws grip it the shop's
+# minimum and its faced top stands the jaw-clearance floor over them.
+# Option C of the 2026-11-27 analysis: delegated ruling 2026-11-27 (Main),
+# precedent D44 (ch_channel_lever faces its plate on the same stack, #3647);
+# owner review #2144 (D58).
+facing_stack_mm = 38.1
+support_plate_face_mm = 0.254
 support_plate_width_mm = 100.33
 support_plate_width_min_mm = 100.076
 support_plate_width_max_mm = 100.584
@@ -628,6 +638,10 @@ inspection = "3.940–3.960 (the calipers across the plate, at both ends and the
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.support_plate_width_min_mm}}", "{{process.support_plate_width_max_mm}}"] }]
 
 [[setups.operations]]
+instruction = "Once per batch, before the Y pick-up: face the support plate's top on the 1 in pair stacked on the 1/2 in pair, its top above the jaws. Take the plate and the 1 in pair out; set the 1 in pair on the 1/2 in pair against each jaw and the plate on them, LEFT edge to the left, milled edge toward the moving jaw; clamp it alone and face its top {{process.support_plate_face_mm:in.3dot}} with T1 by hand jog in overlapping passes, the cutter running off both long edges. Unclamp; the 1 in pair and the plate back as in the Holding."
+feed = "hand"
+
+[[setups.operations]]
 instruction = "First load only, before the blanks go in (the plate on the parallels, the vise open): G54 Y0 the fixed jaw's face, edge finder (900 rpm); note the G54 Y (Setup 3 shifts it and Setup 4 sets it back)."
 instruction_detailed = "Edge finder (900 rpm), its tip .10 below the jaw top, on the fixed jaw's face from the work side: G10 L20 P1 Y-2.540. Send $# and note the G54 line's Y (mm): the noted Setup 2 Y."
 feed = "hand"
@@ -635,10 +649,6 @@ feed = "hand"
 [[setups.operations]]
 instruction = "G54 Z0: the support plate's top with T1, before the blanks go in (the plate alone on the parallels, as for the Y pick-up)."
 instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the plate's top, the vise open and no blank on the plate: G10 L20 P1 Z0.051. The plate stays on the parallels when the blanks go in, so Z0 holds for every load."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First batch only, before the first load: face the support plate's top. Clamp the plate alone on the parallels, face its top .010 with T1 by hand jog in overlapping passes, touch Z0 again as above, then unclamp the plate, leaving it on the parallels."
 feed = "hand"
 
 [[setups.operations]]
