@@ -97,9 +97,8 @@ def test_the_sheet_never_repeats_a_finished_size() -> None:
         assert f"{value / 25.4:.{places}f}".removeprefix("0") not in printed
     assert notes.DRAWING_NOTES.splitlines() == [
         "1. BORE AND LENGTH ARE FINISHED AFTER JOINING TO MHA-CH-13; SEE MHA-CH-06.",
-        "2. BONDED INTO MHA-CH-13 WITH LOCTITE 638: LAND AND HOLE DEGREASED,",
-        "   COMPOUND ON THE LAND ONLY; HELD SQUARE TO THE STRAP UNTIL SET; 24 H CURE",
-        "   BEFORE MHA-CH-06 IS FINISHED. THE HUB DOES NOT TURN BY HAND.",
+        "2. BONDED INTO MHA-CH-13, LOCTITE 638 ON THE LAND ONLY, LAND AND HOLE DEGREASED;",
+        "   HELD SQUARE UNTIL SET; 24 H CURE AT ROOM TEMPERATURE BEFORE MHA-CH-06 IS FINISHED.",
     ]
 
 

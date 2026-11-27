@@ -79,18 +79,23 @@ SUPPLY_LENGTH_CALLOUT = SUPPLY_NOTE_LINK
 # drawing-guidelines.md rule 7: one line a machinist cannot read off the views.
 # Rule 23 (a specified anaerobic bond is a fit): the bond prints its grade,
 # the degrease, where the compound goes, how the joint is held square while
-# it cures and the cure before the joined MHA-CH-06 is finished, with an
-# acceptance; rule 4 form 1. Printed once, here, on the member made last
-# (owner ruling 2026-11-24, fit audit question 2: "hub turned until it
-# slides in (clearance .0005-.0030); bond").
+# it cures and the cure before the joined MHA-CH-06 is finished; rule 4
+# form 1. Printed once, here, on the member made last (owner ruling
+# 2026-11-24, fit audit question 2: "hub turned until it slides in
+# (clearance .0005-.0030); bond"). The cured acceptance and its remedy are
+# bench work, so they are MHA-CH-06's traveler steps (Setup 1), not part of
+# this note (rules 7 and 23; machinist review, farm run
+# 20261127T013540837Z-b9c5): a hub that turns once cured is not held, so it
+# pushes out and is bonded again; the cure is 24 h at room temperature
+# (delegated ruling 2026-11-26 (Main), no precedent; owner review #2144
+# (D54); #3646).
 DRAWING_NOTES = "\n".join(
     (
         f"{SUPPLY_NOTE_NUMBER}. BORE AND LENGTH ARE FINISHED AFTER JOINING TO"
         f" {STRAP_NUMBER}; SEE {ROCKER_NUMBER}.",
-        f"{BOND_NOTE_NUMBER}. BONDED INTO {STRAP_NUMBER} WITH LOCTITE 638: LAND AND HOLE"
-        " DEGREASED,",
-        "   COMPOUND ON THE LAND ONLY; HELD SQUARE TO THE STRAP UNTIL SET; 24 H CURE",
-        f"   BEFORE {ROCKER_NUMBER} IS FINISHED. THE HUB DOES NOT TURN BY HAND.",
+        f"{BOND_NOTE_NUMBER}. BONDED INTO {STRAP_NUMBER}, LOCTITE 638 ON THE LAND ONLY, LAND AND"
+        " HOLE DEGREASED;",
+        f"   HELD SQUARE UNTIL SET; 24 H CURE AT ROOM TEMPERATURE BEFORE {ROCKER_NUMBER} IS FINISHED.",
     )
 )
 if NUMBER in DRAWING_NOTES:
