@@ -7,11 +7,6 @@
 # repeats one there. TOML, deliberately not YAML; no COM build closure reads
 # it: it is in no leaf's cache key.
 
-[tools.endmill-7-32]
-kind = "end_mill"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx C-endmill-7-32: recommended Shars 404-6071."
-
 [tools.threading-bits-lms-6685]
 kind = "threading_tool_bit"
 status = "on_hand"
