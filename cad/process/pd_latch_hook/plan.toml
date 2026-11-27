@@ -1,28 +1,816 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Latch hook MHA-PD-14 (pd-latch-hook.yaml process: ".032 in C26000 H02
+# half-hard brass strip, as supplied: cut the blank to the flat pattern, bend
+# the ear 90 degrees, drill the screw holes from the formed ear, roll the arm
+# and form the tab"; the pin hole is drilled at assembly, MHA-PD-00).
+#
+# Route (approved by Main 2026-11-27, wave3/w3b-small route-proposals.md,
+# recommendation 1). Setup 1 at the bench: mike the on-hand .032 x 6 x 6 in
+# sheet (owner 2026-11-24: "Use the sheet; buy strip only if the hook takes a
+# set"), saw a 2.00 x 4.50 in blank off it, the rest kept for the platen
+# clips; saw a 3.75 in length off the on-hand 6061 1/2 x 6 bar for the
+# former. Setup 2 on the PM-30MV: the blank bonded to the spoil plate on blue
+# painter's tape on both faces with CA glue between (owner 2026-11-23);
+# HL01_sheet (cam:pd_latch_hook, cad/process/pd_latch_hook/cam.py) cuts the
+# hook's flat pattern and a trial strip (the arm's width and length, the same
+# full round tip) nested in its elbow with the 1/16 downcut end mill. Setup 3
+# frees them. Setup 4: the 1/2 x 6 blank bonded the same way, its 6 in along
+# the jaws; HL02_former cuts the former from it, an outer and an inner die
+# half whose faces are the strip's two faces as pressed, facing each other
+# across a channel, with the 1/4 in carbide end mill (a 1/2 x 1 bar's 5 mm of
+# body behind a face fails the bond's lift screen; W3B-Small 2026-11-27, no
+# purchase). Setup 5 frees the
+# halves and presses the trial strip between them in the vise: its two
+# caliper readings gate the former. Setup 6 bends the ear 90° R.05 over a
+# 3/32 drill's shank in the vise. Setup 7: the hook's base bonded flat to
+# the plate, ear up; HL03_holes drills the 2X #30 screw holes from the formed
+# ear's outer face and the base's low edge. Setup 8 presses the roll and the
+# tab in one squeeze in the former, checks the hook, then flexes the arm at
+# the pin station by the worst single release, 8.46 mm
+# (transgear_hanger_joints LATCH_RELEASE_FLEX_WORST): a set stops the job.
+#
+# The former (fixtures.pd-latch-hook-former, Main's ruling on the former
+# 2026-11-27, option 1): the die faces are posted at the design point, the
+# middle of the H02 yield range on record (324.5 MPa) and the nominal .032,
+# from Ri/Rf = 4x^3 - 3x + 1, x = Ri Y/(E t), the bend angle keeping the
+# mid surface's length; E 16,000 ksi (McMaster-Carr's figure for its 260
+# strip, 8859K86; the sheet's own listing was not read), Y 290-359 MPa (the
+# former record's range; Copper Development Association, C26000 flat
+# products, H02: 52 ksi = 359 MPa typical). The recipe checks that the design
+# point presses every printed formed value and that the tab's R.38 lands at
+# every corner of the yield range and the strip's ±.002. No fixed die
+# covers the whole yield range at ±.002: the printed R3.13 ±.02 holds only
+# within the yield window [parameters] window_yield_* (about ±2.7 MPa), so
+# the trial strip, pressed before the hook, is the gate. The sheet's temper
+# is not on its packing list; the H02 range on record, the trial strip and
+# the temper trial carry that unknown.
+#
+# To order: the 1/16 downcut end mill (tools-special-cutters.toml
+# endmill-carbide-3fl-1-16-downcut, Harvey Tool 896262, #3740) and the
+# junior hacksaw (tools-hand.toml junior-hacksaw), both on the platen clip's
+# list too. To make: the spoil plate (fixtures.sheet-spoil-plate). On hand:
+# the sheet, the 6061 1/2 x 6 bar, the 1/4 in end mill, the #30 and 3/32 drills (the
+# 115-piece index), the tape, the CA glue and its accelerator.
 title = "Latch Hook"
-part = "MHA-PD-14 Latch Hook"
-revision = "placeholder"
-material = "C26000 cartridge brass strip .032 in +/-.002 in, H02 half hard, ASTM B36, as supplied; McMaster-Carr 8859K86 (2 x 12 in strip). H01 quarter hard and annealed tempers are not acceptable"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "{{cad.material_spec}}"
+material_key = "c260-h02"
+milling_material = "brass"
+stock = "Qty {{process.quantity:g}}. 260 brass sheet .032 x 6 x 6 in (McMaster-Carr 8956K425, on hand; its packing list states no temper): one {{process.blank_width_in:.2dot}} x {{process.blank_length_in:.2dot}} in blank off one corner; the rest is the platen clips'. 6061-T6511 flat bar 1/2 x 6 in (Online Metals 1173, on hand, the free rest of the 54 in): one {{process.die_blank_length_in:.2dot}} in length for the former."
 shop = "../shop"
-stock_refs = ["c260-h02-strip-032x2"]
+stock_refs = ["c260-sheet-032-6x6", "6061-flat-1-2x6-54in"]
+
+# The shop's standing page carries what every traveler shares (units,
+# homing, Feed Hold, tool changes, proving a file, burrs); This job says what
+# only this hook needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Parts", "One hook. HL01 also cuts a trial strip beside it, and HL02 the former's two die halves from the 1/2 x 6 bar; the trial strip is pressed in the former before the hook and gates it. Keep the strip and the halves with this traveler."],
+  ["Temper", "The sheet's packing list states no temper. The hook is the sheet's temper trial (owner 2026-11-24): a set in Setup 8's flex test stops the job, and buying the H02 strip is the owner's."],
+  ["To buy or make first", "Not on hand: the 1/16 in downcut end mill and the junior hacksaw (both also on the platen clip's list). The spoil plate is to make from owned stock."],
+]
+
+[cad]
+file = "../../out/features/pd_latch_hook/features.toml"
+adapter = "formed_blank"
+part = "pd-latch-hook"
+
+[parameters]
+quantity = 1
+# The blank: 2.00 x 4.50 in off the 6 x 6 sheet, holding the hook's flat
+# pattern (its developed length along the 4.50) and the trial strip; .032
+# as bought.
+blank_length_in = 4.5
+blank_width_in = 2.0
+blank_thickness_in = 0.032
+blank_length_mm = 114.3
+blank_width_mm = 50.8
+blank_area_mm2 = 5806.44
+# --- HL01 layout on the spoil plate (work X/Y) ---
+# The blank's left end flush with the plate's left end (X0), its back edge
+# on the fixed jaw's tape strip. The hook's top bar (the ear and base, flat)
+# stands part_left_x_mm in, the base's end part_margin_y_mm off the jaw, the
+# arm along the blank toward the moving jaw's side; the trial strip in the
+# L's elbow, part_gap_mm off the hook. The saw cut may wander saw_error_mm
+# (the author's 1/16 in, no source).
+part_left_x_mm = 3.81
+part_margin_y_mm = 2.54
+part_gap_mm = 2.032
+hook_base_end_y_mm = -2.54
+blank_right_margin_mm = 4.866
+blank_front_margin_mm = 17.662
+saw_error_mm = 1.5875
+# The spoil plate (fixtures.sheet-spoil-plate): the 1/2 x 6 in bar's 6 in
+# width along the jaws, its sawn 5 in length across them.
+plate_length_mm = 152.4
+plate_width_mm = 127.0
+plate_thickness_mm = 12.7
+plate_from_x_mm = 0.0
+plate_to_x_mm = 152.4
+plate_overhang_mm = 0.0
+# HL01's cut along the plate (the beam check): the hook's top edge path to
+# the trial strip's tip path.
+sheet_from_x_mm = 3.0226
+sheet_to_x_mm = 110.2214
+# The hold (owner 2026-11-23): ScotchBlue 2090 on the plate and on each
+# piece's underside, GH1200 thick CA glue between. The stack and its band are
+# the shop record's (consumables.hold-painters-tape-ca: .011 nominal,
+# .009-.013); the bond strengths are the stresses accepted for the hold (the
+# owner: "take it as given it will work"; the same record's 0.6 MPa).
+tape_stack_mm = 0.28
+tape_stack_min_mm = 0.23
+tape_stack_max_mm = 0.33
+bond_accepted_shear_mpa = 0.6
+bond_accepted_tensile_mpa = 0.6
+# The pieces HL01 leaves on the tape (the recipe recomputes each): the hook,
+# its arm the narrowest; the trial strip; the rest of the blank.
+hook_bond_area_mm2 = 1289.8024
+hook_least_width_mm = 9.906
+trial_bond_area_mm2 = 1077.1184
+trial_width_mm = 11.43
+sheet_waste_bond_area_mm2 = 3439.5192
+# Depth (as the platen clip's PC01_sheet): from the thickest strip on the
+# thickest stack to the tip .004 into the plate, at least
+# through_margin_min_mm under the thinnest strip on the thinnest stack, no
+# deeper than spoil_cut_max_mm; equal levels, each at most
+# level_depth_max_fraction of the cutter's diameter (Harvey Tool SF_896200's
+# slotting depth, .5 x D, for the 1/16; the 1/4's levels held the same).
+sheet_tip_z_mm = -0.1016
+sheet_tip_into_plate_mm = 0.1016
+through_margin_min_mm = 0.2
+spoil_cut_max_mm = 0.254
+level_depth_max_fraction = 0.5
+sheet_depth_mm = 1.2952
+sheet_level_count = 2
+sheet_level_depth_mm = 0.6476
+# The 1/16 end mill (shop tools.endmill-carbide-3fl-1-16-downcut).
+sheet_cutter_dia_mm = 1.5748
+# The title block's INSIDE CORNERS R.040 MAX (cad/config/title_block.yaml):
+# the cutter's radius must not exceed it (the taper's inside corner is cut
+# sharp to the cutter's R.031).
+inside_corner_max_mm = 1.016
+# Plunges into waste at a quarter of the cutting feed (the author's, no
+# source; the platen clip's).
+plunge_feed_fraction = 0.25
+sheet_plunge_feed_mm_min = 34.2901
+# --- The former: springback inputs and the die faces (header) ---
+# E 16,000 ksi; Y 290-359 MPa; the design point their middle.
+strip_modulus_mpa = 110316.1
+strip_yield_min_mpa = 290.0
+strip_yield_max_mpa = 359.0
+former_design_yield_mpa = 324.5
+# Recomputed: the dies' inside radii and turns at the design point (the tab
+# to its square end).
+roll_die_radius_mm = 43.3597
+roll_die_deg = 59.5216
+tab_die_radius_mm = 8.6959
+tab_die_deg = 38.4809
+# Recomputed, for information (Main 2026-11-27: printed, not refused): what
+# these dies press at the corners of Y 290-359 and t .030-.034.
+corner_roll_r_min_mm = 70.7066
+corner_roll_r_max_mm = 92.2806
+corner_tab_r_min_mm = 9.4453
+corner_tab_r_max_mm = 9.784
+corner_face_x_min_mm = 16.6166
+corner_face_x_max_mm = 21.304
+corner_face_y_min_mm = 69.3253
+corner_face_y_max_mm = 71.3899
+corner_tab_end_x_min_mm = 24.7758
+corner_tab_end_x_max_mm = 32.1208
+# Recomputed: the yields (nominal strip) at which these dies press every
+# printed formed value inside its band, and over them the two caliper
+# checks: the tab's far point from the ear's outer face, and the strip's top
+# end to the tip (the trial strip's length is that less the ear's width);
+# the overall reading also allows the strip's set-in along the dies that
+# keeps the roll start and the far face's height in their bands.
+window_yield_min_mpa = 321.3
+window_yield_max_mpa = 326.6
+check_tip_x_min_mm = 29.3517
+check_tip_x_max_mm = 29.7023
+check_overall_min_mm = 96.0826
+check_overall_max_mm = 97.1726
+check_trial_length_min_mm = 87.9546
+check_trial_length_max_mm = 89.0446
+# Recomputed: the tab's far point these dies press at Y 290, 324.5 and 359
+# (nominal strip), the relation a re-post reads (springback depends on Y/t
+# only).
+relation_tip_x_ylo_mm = 31.7795
+relation_tip_x_yd_mm = 29.4905
+relation_tip_x_yhi_mm = 27.2207
+# The ear's bend over the 3/32 drill's shank (R.047, inside the printed
+# R.04-.06): recomputed, its sprung radius over the corners and the angle to
+# press for 90° at the design point.
+ear_formed_radius_min_mm = 1.2037
+ear_formed_radius_max_mm = 1.2091
+ear_press_deg = 90.8787
+# The dies: each half's face runs past the tip by die_runout_mm (the
+# author's); the face's length along the chord, recomputed.
+die_runout_mm = 3.0
+die_length_mm = 90.8843
+# The blank: one length off the 1/2 x 6 bar (stock-bought.toml
+# 6061-flat-1-2x6-54in), its 6 in width as bought along the jaws and the
+# chord, sawn die_blank_length_in across them; miked under
+# die_blank_thickness_max_mm (HL02 starts its cut there; the author's .510,
+# no source) and over die_blank_thickness_min_mm (the arm's widest printed
+# width, .46, so the dies cover it). Its left end flush with the plate's left
+# end, its back (sawn) edge die_blank_back_y_mm off the fixed jaw on a line
+# marked on the tape.
+die_blank_width_mm = 152.4
+die_blank_length_in = 3.75
+die_blank_length_mm = 95.25
+die_blank_thickness_min_mm = 11.684
+die_blank_thickness_max_mm = 12.954
+die_blank_back_y_mm = -10.0
+die_blank_area_mm2 = 14516.1
+# Both halves in the blank, the outer toward the fixed jaw, faces facing:
+# the halves as pressed with the inner moved die_shift_mm away (the author's,
+# so the channel between the finished faces, recomputed, is at least the
+# cutter and two margins wide and at most two cutters and two margins).
+# Each half's top end die_end_excess_mm in from the blank's left end, its
+# right end as far in from the right end, both back edges skimmed
+# die_back_skim_mm off the sawn edges; the blank may lie die_place_error_mm
+# off its marks (the author's).
+die_shift_mm = 8.0
+die_gap_min_mm = 7.496
+die_gap_max_mm = 8.83
+die_end_excess_mm = 3.0
+die_back_skim_mm = 1.0
+die_place_error_mm = 0.5
+# Each half's least body behind its face: recomputed from the blank's length,
+# at least die_body_min_mm, so the cutter's helix lift passes the bond's
+# lift screen (prechips milling_deflection: 4 × lift / width² within the
+# accepted 0.6 MPa needs 27.4 mm at the 113 N it computes for a full-width
+# cut; the author's 28).
+die_body_min_mm = 28.0
+die_least_width_mm = 33.5512
+outer_die_bond_area_mm2 = 6485.7506
+inner_die_bond_area_mm2 = 5868.456
+# The 1/4 in carbide end mill (shop tools.endmill-carbide-3fl-1-4): the
+# Carbide End Mill Store "General Purpose, Uncoated" chart (6gtools.com,
+# read 2026-11-22, the PDF shop/pd.toml's platen settings cite), Non-Ferrous,
+# Aluminum: 500 SFM, 1/4 in .0022 in/tooth at chip-load factor 1.0 (50 %
+# radial engagement and more): 7640 rpm, so the spindle's 2800; 2800 × 3 ×
+# .0022 = 18.5 in/min, for the channel's full-width slot and, slower than
+# the chart allows at its lighter engagement, for every other pass.
+die_cutter_dia_mm = 6.35
+em_quarter_flutes = 3
+former_chip_load_in = 0.0022
+former_feed_mm_min = 469.392
+former_plunge_feed_mm_min = 117.348
+die_tip_z_mm = -0.1016
+die_depth_mm = 13.3856
+die_level_count = 5
+die_level_depth_mm = 2.6771
+former_to_x_mm = 152.4
+die_lead_overhang_mm = 7.35
+die_y_span_mm = 105.95
+# --- HL03: the hook on the plate ---
+# The ear's outer face holes_ear_x_on_plate_mm from the plate's left end, the
+# base's side edge holes_base_from_jaw_mm off the fixed jaw (marks on the
+# tape); the #30's tip holes_drill_past_mm under the thinnest stack's
+# underside plus its point, no deeper into the plate than spoil_drill_max_mm
+# (the author's).
+holes_ear_x_on_plate_mm = 76.2
+holes_base_from_jaw_mm = 12.7
+holes_fixed_jaw_y_mm = 20.828
+# Recomputed: the plate along the base (from the ear's outer face toward the
+# base's end) and the base's flat underside on the tape (its length past the
+# ear's bend over the 3/32 shank, by its width).
+holes_plate_from_mm = -76.2
+holes_plate_to_mm = 76.2
+holes_bond_area_mm2 = 119.974
+holes_drill_past_mm = 0.254
+spoil_drill_max_mm = 1.27
+holes_tip_z_mm = -1.0046
+drill_30_dia_mm = 3.2639
+# The envelopes' tops: the drawing's thickest strip (.034) and tallest ear
+# (.62 over the base's underside); the recipe reads both from the export.
+strip_thickness_max_mm = 0.8636
+ear_height_max_mm = 15.748
+# Machine-capacity inputs (mm): heights above the mill table, tool lengths
+# from spindle nose to tip.
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+parallel_height_mm = 25.4        # 1 in parallels (shop-equipment fixtures.parallels-lms-6745).
+jaw_top_over_plate_mm = 6.8453
+sheet_collet_over_jaw_mm = 12.1031
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm (as the base-bar plan).
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm (as dt_crank_pin).
+# The 1/16 end mill 3/4 to 1 in out of its 1/8 collet (as the platen clip);
+# the 1/4 end mill (3 in overall) 1-1/4 to 1-1/2 in out of its 1/4 collet,
+# so the collet clears the blank's top at the deepest level; the #30 at least
+# 1 in out of the chuck, so the chuck clears the ear (the #30 jobber drill
+# 2-3/4 in overall, ASME B94.11M, as dt_cone_tip_block).
+em_sixteenth_projection_min_mm = 19.05
+em_sixteenth_projection_max_mm = 25.4
+em_quarter_projection_min_mm = 31.75
+em_quarter_projection_max_mm = 38.1
+drill_30_projection_min_mm = 25.4
+drill_30_oal_mm = 69.85
 
 [[tools]]
-id = "riser-drill-30"
+id = "saw"
+name = "Junior hacksaw, 32 TPI; two scrap wood blocks"
+ref = "junior-hacksaw"
+
+[[tools]]
+id = "cutoff-saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
+
+[[tools]]
+id = "file"
+name = "8 in smooth file"
+ref = "jig-files"
+
+[[tools]]
+id = "square"
+name = "12 in combination square"
+ref = "combination-square-starrett-c11h-12"
+
+[[tools]]
+id = "plate"
+name = "Spoil plate"
+ref = "sheet-spoil-plate"
+description = "Spoil plate 6 x 5 x 1/2 in 6061, made beforehand: a 5 in length sawn off the owned 1/2 x 6 in bar, sawn ends deburred, top as supplied"
+
+[[tools]]
+id = "tape"
+name = "Blue painter's tape"
+ref = "tape-scotchblue-2090"
+description = "ScotchBlue Original Multi-Surface 2090 painter's tape, 1.41 in wide: on the plate and on each piece's underside"
+
+[[tools]]
+id = "glue"
+name = "CA glue, thick"
+ref = "ca-glue-gh1200"
+description = "GH1200 CA super glue, the 1500 cps thick bottle: the bead between the plate's tape and the piece's tape"
+
+[[tools]]
+id = "accelerator"
+name = "CA accelerator"
+ref = "ca-accelerator-starbond"
+description = "Starbond CA glue accelerator spray: misted on the piece's tape so the glue sets at once"
+
+[[tools]]
+id = "em-sixteenth"
+name = "1/16 in carbide downcut end mill"
+ref = "endmill-carbide-3fl-1-16-downcut"
+# Harvey Tool 896262: left-hand spiral, right-hand cut; its helix pushes the
+# taped strip onto the tape.
+axial_direction = "down"
+
+[[tools]]
+id = "em-quarter"
+name = "1/4 in carbide end mill"
+ref = "endmill-carbide-3fl-1-4"
+
+[[tools]]
+id = "drill-30"
 name = "#30 drill"
-ref = "riser-drill-30"  # Drills #30
+ref = "riser-drill-30"
 
 [[tools]]
-id = "pd-latch-hook-former"
-name = "Latch-hook former (R3.13, R.38)"
-ref = "pd-latch-hook-former"  # drawing cross-check 2026-11-19: R3.13 ±.02, R.38 ±.02
+id = "mandrel"
+name = "3/32 drill, its shank the ear's mandrel"
+ref = "drill-3-32"
+
+[[tools]]
+id = "former"
+name = "Latch-hook former (the two die halves)"
+ref = "pd-latch-hook-former"
+description = "The outer and inner die halves HL02_former cuts in Setup 4, stood on 1/2 in parallels against the vise jaws"
+
+[[tools]]
+id = "stone"
+name = "Two-grit sharpening stone (320 face)"
+ref = "sharpening-stone-two-grit"
+
+[[tools]]
+id = "deburr"
+name = "Deburring set"
+ref = "deburring-set"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: mike the sheet and the 1/2 x 6 bar; saw the sheet blank and the die blank"
+machine = "Bench; Evolution miter saw"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/blank.svg", alt = "To scale: the 6 x 6 in sheet with the blank, {{process.blank_width_in:.2dot}} x {{process.blank_length_in:.2dot}} in, marked off one corner and the rest kept for the platen clips; below, the sheet between two wood blocks in the bench vise, the hacksaw on the line; right, the 1/2 x 6 bar with the {{process.die_blank_length_in:.2dot}} in die blank marked off its end." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+instruction = "Mike the sheet 1 in in from two opposite edges, and the 1/2 x 6 bar's thickness 1 in from its end at both edges."
+inspection = "Sheet: both readings {{cad.strip_thickness_min_in:.3dot}}–{{cad.strip_thickness_max_in:.3dot}}, else stop: it is not the .032 sheet. Bar: {{process.die_blank_thickness_min_mm:in.3dot}}–{{process.die_blank_thickness_max_mm:in.3dot}}, else stop: HL02 starts its cut at the thickest."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.strip_thickness_band_mm}}" }, { gauge = "micrometers", band_mm = ["{{process.die_blank_thickness_min_mm}}", "{{process.die_blank_thickness_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+steps = [
+  { kind = "action", text = "With the square and a marker, mark a line {{process.blank_width_in:.2dot}} in in from one edge of the sheet, across it. Lay the sheet between two scrap wood blocks that run past the line, and clamp the stack in the bench vise, the line 1/2 in out past the vise jaws." },
+  { kind = "action", text = "Saw down the line through block, sheet and block, the kerf on the line's waste side; light, full-length strokes. Then mark the {{process.blank_width_in:.2dot}} in strip {{process.blank_length_in:.2dot}} in from one end and saw it off the same way: the blank. Keep the rest of the sheet for the platen clips." },
+]
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "cutoff-saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw a {{process.die_blank_length_in:.2dot}} in length off the 1/2 x 6 bar's end with the miter saw, the bar flat on the saw bed (tape measure): the die blank."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+steps = [
+  { kind = "action", text = "File the saw burr off every sawn edge of the blank, the blank flat on the spoil plate, and off the die blank's two sawn edges." },
+  { kind = "check", text = "The blank lies flat on the plate: no edge rocks or stands up when pressed." },
+  { kind = "stop", text = "An edge stands up: saw a new blank off the sheet the same way and try again." },
+]
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "CNC mill: bond the blank to the spoil plate; cut the hook and the trial strip"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, and at the least stickout the collet's nose passes {{process.sheet_collet_over_jaw_mm:in.2dot}} over them at the cut. The blank bonded to its top: blue tape under its whole face, on the plate and on the blank, and a zigzag CA bead between that runs under the hook and the strip (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); its left end flush with the plate's left end, its back edge against a 1/8 in strip of the tape on the fixed jaw's face."
+datum = "Program HL01_sheet. G54: X0 the plate's left end, Y0 the fixed jaw's bare face, Z0 the plate top, bare right of the tape; +Y toward the fixed jaw. The hook's top bar stands at X {{process.part_left_x_mm:in.3dot}}, its base's end at Y {{process.hook_base_end_y_mm:in.3dot}}. After homing again: check the blank has not moved or lifted on its tape (push test), then check the zeros."
+diagram = { file = "diagrams/sheet.svg", alt = "Plan of the spoil plate in the vise, to scale: the blank on its tape against the fixed jaw, flush with the plate's left end; on it the hook's flat pattern, the ear and base as a bar across the blank at the left with the arm running along the blank toward the right, its full round tip at the right; the trial strip in the L's elbow. The 1/16 in end mill at HL01's first plunge, on the path beside the top bar's edge, the anticlockwise way arrowed. A section across the jaws: the plate on a 1 in parallel at each jaw, the blank on its tape stack." }
+envelope = { x_span_mm = ["{{process.blank_length_mm}}"], y_span_mm = ["{{process.blank_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.tape_stack_max_mm}}", "{{process.strip_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.sheet_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_sixteenth_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_sixteenth_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.blank_area_mm2}}", width_mm = "{{process.blank_width_mm}}" }] } }
+
+[[setups.operations]]
+instruction = "Spoil plate on the 1 in parallels across the jaws, its back edge on the fixed jaw, centred along the jaws; close the vise and tap the plate down onto the parallels."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 X0 the plate's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm). Y: its tip .10 below the jaw top, on the fixed jaw's face from the plate's side (−Y), G10 L20 P1 Y-2.540. X: its tip .10 below the plate top, on the plate's left end from the left, G10 L20 P1 X-2.540. Edge finder out."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mike the blank 1/2 in in from each end and write both readings down in mm (in × 25.4): the stack check below subtracts them."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Clean: degrease the plate top and the blank's underside with isopropyl alcohol on a clean rag; wipe each dry with a fresh rag."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tape"
+drilling = "none"
+sizing = "other"
+steps = [
+  { kind = "action", text = "Tape the plate: two strips of the blue tape along the jaws from the plate's left end (trimmed flush) to 5 in, the first against the fixed jaw, edges butted, never overlapped. Tape the blank's whole underside the same: two strips along its length, butted, trimmed flush with a knife." },
+  { kind = "action", text = "Burnish both tapes down hard with the round back of a screwdriver handle. Knife a 1/8 in strip of the tape and lay it along the fixed jaw's face over the plate's length, its lower edge down on the plate's tape: squeezed-out glue lands on it, not on the jaw." },
+]
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "glue"
+drilling = "none"
+sizing = "other"
+steps = [
+  { kind = "action", text = "Thick CA on the plate's tape in the blank's place, a zigzag bead about 1/16 wide, lines about 3/4 in apart, from 1/16 in off the jaw's strip to 1/4 in inside the blank's front edge and ends. No glue on bare metal." },
+  { kind = "action", text = "Mist the accelerator on the blank's tape, two or three sprays; within about 10 seconds lower the blank, its back edge against the jaw's tape strip and its left end against the square's blade held on the plate's left end. Press it down over its whole face with a flat block for 1 minute, then wait 5 minutes." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Console M6 T1 (1/16 in end mill, {{process.em_sixteenth_projection_min_mm:in.2dot}}–{{process.em_sixteenth_projection_max_mm:in.2dot}} out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the bare plate top right of the tape: G10 L20 P1 Z0.051 (mm: .002 in)."
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Check, stack (spindle stopped): drag the same leaf under the tip on the blank's top 1/2 in in from each end; read Z (mm). Stack = reading − 0.051 (the leaf) − that end's miked thickness. Then push the blank hard along and across with the heel of the hand." },
+  { kind = "check", text = "Each stack {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm, the two within 0.05 mm of each other; no movement, no lifted corner." },
+  { kind = "stop", text = "Out, or it moves: free the blank with a thin blade under the plate's tape, peel all the tape and bond it again from the cleaning step." },
+]
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-sixteenth"
+drilling = "none"
+sizing = "other"
+instruction = "Run HL01_sheet (M6 T1: set 2800, then Cycle Start; about 12 min). It plunges into waste beside the hook's top bar at a quarter feed and cuts the hook round, then the trial strip the same; two levels each, the last {{process.sheet_tip_into_plate_mm:in.3dot}} into the plate. Dry: blow the chips off as it goes, no coolant (the paper tape soaks and lets go)."
+settings = "endmill-carbide-3fl-1-16-downcut-c260"
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "hook", kind = "part", area_mm2 = "{{process.hook_bond_area_mm2}}", width_mm = "{{process.hook_least_width_mm}}" }, { name = "trial strip", kind = "part", area_mm2 = "{{process.trial_bond_area_mm2}}", width_mm = "{{process.trial_width_mm}}" }, { name = "waste", kind = "waste", area_mm2 = "{{process.sheet_waste_bond_area_mm2}}" }] } }
+milling_cuts = [
+  { name = "sheet", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.sheet_cutter_dia_mm}}", axial_doc_mm = "{{process.sheet_level_depth_mm}}", radial_woc_mm = "{{process.sheet_cutter_dia_mm}}", traverse_mm = ["{{process.sheet_from_x_mm}}", "{{process.sheet_to_x_mm}}"] },
+]
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "The cut smokes or smells hot (CA softens with heat): Feed Hold, then Reset (the spindle stops); jog Z up clear and wait until the blank is cool to a finger." },
+]
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: free the hook and the trial strip, deburr, check the flat hook"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The flat hook, to scale, from above as it lay on the plate: the top bar's length and width, the arm's width below the root and past the taper, where the calipers read them; every other station is the program's." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+# The outline's stations, the taper, the root relief and the tip round are
+# held by the program (cam:pd_latch_hook checks the posted path against the
+# drawing's bands); the calipers read the widths that set the forming.
+inspection = [
+  "Flat hook: the top bar {{cad.strip_width_min_in:.2dot}}–{{cad.strip_width_max_in:.2dot}} long (ear and base, across), {{cad.side_edge_width_min_in:.2dot}}–{{cad.side_edge_width_max_in:.2dot}} wide; the arm {{cad.arm_front_width_min_in:.2dot}}–{{cad.arm_front_width_max_in:.2dot}} wide below the root and {{cad.arm_low_front_width_min_in:.2dot}}–{{cad.arm_low_front_width_max_in:.2dot}} past the taper.",
+]
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.strip_width_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.side_edge_width_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.arm_front_width_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.arm_low_front_width_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Peel the tape strip off the fixed jaw; plate out of the vise, on the bench. Waste first: slide a thin blade (single-edge razor or .010 feeler) flat under the plate's tape at the waste's outer edge, work it along and peel the waste off with its tape. Then the hook and the strip the same, the blade worked along their whole length so the tape bends, not the part; never lift the arm by its tip while tape still holds it."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Lay each part tape-up on the plate, hold it flat close to the peel line and peel its tape back on itself, low and slow. Any CA spot: acetone on a rag; tape film: isopropyl alcohol. Peel the plate's tape and wipe the plate."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "stone"
+drilling = "none"
+sizing = "other"
+instruction = "Rub each face of both parts flat on the 320-grit face of the stone to take the cut's burr off. Break the hook's edges, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max: the outside edges with the smooth file, the root relief and the taper's corner with the deburring set's scraper, one light stroke."
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Measure the flat hook with calipers: the setup's inspection line." },
+  { kind = "check", text = "Every width in its band, and both parts lie flat on the plate." },
+  { kind = "stop", text = "A width out: scrap the hook and stop; find the cause (cutter, G54, the blank's seat) before cutting a new blank." },
+]
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "CNC mill: bond the die blank to the spoil plate; cut the former"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Spoil plate on 1 in parallels across the vise jaws as in Setup 2. The die blank bonded to its top on a broad face, on the tape and a zigzag CA bead: its 6 in along the jaws, its left end flush with the plate's left end, its back (sawn) edge {{process.die_blank_back_y_mm:in.3dot}} from the fixed jaw on a line marked on the tape. At the least stickout the collet clears the blank's top at the deepest level."
+datum = "Program HL02_former. G54 as Setup 2: X0 the plate's left end, Y0 the fixed jaw's bare face, Z0 the plate top, bare right of the tape. After homing again: check the blank has not moved (push test), then check the zeros."
+diagram = { file = "diagrams/former.svg", alt = "Plan of the spoil plate in the vise, to scale: the die blank across the plate's length, flush with its left end, its back edge off the fixed jaw; on it the two die halves, the outer toward the fixed jaw and the inner toward the moving jaw, their faces facing across the channel that runs the blank's length, its waste hatched. The 1/4 in end mill at HL02's first slot, past the blank's right end, its way arrowed. A section across the jaws: the plate on the parallels, the blank on its tape." }
+envelope = { x_span_mm = ["{{process.die_blank_width_mm}}", "{{process.die_lead_overhang_mm}}", "{{process.die_lead_overhang_mm}}"], y_span_mm = ["{{process.die_y_span_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.tape_stack_max_mm}}", "{{process.die_blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.die_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_quarter_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_quarter_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.die_blank_width_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "die blank", kind = "part", area_mm2 = "{{process.die_blank_area_mm2}}", width_mm = "{{process.die_blank_length_mm}}" }] } }
+
+[[setups.operations]]
+instruction = "Spoil plate in the vise as in Setup 2 (the parallels, the fixed jaw, centred); G54 X and Y with the edge finder the same way."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tape"
+drilling = "none"
+sizing = "other"
+steps = [
+  { kind = "action", text = "Degrease the plate top and one broad face of the die blank with isopropyl alcohol. Tape the plate's whole top, strips along the jaws, butted; tape the blank's face the same, trimmed flush." },
+  { kind = "action", text = "With the square and a marker, mark on the plate's tape the blank's back edge line {{process.die_blank_back_y_mm:in.3dot}} from the fixed jaw." },
+]
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "glue"
+drilling = "none"
+sizing = "other"
+steps = [
+  { kind = "action", text = "A zigzag CA bead on the plate's tape in the blank's place, 1/4 in inside its edges; mist the accelerator on the blank's tape; within about 10 seconds lower the blank on its line, its left end against the square's blade held on the plate's left end. Press it down for 1 minute." },
+  { kind = "action", text = "Wait 5 minutes, then push the blank hard along and across with the heel of the hand: no movement, no creak." },
+  { kind = "stop", text = "It moves or lies off its line by more than 1/64 in: free it with the blade under the plate's tape, peel, and bond it again." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Console M6 T2 (1/4 in end mill, {{process.em_quarter_projection_min_mm:in.2dot}}–{{process.em_quarter_projection_max_mm:in.2dot}} out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the bare plate top in front of the blank: G10 L20 P1 Z0.051 (mm: .002 in)."
+feed = "hand"
+
+# The channel first, all five levels: a slot along the inner half's face,
+# then a pass along the outer half's face, each run in from past the blank's
+# end; then each half cut round at each level (back edge, ends, face) from a
+# lead-in past the blank's end along its back edge.
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-quarter"
+drilling = "none"
+sizing = "other"
+instruction = "Run HL02_former (M6 T2: set 2800, then Cycle Start; about 25 min). It cuts the channel between the two faces the blank's whole length, five levels down to {{process.die_tip_z_mm:in.3dot}} into the plate, then cuts each half round: its back edge, ends and face. Dry: blow the chips out of the channel as it goes."
+rpm = 2800
+feed = "18.5 in/min"
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.die_blank_width_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "outer die half", kind = "part", area_mm2 = "{{process.outer_die_bond_area_mm2}}", width_mm = "{{process.die_least_width_mm}}" }, { name = "inner die half", kind = "part", area_mm2 = "{{process.inner_die_bond_area_mm2}}", width_mm = "{{process.die_least_width_mm}}" }] } }
+milling_cuts = [
+  { name = "former", kind = "slot", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.die_cutter_dia_mm}}", flutes = 3, rpm = 2800, feed_mm_min = "{{process.former_feed_mm_min}}", axial_doc_mm = "{{process.die_level_depth_mm}}", radial_woc_mm = "{{process.die_cutter_dia_mm}}", traverse_mm = [0, "{{process.former_to_x_mm}}"] },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Bench and vise: free the die halves; press and check the trial strip"
+machine = "Bench; PM-30MV vise, spindle off"
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/trial.svg", alt = "From above, to scale: the two die halves stood on 1/2 in parallels against the vise jaws, faces facing, the trial strip on edge between them, its top end on the square's blade laid across both halves' top ends. Below, the pressed strip with the two caliper readings: across from its top straight's outer face to the tab's far point, and along from its top end to the tip." }
+# The gate (Main 2026-11-27, option 1): the trial strip, from the same sheet,
+# is pressed before the hook.
+inspection = [
+  "Trial strip, pressed: its top straight's outer face to the tab's far point {{process.check_tip_x_min_mm:in.3dot}}–{{process.check_tip_x_max_mm:in.3dot}}; its top end to the tip {{process.check_trial_length_min_mm:in.3dot}}–{{process.check_trial_length_max_mm:in.3dot}}.",
+]
+gauge_checks = [
+  { gauge = "calipers", band_mm = ["{{process.check_tip_x_min_mm}}", "{{process.check_tip_x_max_mm}}"] },
+  { gauge = "calipers", band_mm = ["{{process.check_trial_length_min_mm}}", "{{process.check_trial_length_max_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Plate out of the vise. Free each die half with the blade under the plate's tape as in Setup 3; peel the tape; acetone off any CA. Mark the halves OUT (the one cut nearer the fixed jaw) and IN on their top faces. File the burr off every cut edge except the faces; stone the faces' edges lightly, one stroke."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "former"
+drilling = "none"
+sizing = "other"
+steps = [
+  { kind = "action", text = "Vise open about 4 in. Stand a 1/2 in parallel on the bed against each jaw. Stand OUT on the fixed jaw's parallel and IN on the moving jaw's, back edges on the jaws, faces facing, both top ends (the halves' left ends as cut, where the face's straight run starts) flush: the square's blade laid across both." },
+  { kind = "action", text = "Stand the trial strip on edge between the faces, its top end on the blade, its upper edge flush with the halves' top faces. Close the vise by hand, firmly, until both faces bear on the strip along its whole length; open it and lift the strip out." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Calipers: the fixed jaw flat on the strip's top straight's outer face (the face OUT pressed), the beam square to it, the moving jaw closed on the tab's far point. Then the length: one jaw on the top end, the other on the tip." },
+  { kind = "check", text = "Both readings in the setup's inspection line: go on with the hook." },
+  { kind = "stop", text = "A reading out: stop. Keep the strip and both halves for the owner, who reads the yield the strip implies from the first reading (in these dies the tab's far point stands {{process.relation_tip_x_ylo_mm:in.3dot}} at 290 MPa, {{process.relation_tip_x_yd_mm:in.3dot}} at 324.5, {{process.relation_tip_x_yhi_mm:in.3dot}} at 359; springback goes with yield over thickness), re-posts HL02 there and has a new pair cut from the same bar." },
+]
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Vise, spindle off: bend the ear over the 3/32 drill's shank"
+machine = "PM-30MV vise, spindle off"
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/ear.svg", alt = "End view along the bend line, to scale: the flat hook gripped in the vise, the ear and arm between the jaws, the 3/32 drill's shank between the hook and the moving jaw at the jaw tops, the bend line at the shank's centre; the base standing up above the jaws, its bend over the shank to 91° arrowed. Below, the bent hook against the square." }
+inspection = [
+  "The ear's height {{cad.ear_top_height_min_in:.2dot}}–{{cad.ear_top_height_max_in:.2dot}} over the base's underside; the base {{cad.base_end_length_min_in:.2dot}}–{{cad.base_end_length_max_in:.2dot}} from the ear's outer face; the ear square to the base within 1°: no .011 feeler leaf enters between the square's blade and the ear's outer face at its top.",
+]
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.ear_top_height_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.base_end_length_band_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "mandrel"
+drilling = "none"
+sizing = "other"
+steps = [
+  { kind = "action", text = "With the square and a marker, mark the bend line across the top bar {{cad.ear_bend_flat_centreline_mm:in.3dot}} from its top edge (the arm's rear edge)." },
+  { kind = "action", text = "Grip the hook in the vise, the ear and the arm between the jaws, the base standing up above them; lay the 3/32 drill's shank across the hook against the moving jaw's side, its centre on the bend line at the jaw tops, and close the vise on hook and shank." },
+  { kind = "action", text = "Push the base over the shank toward the moving jaw with a flat block until it stands {{process.ear_press_deg:.0f}}° from the ear (1° past square for the springback); let go, open the vise and take the hook and the shank out." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Measure: the setup's inspection line, the square's stock on the base's underside, its blade against the ear's outer face." },
+  { kind = "check", text = "Each reading in its band and no leaf enters." },
+  { kind = "stop", text = "Under 90°: press the base over a little more and check again. Over 91°: open it a little by hand. Either size out of its band: scrap the hook and stop." },
+]
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "CNC mill: bond the hook's base to the spoil plate; drill the screw holes"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Spoil plate on 1 in parallels across the vise jaws as in Setup 2. The hook's base bonded to its top on the tape and a CA dot, underside down, the ear standing up and the flat arm standing on edge in the air off the ear, toward the moving jaw: the ear's outer face {{process.holes_ear_x_on_plate_mm:in.2dot}} from the plate's left end, the base's side edge {{process.holes_base_from_jaw_mm:in.2dot}} off the fixed jaw, on lines marked on the tape."
+datum = "Program HL03_holes. G54: X0 the ear's outer face, Y0 the base's low edge (the edge the arm leaves from), Z0 the plate top, bare beside the tape; +Y toward the fixed jaw. After homing again: check the hook has not moved, then check the zeros."
+diagram = { file = "diagrams/holes.svg", alt = "From above, to scale: the hook's base bonded on the spoil plate, the ear standing along its right end and the arm running from it toward the moving jaw; the #30 drill in the first screw hole, nearer the ear. Beside it, from the moving jaw's side: the base on its tape, the ear standing up, the drill's point through the base into the plate." }
+envelope = { x_span_mm = ["{{cad.base_end_length_mm}}"], y_span_mm = ["{{cad.side_edge_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.tape_stack_max_mm}}", "{{process.ear_height_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.holes_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_30_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_30_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.base_end_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.holes_plate_from_mm}}", "{{process.holes_plate_to_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "base", kind = "part", area_mm2 = "{{process.holes_bond_area_mm2}}", width_mm = "{{cad.side_edge_width_mm}}" }] } }
+
+[[setups.operations]]
+instruction = "Spoil plate in the vise as in Setup 2; degrease the plate top and the base's underside; tape the plate under the hook's place (one strip) and the base's underside, trimmed flush. Mark on the plate's tape the ear's outer face line {{process.holes_ear_x_on_plate_mm:in.2dot}} from the plate's left end and the base's side edge line {{process.holes_base_from_jaw_mm:in.2dot}} off the fixed jaw."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "glue"
+drilling = "none"
+sizing = "other"
+instruction = "A dot of thick CA under the base's place; mist the accelerator on the base's tape; within about 10 seconds set the base down on its two lines, the ear up, the arm toward the moving jaw. Press the base down for 1 minute; never press on the arm. Wait 5 minutes."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 X0 the ear's outer face, Y0 the base's low edge: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm). X: its tip about .05 above the plate's tape, on the ear's outer face from +X, G10 L20 P1 X2.540. Y: its tip the same height, on the base's low edge from −Y between the ear and the base's end, G10 L20 P1 Y-2.540. Edge finder out."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Console M6 T3 (#30 drill, at least {{process.drill_30_projection_min_mm:in.2dot}} out of the chuck, so the chuck clears the ear). Spindle stopped, its point just dragging a .002 feeler leaf on the bare plate top beside the tape: G10 L20 P1 Z0.051 (mm: .002 in)."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-30"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.screw_holes_dia_band_mm}}" }
+instruction = "Run HL03_holes (M6 T3: set 2800, then Cycle Start; about 1 min): the #30 drills each screw hole through the base in one feed, the near hole first, its point {{process.holes_tip_z_mm:in.3dot}} below the plate top. Dry."
+settings = "pd-drill-30-c260"
+hole_depth_mm = "{{cad.strip_thickness_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "holes", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.drill_30_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = 71.12, stations_mm = ["{{cad.screw_holes_x_near_mm}}", "{{cad.screw_holes_x_far_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Plate out; free the base with the blade under the plate's tape and peel it. Break each hole's edge on both faces with the deburring set's countersink, turned by hand a turn or two: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. Then the #30's shank enters each hole (the #30 is .1285, inside the holes' {{cad.screw_holes_dia_min_in:.3dot}}–{{cad.screw_holes_dia_max_in:.3dot}}; the program holds the stations)."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Vise, spindle off: press the roll and the tab; check the hook; the temper trial"
+machine = "PM-30MV vise, spindle off"
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/form.svg", alt = "From above, to scale: the two die halves on their parallels against the jaws as in Setup 5, the hook's arm on edge between the faces, the ear's lower edge on the square's blade across the halves' top ends and the base standing off past them. Below, the formed hook with its two caliper readings: across from the ear's outer face to the tab's far point, and along from the strip's top end to the tip." }
+inspection = [
+  "The hook, pressed: the ear's outer face to the tab's far point {{process.check_tip_x_min_mm:in.3dot}}–{{process.check_tip_x_max_mm:in.3dot}}; the strip's top end (the ear and base's edge opposite the arm) to the tip {{process.check_overall_min_mm:in.3dot}}–{{process.check_overall_max_mm:in.3dot}}. Within the dies' springback, these two readings hold the drawing's formed values: roll start {{cad.roll_start_min_in:.2dot}}–{{cad.roll_start_max_in:.2dot}}, R{{cad.roll_radius_min_in:.2f}}–{{cad.roll_radius_max_in:.2f}}, R{{cad.tab_radius_min_in:.2dot}}–{{cad.tab_radius_max_in:.2dot}}, the far face {{cad.far_face_x_min_in:.2dot}}–{{cad.far_face_x_max_in:.2dot}} by {{cad.far_face_y_min_in:.2f}}–{{cad.far_face_y_max_in:.2f}}, the tab's end {{cad.tab_end_x_min_in:.2f}}–{{cad.tab_end_x_max_in:.2f}}.",
+]
+gauge_checks = [
+  { gauge = "calipers", band_mm = ["{{process.check_tip_x_min_mm}}", "{{process.check_tip_x_max_mm}}"] },
+  { gauge = "calipers", band_mm = ["{{process.check_overall_min_mm}}", "{{process.check_overall_max_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "former"
+drilling = "none"
+sizing = "other"
+steps = [
+  { kind = "action", text = "The halves on their parallels in the vise as Setup 5 stood them, top ends flush on the square's blade, the parallels' ends flush with the top ends (the base stands past them)." },
+  { kind = "action", text = "Stand the hook's arm on edge between the faces, the ear's outer face on OUT's side, the arm's rear edge flush with the halves' top faces, the outer corner of the ear's lower edge on the blade. Close the vise by hand, firmly, until both faces bear on the arm along its whole length; open it and lift the hook out." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Calipers: the fixed jaw flat on the ear's outer face, the beam square to it, the moving jaw closed on the tab's far point; write the reading down. Then the length: one jaw on the strip's top end, the other on the tip." },
+  { kind = "check", text = "Both readings in the setup's inspection line." },
+  { kind = "stop", text = "A reading out: stop and keep the hook and the halves for the owner." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Temper trial: grip the base flat between two wood blocks in the bench vise, the arm free. Mark the arm's far face (the straight's face that looks away from the ear's side) {{cad.far_face_y_nominal_in:.2f}} below the base's low edge." },
+  { kind = "action", text = "Hold the calipers' depth rod square to the straight at the mark from a block clamped beside it on the far face's side; read it. Set the rod .333 shorter (the worst single release, 8.46 mm). Push the arm at the mark toward the block until the far face meets the rod's end; hold one second; let go." },
+  { kind = "action", text = "Take the hook out and read the ear's face to the tab's far point again, as above." },
+  { kind = "check", text = "The reading is within .002 of the one written down: the arm came back." },
+  { kind = "stop", text = "It moved more: the sheet takes a set. Stop and keep the hook for the owner; buying the H02 strip is the owner's (owner 2026-11-24)." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Bag the hook (FINISH: {{cad.finish}}). Keep the two die halves and the trial strip taped together with this traveler: they are the former."
+feed = "hand"

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" font-family="sans-serif" font-size="14">
+  <!-- Hand picture, to scale at 8 px/mm, in HL03's frame (X0 the ear's outer face, Y0 the base's low edge, +Y toward the fixed jaw). From above: the spoil plate (part of it, to break lines) and its tape, the fixed jaw 20.828 mm from Y0 (holes_fixed_jaw_y_mm), the base 16.764 x 8.128 mm (base_end length, side_edge width) on the tape, the ear standing up along X0 .032 thick, the flat arm on edge in the ear's plane toward the moving jaw (cut short to a break line); the #30 drill, Ø3.2639 mm (drill_30_dia_mm), at the near hole X-5.639 Y4.039 (posted NC). From the moving jaw's side: the plate top, the tape stack 0.28 mm, the base .032, the ear up to 15.494 mm (ear_top), the drill's 118° point 1.005 mm below the plate top (holes_tip_z_mm), the drill drawn 25.4 mm long (drill_30_projection_min_mm) to a break line. -->
+  <rect class="paper" x="0" y="0" width="1000" height="600"/>
+  <text class="title" x="20" y="24">Setup 7: the hook's base on the spoil plate, HL03_holes at the near hole (to scale, 8 px/mm)</text>
+  <rect class="fixture-plate" x="60.0" y="103.38" width="304.0" height="374.62"/>
+  <path class="leader" d="M60.0,478.0 L110.67,472.0 L161.33,478.0 L212.0,472.0 L262.67,478.0 L313.33,472.0 L364.0,478.0"/>
+  <rect class="clamp" x="60.0" y="63.38" width="304.0" height="40.0"/>
+  <text class="label-on-clamp" x="76.0" y="88.38">fixed jaw</text>
+  <rect class="bond" x="140.0" y="186.0" width="176.0" height="276.0"/>
+  <rect class="part-kept" x="165.89" y="204.98" width="134.11" height="65.02"/>
+  <rect class="part-kept" x="293.5" y="204.98" width="6.5" height="257.02"/>
+  <path class="leader" d="M276.0,462.0 L282.67,456.0 L289.33,462.0 L296.0,456.0 L302.67,462.0 L309.33,456.0 L316.0,462.0"/>
+  <circle class="holes" cx="198.89" cy="237.69" r="13.06"/>
+  <circle class="cutter" cx="254.89" cy="237.69" r="13.06"/>
+  <line class="datum" x1="300.0" y1="158.0" x2="300.0" y2="478.0"/>
+  <text class="datum-label" x="304.0" y="158.0">X0: ear's outer face</text>
+  <line class="datum" x1="108.0" y1="270.0" x2="364.0" y2="270.0"/>
+  <text class="datum-label" x="368.0" y="275.0">Y0: base's low edge</text>
+  <text class="label" x="165.89" y="198.98">base (taped)</text>
+  <text class="label" x="198.89" y="288.0" text-anchor="middle">far hole (next)</text>
+  <text class="label" x="60.0" y="508.0">From above; the ear and the flat arm stand on edge</text>
+  <text class="label" x="60.0" y="526.0">along X0, the arm toward the moving jaw</text>
+  <rect class="fixture-plate" x="560.0" y="470.0" width="304.0" height="48.0"/>
+  <path class="leader" d="M560.0,518.0 L610.67,512.0 L661.33,518.0 L712.0,512.0 L762.67,518.0 L813.33,512.0 L864.0,518.0"/>
+  <rect class="bond" x="640.0" y="467.76" width="176.0" height="2.24"/>
+  <rect class="part-kept" x="665.89" y="461.26" width="134.11" height="6.5"/>
+  <rect class="part-kept" x="793.5" y="343.81" width="6.5" height="123.95"/>
+  <path class="cutter" d="M741.83,470.19 L754.89,478.04 L767.94,470.19 L767.94,274.84 L741.83,274.84 Z"/>
+  <path class="leader" d="M734.89,274.84 L741.55,268.84 L748.22,274.84 L754.89,268.84 L761.55,274.84 L768.22,268.84 L774.89,274.84"/>
+  <text class="label" x="560.0" y="464.0">spoil plate</text>
+  <text class="label" x="814.0" y="347.81">ear</text>
+  <text class="label" x="560.0" y="548.0">From the moving jaw's side</text>
+</svg>

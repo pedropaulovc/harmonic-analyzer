@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" font-family="sans-serif" font-size="14">
+  <!-- Hand picture, to scale at 6 px/mm: the hook's flat pattern from HL01_sheet's checked outline (cam:pd_latch_hook context), seen from above as it lay on the plate, and the four caliper readings the setup's inspection line names: the top bar's length (the strip width) and width (the side edge), the arm below the root (arm_front) and past the taper (arm_low_front). Every other station is held by the program. -->
+  <rect class="paper" x="0" y="0" width="900" height="360"/>
+  <text class="title" x="20" y="24">Setup 3: the flat hook, what the calipers read (to scale, 6 px/mm)</text>
+  <path class="part-kept" d="M200.0,90.48 L200.0,274.07 L787.26,274.07 A34.29,34.29 0 0 0 821.55,239.78 A34.29,34.29 0 0 0 787.26,205.49 L424.23,205.49 L363.94,214.63 L260.96,214.63 A12.19,12.19 0 0 1 248.77,202.44 L248.77,90.48 L200.0,90.48 Z"/>
+  <line class="dims" x1="182.0" y1="90.48" x2="182.0" y2="274.07"/>
+  <text class="label" x="176.0" y="187.27" text-anchor="end">top bar's length</text>
+  <line class="dims" x1="200.0" y1="72.48" x2="248.77" y2="72.48"/>
+  <text class="label" x="254.77" y="76.48">top bar's width</text>
+  <line class="dims" x1="309.14" y1="274.07" x2="309.14" y2="214.63"/>
+  <text class="label" x="309.14" y="297.24" text-anchor="middle">arm below the root</text>
+  <line class="dims" x1="597.14" y1="274.07" x2="597.14" y2="205.49"/>
+  <text class="label" x="597.14" y="297.24" text-anchor="middle">arm past the taper</text>
+  <text class="label" x="177.14" y="335.24">Flat, before the ear bend: the setup's inspection line gives each band.</text>
+</svg>
