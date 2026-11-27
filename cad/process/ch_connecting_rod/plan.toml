@@ -583,7 +583,7 @@ inspection = "Each blank {{process.blank_length_in:.2f}}–{{process.blank_lengt
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Mic each blank's thickness at both ends and the middle, and its width at the middle. Mark one wide face D with marking fluid along its length; the other is F. Number the blanks 1–{{process.quantity:d}} in marker on one sawn end face (no cut reaches it); that end is the left end in every setup. Write each blank's width (to .0001) beside its number. Pair them into loads of two whose thickness readings agree within .0005, and keep each load's two in their order."
+instruction = "Mic each blank's thickness at both ends and the middle, and its width at the middle. Mark one wide face D with marking fluid along its length; the other is F. Number the blanks 1–{{process.quantity:d}} in marker on one sawn end face (no cut reaches it); that end is the left end in every setup. Write each blank's width (to .0001) beside its number. Pair them into loads of two whose thickness readings agree within .0005, and keep each load's two together."
 inspection = "Every thickness reading {{process.blank_thickness_min_mm:in.4dot}}–{{process.blank_thickness_max_mm:in.4dot}}: this traveler's incoming-stock gate (the fork, ({{cad.fork_far_face_thickness_in:.3dot}}) REF on the drawing, is skimmed from F to this traveler's {{process.fork_thickness_mm:in.4dot}}). Width 1.9950–2.0020: this traveler's gate, which keeps the support plate (3.940–3.960) narrower than any pair and on the moving parallel under the widest, and the frame beside each ring. Outside either: set the blank aside and tell the owner."
 gauge_checks = [
   { gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] },
@@ -604,7 +604,7 @@ title = "Face F: skim and rough"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Two 1 in parallels on the vise bed, one against each jaw; the support plate on them, its LEFT edge to the left and its milled edge toward the moving jaw. A pair of blanks side by side across the jaws on the plate, each on its D face (F up), numbers to the left. Hold a 1-2-3 block's 2 in face across the two left ends and the plate's left edge and push them flush; then set the jaws' left side {{process.jaw_start_mm:in.2dot}} right of the ends (the calipers' depth rod) and close the vise on the blanks (the plate, narrower than the load, is not gripped), tapping them down onto the plate."
+holding = "Two 1 in parallels on the vise bed, one against each jaw; the support plate on them, its LEFT edge to the left and its milled edge toward the moving jaw. A pair of blanks side by side across the jaws on the plate, each on its D face (F up), numbers to the left, the lower number against the fixed jaw. Hold a 1-2-3 block's 2 in face across the two left ends and the plate's left edge and push them flush; then set the jaws' left side {{process.jaw_start_mm:in.2dot}} right of the ends (the calipers' depth rod) and close the vise on the blanks (the plate, narrower than the load, is not gripped), tapping them down onto the plate."
 datum = "Program CR01_rough_2 (T1, T2). G54: X0 the blanks' left ends, Y0 the fixed jaw's face, Z0 the support plate's top (face D). +X toward the blanks' right ends, +Y toward the fixed jaw."
 diagram = { file = "diagrams/face_f.svg", alt = "From above: the two blanks F up across the jaws, the support plate hidden under them; the 1/2 in end mill, to scale, on its first pass, skimming fork 1 along −X; the ring zones and shank bands it then roughs, hatched. Section across the jaws at the fork: the blanks on the plate, the plate on a 1 in parallel at each jaw, the end mill on the fork's face. The 1-2-3 block that flushed the ends is taken away." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.floor_rough_2_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
@@ -683,7 +683,7 @@ inspection = "Fork {{process.fork_thickness_mm:in.4dot}} ±.001 over D and F: th
 gauge_checks = [{ gauge = "micrometers", band_mm = [6.0706, 6.1214] }]
 
 [[setups.operations]]
-instruction = "Unclamp the load; back to T1, clamp the next pair flush on the plate and repeat this setup from CR01_rough_2: X, Y and Z0 stay."
+instruction = "Unclamp the load and keep its two together; back to T1, clamp the next pair flush on the plate, its lower number against the fixed jaw, and repeat this setup from CR01_rough_2: X, Y and Z0 stay."
 feed = "hand"
 
 [[setups]]
@@ -692,9 +692,9 @@ title = "Face D: rough, reseat, finish"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Take the load's two blanks as left by Setup 2, in their order, and turn them over together as one stack about its length (D up, F on the plate): the blank that was against the fixed jaw now lies against the moving jaw; numbers still at the left ends. Left ends flushed with the 1-2-3 block against the plate's left edge. Tap the blanks down while closing the vise."
+holding = "Take the load's two blanks and turn them over together as one stack about its length (D up, F on the plate): the higher number against the fixed jaw, the lower (against it in Setup 2) against the moving jaw; numbers still at the left ends. Left ends flushed with the 1-2-3 block against the plate's left edge. Tap the blanks down while closing the vise."
 datum = "Programs CR02_rough_1 and CR03_finish_1 (T1, T2). G54: X0 unchanged; Y0 the noted Setup 2 Y shifted by this load's width (op below); Z0 face D, the top of the blank against the fixed jaw (its pair agrees within .0005)."
-diagram = { file = "diagrams/face_d.svg", alt = "From above: the pair D up; the 1/2 in end mill, to scale, on its first row along blank 1's ring zone and shank band, fed along +X. Section across the jaws: the blanks on the plate and parallels, the end mill just under face D." }
+diagram = { file = "diagrams/face_d.svg", alt = "From above: the pair D up, the higher number (2) against the fixed jaw; the 1/2 in end mill, to scale, on its first row along blank 2's ring zone and shank band, fed along +X. Section across the jaws: the blanks on the plate and parallels, the end mill just under face D." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_min_mm}}", "{{process.floor_rough_1_mm}}", -0.508], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.support_height_mm}}", overhang_mm = ["{{process.jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "y", hold = "between", extent_mm = [0, "{{process.blank_pitch_mm}}"], supports_mm = [0, "{{process.blank_pitch_mm}}"], section_mm = { x = "{{process.blank_pitch_mm}}", z = "{{process.web_d_finish_mm}}" } }
@@ -739,7 +739,7 @@ tool = "em-eighth"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T2 (set 2800): the band round each ring to the same rough floor."
-diagram = { file = "diagrams/face_d-band.svg", alt = "From above: the 1/8 in end mill, to scale, at the start of its circle round ring 1's band, D up. Section across the jaws through it: the end mill at the band's rough floor under face D." }
+diagram = { file = "diagrams/face_d-band.svg", alt = "From above: the 1/8 in end mill, to scale, at the start of its circle round ring 2's band (the higher number, against the fixed jaw), D up. Section across the jaws through it: the end mill at the band's rough floor under face D." }
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "band rough 1", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 0.381, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_pitch_mm}}"] },
@@ -787,7 +787,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Unclamp the load; back to T1, turn the next pair over as one stack, D up, clamp it flush, and repeat this setup from the G54 Y op (Y from that load's W; Z0 touched again on the new pair's blank against the fixed jaw)."
+instruction = "Unclamp the load and keep its two together; back to T1, turn the next pair over as one stack, D up, clamp it flush, its higher number against the fixed jaw, and repeat this setup from the G54 Y op (Y from that load's W; Z0 touched again on the new pair's blank against the fixed jaw)."
 feed = "hand"
 
 [[setups]]
@@ -796,7 +796,7 @@ title = "Face F: finish, end, bore"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "As Setup 2: the load's two blanks turned back over together as one stack (F up, D on the plate), so each is back in its Setup 2 place, numbers at the left ends; left ends flushed with the 1-2-3 block against the plate's left edge; the jaws' left side {{process.jaw_start_mm:in.2dot}} right of the ends. Tap the blanks down while closing the vise."
+holding = "As Setup 2: the load's two blanks turned back over together as one stack (F up, D on the plate), so each is back in its Setup 2 place, the lower number against the fixed jaw, numbers at the left ends; left ends flushed with the 1-2-3 block against the plate's left edge; the jaws' left side {{process.jaw_start_mm:in.2dot}} right of the ends. Tap the blanks down while closing the vise."
 datum = "Programs CR04a_end_trim (T1), CR04_finish_2 and CR05_bore (T1, T2). G54: X0 unchanged; Y0 the noted Setup 2 Y, set back before this setup's first load; Z0 the support plate's top (face D): touch it again with T1 before this setup's first load goes in, as in Setup 2."
 diagram = { file = "diagrams/face_f_finish.svg", alt = "From above: the pair F up; the 1/2 in end mill, to scale, on its last end-trim pass, its side on fork 1's crown, fed along +Y. Section through the cutter past the fork ends: its tip just under the plate's top level, in the air." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", -0.25], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
@@ -1098,7 +1098,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Unclamp the load and lift the blanks out, each rod hanging on its tabs in its frame. Back to the collet and T1: touch G54 Z0 on the bare plate's top again as at the start of Setup 4. Clamp the next pair as in Setup 4 and repeat Setups 4 to 6 from CR04a_end_trim."
+instruction = "Unclamp the load and lift the blanks out, each rod hanging on its tabs in its frame. Back to the collet and T1: touch G54 Z0 on the bare plate's top again as at the start of Setup 4. Clamp the next pair as in Setup 4, its lower number against the fixed jaw, and repeat Setups 4 to 6 from CR04a_end_trim."
 feed = "hand"
 
 [[setups]]

@@ -14,7 +14,7 @@
   <rect class="clamp" x="49.2" y="237.56" width="253.88" height="9.6"/>
   <text class="label" x="158" y="61.4" text-anchor="middle">fixed jaw</text>
   <text class="label" x="158" y="260.16" text-anchor="middle">moving jaw</text>
-  <path class="hidden" d="M30 77.03H273.84V235.53H30Z"/>
+  <path class="hidden" d="M30 76.02H273.84V236.54H30Z"/>
   <line class="datum" x1="30" y1="55.8" x2="30" y2="253.56"/>
   <text class="datum-label" x="28" y="266.56" text-anchor="middle">X0</text>
   <text class="label" x="16" y="119.64" text-anchor="middle">1</text>

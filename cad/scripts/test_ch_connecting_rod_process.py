@@ -12,6 +12,7 @@ them, and seeded faults show each check catches what it guards.
 from __future__ import annotations
 
 import copy
+import re
 import tomllib
 from pathlib import Path
 
@@ -270,6 +271,117 @@ def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> Non
     features["features"]["shank_right_flank"]["corner_r"] = [0.889, 1.016]
     with pytest.raises(ValueError, match="outside the shank corners' limits"):
         RECIPE.context(features, PLAN, SHOP, "rod.step")
+
+
+_PLATE_OUTLINE = re.compile(
+    r'<path class="hidden" d="M([\d.]+) ([\d.]+)H([\d.]+)V([\d.]+)H\1Z"/>'
+)
+_TOP_SCALE = re.compile(r"(?:both views|from above) at ([\d.]+) px/mm")
+_BLANK = re.compile(
+    r'<rect class="part-rest" x="([\d.]+)" y="([\d.]+)" width="[\d.]+" '
+    r'height="([\d.]+)"/>'
+)
+
+
+@pytest.mark.parametrize(
+    "picture",
+    [
+        "face_f",
+        "face_f-band",
+        "face_d",
+        "face_d-band",
+        "face_f_finish",
+        "face_f_finish-band",
+        "outline",
+        "fork",
+    ],
+)
+def test_the_top_views_draw_the_support_plate_at_its_size(picture) -> None:
+    """#3729: each top view's hidden support plate is the plate's milled
+    width across the jaws and its length along X, at the scale the picture
+    states, centred across the load of two blanks."""
+    p = PLAN["parameters"]
+    svg = (
+        _process_plans.plan_path(STEM).parent / "diagrams" / f"{picture}.svg"
+    ).read_text(encoding="utf-8")
+    scale = float(_TOP_SCALE.search(svg).group(1))
+    (outline,) = _PLATE_OUTLINE.findall(svg)
+    x0, y0, x1, y1 = map(float, outline)
+    assert x1 - x0 == pytest.approx(p["support_plate_length_mm"] * scale, abs=0.01)
+    assert y1 - y0 == pytest.approx(p["support_plate_width_mm"] * scale, abs=0.01)
+    # The top view's two blanks start at X0, the plate's left edge.
+    blanks = [
+        (float(y), float(y) + float(h))
+        for x, y, h in _BLANK.findall(svg)
+        if float(x) == x0
+    ]
+    assert len(blanks) == 2
+    load_middle = (min(b[0] for b in blanks) + max(b[1] for b in blanks)) / 2
+    assert (y0 + y1) / 2 == pytest.approx(load_middle, abs=0.05)
+
+
+def test_each_setup_places_the_pair_by_blank_number() -> None:
+    """#3728: loads are paired by thickness and all wait between Setups 2
+    and 3, so each holding names which number goes against the fixed jaw:
+    the lower in Setups 2 and 4, the higher in Setup 3 (the pair turned over
+    as one stack). Each setup's step that clamps the next pair repeats it,
+    and Setups 2 and 3 keep the unclamped load's two together."""
+    face_f, face_d, finish_f = PLAN["setups"][1:4]
+    outline = PLAN["setups"][5]
+    assert "the lower number against the fixed jaw" in face_f["holding"]
+    assert "the higher number against the fixed jaw" in face_d["holding"]
+    assert "the lower number against the fixed jaw" in finish_f["holding"]
+
+    def unclamp(setup: dict) -> str:
+        (step,) = [
+            op["instruction"]
+            for op in setup["operations"]
+            if op["instruction"].startswith("Unclamp the load")
+        ]
+        return step
+
+    for setup, number in ((face_f, "lower"), (face_d, "higher")):
+        assert "keep its two together" in unclamp(setup)
+        assert f"{number} number against the fixed jaw" in unclamp(setup)
+    assert (
+        "Clamp the next pair as in Setup 4, its lower number against the fixed jaw"
+        in unclamp(outline)
+    )
+
+
+_NUMBER_LABEL = re.compile(
+    r'<text class="label" x="[\d.]+" y="([\d.]+)" text-anchor="middle">([12])</text>'
+)
+_FIXED_JAW = re.compile(
+    r'<text class="[\w-]+" x="[\d.]+" y="([\d.]+)" text-anchor="middle">fixed jaw</text>'
+)
+
+
+@pytest.mark.parametrize(
+    ("picture", "at_fixed_jaw"),
+    [
+        ("face_f", "1"),
+        ("face_f-band", "1"),
+        ("face_d", "2"),
+        ("face_d-band", "2"),
+        ("face_f_finish", "1"),
+        ("face_f_finish-band", "1"),
+        ("fork", "1"),
+        ("outline", "1"),
+    ],
+)
+def test_the_top_views_label_the_pair_by_its_numbers(picture, at_fixed_jaw) -> None:
+    """#3728: a top view's 1 and 2 are the pair's lower and higher numbers,
+    so the label at the fixed jaw is 1 in Setups 2 and 4-6 and 2 in Setup 3
+    (the pair turned over as one stack)."""
+    svg = (
+        _process_plans.plan_path(STEM).parent / "diagrams" / f"{picture}.svg"
+    ).read_text(encoding="utf-8")
+    fixed_y = float(_FIXED_JAW.search(svg).group(1))
+    labels = {text: float(y) for y, text in _NUMBER_LABEL.findall(svg)}
+    assert set(labels) == {"1", "2"}
+    nearer = min(labels, key=lambda text: abs(labels[text] - fixed_y))
+    assert nearer == at_fixed_jaw
 
 
 @pytest.mark.parametrize(
