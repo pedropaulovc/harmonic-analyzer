@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
   <!-- As Setup 5's picture (from the front, +X right, +Y into the page). The V drill, cutter_dia_mm 9.5758 = 52.7 px, 118 deg point, at X -44.45 (NC: PA04 T4) at the bottom of its one plunge: full diameter bore_drill_past_mm 1.0 below the stacks' top, point Z -3.877 (bore_tip_height_mm), between the stacks (the front stack an outline). Drawn short to a break. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Op 310, V drill (PA04 T4), 5.5 px/mm: the bore down through the strap</text>
+  <text class="title" x="20" y="22">Op 300, V drill (PA04 T4), 5.5 px/mm: the bore down through the strap</text>
   <rect class="fixture-support" x="64.98" y="300" width="351.52" height="6"/>
   <rect class="hidden" x="30" y="244.89" width="410" height="95"/>
   <line class="hidden" x1="64.98" y1="306" x2="64.98" y2="340"/>

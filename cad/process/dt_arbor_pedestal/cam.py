@@ -48,7 +48,9 @@ Work frames (G54), each set in its setup:
 
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, real G0 above the stock; the
-step's passes and the outline climb (ball screws). The apex hole is tapped
+outline climbs (ball screws). The step's passes cut conventional (#3691: the
+owner's 2026-11-25 ruling on #3590, no program climbs before a measured
+climb test; the step's setting was measured conventional). The apex hole is tapped
 by hand (FluidNC cannot rigid-tap; owner, Pedro, 2026-11-17), the T-handle
 wrench's centre hole on the spring point of the Fisher tap guide in the
 1/2 in R8 collet (owner, Pedro, 2026-11-21: "use
@@ -345,10 +347,10 @@ def _step(
     levels: list[float], top: float, xs: list[float], y: tuple[float, float]
 ) -> list[str]:
     """The step, level by level: at each, one pass per station in ``xs``
-    (from the open end toward the foot), every pass along +Y from ``y[0]``
-    to ``y[1]``: the uncut stock on the cutter's +X side, on the right of
-    travel, climb with the clockwise (M3) spindle. Each pass plunges beside
-    the part and lifts above the stock top before the next."""
+    (from the open end toward the foot), every pass along -Y from ``y[0]``
+    to ``y[1]``: the uncut stock on the cutter's +X side, on the left of
+    travel, conventional with the clockwise (M3) spindle. Each pass plunges
+    beside the part and lifts above the stock top before the next."""
     safe, clear = _r(top + SAFE_MM), _r(top + CLEAR_MM)
     lines = [f"G0 Z{clear:.3f}"]
     for z in levels:
@@ -991,9 +993,9 @@ def context(
     outline_job["ops"].append(
         ["outline", "profile the flanks and the crown", outline_lines]
     )
-    # Along +Y, from beside the moving jaw (E) to beside the fixed jaw (W):
+    # Along -Y, from beside the fixed jaw (W) to beside the moving jaw (E):
     # both plunges stand over a jaw, above its top (the step's floor is).
-    step_y = (-width - r - APPROACH_MM, r + APPROACH_MM)
+    step_y = (r + APPROACH_MM, -width - r - APPROACH_MM)
     jobs.append(
         {
             **em_tool,
@@ -1281,7 +1283,8 @@ def context(
                             "final": _r(final_x),
                             "raw": _r(raw_x),
                             "max_step": station,
-                            "direction": 1.0,
+                            "direction": -1.0,
+                            "cut": "conventional",
                             "span": width,
                             "below_z": height,
                             "max_stepdown": step_level,

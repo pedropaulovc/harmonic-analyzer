@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
-  <!-- 5.5 px/mm. From the front (looking at the moving jaw): +X right, +Y into the page. X0 the seat (right), the part to -X. The moving jaw (in front) and the stacks drawn as outlines. The 1/2 in end mill (69.85 px, 12 % end arc) on PA04's first level Z 26.924, on its first pass X -62.149 (its edge 2.1 mm into the part's left end), running +Y from E toward W, climb, into the page (NC line 25); drawn short to a break. Every pass runs Y -32.766 to +8.89, out over the fixed jaw: at the floor, Z 11.684, the cutter's end is 1.66 mm above the jaw tops (step_grip_mm 10.020). -->
+  <!-- 5.5 px/mm. From the front (looking at the moving jaw): +X right, +Y into the page. X0 the seat (right), the part to -X. The moving jaw (in front) and the stacks drawn as outlines. The 1/2 in end mill (69.85 px, 12 % end arc) on PA04's first level Z 26.924, on its first pass X -62.149 (its edge 2.1 mm into the part's left end), running -Y from W toward E, conventional, out of the page (NC line 25); drawn short to a break. Every pass runs Y +8.89 to -32.766, from over the fixed jaw: at the floor, Z 11.684, the cutter's end is 1.66 mm above the jaw tops (step_grip_mm 10.020). -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="22">Setup 5 (PA04_step_bore), 5.5 px/mm: the step down to the strap, first pass</text>
   <rect class="fixture-support" x="64.98" y="300" width="351.52" height="6"/>
@@ -21,7 +21,7 @@
   <rect class="hidden" x="359" y="174.27" width="41" height="25.15"/>
   <path class="cutter" d="M93.11 143.54L93.11 64L85.34 61L77.58 64L69.82 61L62.06 64L54.3 61L46.54 64L38.78 61L31.02 64L23.26 64L23.26 143.54A34.92 8.38 0 0 0 93.11 143.54Z"/>
   <text class="label" x="150" y="70">1/2 in end mill, level 1 (Z 26.924 mm), first pass at the left end:</text>
-  <text class="label" x="150" y="86">+Y, into the page (from E toward W, climb); levels of {{process.step_level_mm:in.3dot}},</text>
+  <text class="label" x="150" y="86">−Y, out of the page (from W toward E, conventional); levels of {{process.step_level_mm:in.3dot}},</text>
   <text class="label" x="150" y="102">passes {{process.step_station_mm:in.3dot}} apart toward the seat, the last with its edge on the foot top</text>
   <line class="leader" x1="146" y1="80" x2="94" y2="110"/>
   <circle class="leader-dot" cx="94" cy="110" r="2"/>

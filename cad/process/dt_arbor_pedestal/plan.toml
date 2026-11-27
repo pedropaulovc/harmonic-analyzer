@@ -124,10 +124,10 @@ face_cutter_dia_mm = 12.7
 face_stepover_max_mm = 6.35
 far_face_stepover_max_mm = 5.08
 # The step (PA04): equal levels from the near end down to the strap's outer
-# face (7 × .100), each a row of passes across the width along +Y, E toward
-# W (climb: the uncut stock on the right of travel with M3; the owner's
-# 2026-11-16 ruling, ball screws: the report measured conventional passes
-# only), at equal stations no further apart than step_station_max_mm from
+# face (7 × .100), each a row of passes across the width along -Y, W toward
+# E (conventional: the uncut stock on the left of travel with M3, the
+# direction the setting below was measured in; #3691, the owner's 2026-11-25
+# ruling on #3590: no climb before a measured climb test), at equal stations no further apart than step_station_max_mm from
 # beside the open end to the foot top's station (the cutter's edge on the
 # foot top). At the measured setting em-half-carbide-1018-v6-deep (stable
 # to 6.6 mm deep and 2.2 mm wide): its .100 levels at 2.2 mm stations run
@@ -521,7 +521,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 7/8 in + 1/2 in stacks against each jaw (1/8 in thick: the bore falls between them). The part lying along the jaws, N UP, F down on both stacks; gripped on W (against the FIXED jaw) and E; the seat to the RIGHT; centred on the jaws. The jaws grip only the lower {{process.step_grip_mm:in.3dot}} (a third of the part's height): the strap and the far face's stock. The step's floor stands {{process.step_floor_mm:in.3dot}} above the stacks, above the jaw tops; tap the part down onto both stacks and close the vise firmly."
 datum = "Program PA04_step_bore. G54: X0 the seat (the part's RIGHT end), the part to −X; Y0 the fixed jaw's face (W), +Y toward it; Z0 the stacks' top (F). The foot top at X −{{cad.foot_top_height_mm:.3f}}; the bore at X −{{cad.arbor_bore_height_mm:.3f}}, Y −{{cad.arbor_bore_lateral_mm:.3f}} mm. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
-diagram = { file = "diagrams/step.svg", alt = "From the front, 5.5 px/mm: the part lying on the 7/8 + 1/2 in stacks, N up, the seat to the right, the moving jaw in front as an outline; the 1/2 in end mill, to scale, on its first level and first pass at the left end, running +Y into the page from E toward W (climb); the step comes down in levels to the strap, the passes stepping toward the seat, the last with its edge on the foot top. The bore's centre line; the V drill is its own picture." }
+diagram = { file = "diagrams/step.svg", alt = "From the front, 5.5 px/mm: the part lying on the 7/8 + 1/2 in stacks, N up, the seat to the right, the moving jaw in front as an outline; the 1/2 in end mill, to scale, on its first level and first pass at the left end, running −Y out of the page from W toward E (conventional); the step comes down in levels to the strap, the passes stepping toward the seat, the last with its edge on the foot top. The bore's centre line; the V drill is its own picture." }
 envelope = { x_span_mm = ["{{process.upright_top_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.east_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.step_riser_height_mm}}", "{{process.depth_top_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.step_riser_height_mm}}", "{{process.bore_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_v_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.east_side_width_mm}}", along_jaws_mm = "{{process.upright_top_max_mm}}", part_height_mm = "{{process.depth_top_mm}}", parallel_height_mm = "{{process.step_riser_height_mm}}", overhang_mm = ["{{process.vise_step_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.upright_top_max_mm}}"], clamp_mm = [0, "{{process.upright_top_max_mm}}"], section_mm = { y = "{{cad.east_side_width_mm}}", z = "{{process.step_floor_mm}}" }, vise_left = "end" }
@@ -545,23 +545,12 @@ instruction = "First blank only: prove PA04_step_bore in air, Z0 raised {{proces
 instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + {{process.step_prove_raise_mm:.3f}}) raises Z0 {{process.step_prove_raise_mm:in.3dot}} in: the drill's point then stands above N. Run PA04_step_bore through every M6, watching each move cut only air and each pass cross above the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
-# The step's depth and width lie inside em-half-carbide-1018-v6-deep, but
-# cad/config/shop-equipment/measured-cuts.toml records its direction as
-# conventional (every measured pass), and the owner's 2026-11-16 ruling
-# (cam.py: ball screws) keeps the step's passes climb: the first part is
-# listened to.
-[[setups.operations]]
-steps = [
-  { kind = "stop", text = "First part only: the step passes at 2400 rpm are inside the depth and width the owner chatter-tested on this end mill, but they cut climb, which was not tested: {{process.step_level_mm:in.3dot}} deep x {{process.step_station_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner." },
-]
-feed = "hand"
-
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA04_step_bore (M6 T1; set 2400): the step down to Z {{process.step_floor_mm:in.4dot}} in {{process.step_level_mm:in.3dot}} levels, each in passes across the width, every pass from E toward W (climb), the passes {{process.step_station_mm:in.3dot}} apart from the left end toward the seat, the last with the cutter's edge on the foot top. The step cuts the waste above the foot top away: the hold-down hole opens. At the M6 T2 stop look: the floor flat, the foot top a clean wall."
+instruction = "Run PA04_step_bore (M6 T1; set 2400): the step down to Z {{process.step_floor_mm:in.4dot}} in {{process.step_level_mm:in.3dot}} levels, each in passes across the width, every pass from W toward E (conventional), the passes {{process.step_station_mm:in.3dot}} apart from the left end toward the seat, the last with the cutter's edge on the foot top. The step cuts the waste above the foot top away: the hold-down hole opens. At the M6 T2 stop look: the floor flat, the foot top a clean wall."
 settings = "em-half-carbide-1018-v6-deep"
 milling_cuts = [
   { name = "step", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.step_level_mm}}", radial_woc_mm = "{{process.step_station_mm}}", traverse_mm = ["{{cad.foot_top_height_mm}}", "{{process.upright_top_max_mm}}"] },
