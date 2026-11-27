@@ -798,7 +798,9 @@ def test_detail_b_frames_the_head_seat_inside_the_sheet() -> None:
     x, y = drawing.DETAIL_B_CENTER
     crop = drawing.DETAIL_B_CROP_RADIUS
     assert 0.0127 < x - crop and x + crop < 0.4191 and 0.0127 < y - crop
-    # Clear of the title block and of detail A.
+    # Clear of the bottom inner border (two-line label ~13 mm tall from top),
+    # the title block, and detail A.
+    assert drawing.DETAIL_B_LABEL_XY[1] - 0.014 > 0.0127
     assert x + crop < 0.218 or y - crop > 0.065
     ax, ay = drawing.DETAIL_CENTER
     assert math.hypot(x - ax, y - ay) > crop + drawing.DETAIL_CROP_RADIUS

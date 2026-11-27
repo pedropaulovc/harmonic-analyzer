@@ -336,8 +336,8 @@ DETAIL_B_FOCUS_MM = (
     (_ROUND_ON_SHOULDER[0] + _BREAK_ON_OD[0]) / 2.0,
     (_ROUND_ON_SHOULDER[1] + _BREAK_ON_OD[1]) / 2.0,
 )
-DETAIL_B_RADIUS_MM = 1.0
-_DETAIL_B_MARGIN_MM = 0.2
+DETAIL_B_RADIUS_MM = 0.90
+_DETAIL_B_MARGIN_MM = 0.15
 if (
     any(
         math.dist(DETAIL_B_FOCUS_MM, point) > DETAIL_B_RADIUS_MM - _DETAIL_B_MARGIN_MM
@@ -350,12 +350,13 @@ if (
         "and stay above the axis"
     )
 # Bottom middle, right of detail A and left of the title block: the circle
-# spans x 0.152..0.192, y 0.026..0.066, under the overall's row.
-DETAIL_B_CENTER = (0.172, 0.046)
+# spans x 0.154..0.190, y 0.038..0.074, under the overall's row, with its
+# two-line label at y 0.034 wholly inside the 0.0127 inner border.
+DETAIL_B_CENTER = (0.172, 0.056)
 DETAIL_B_CROP_RADIUS = DETAIL_B_RADIUS_MM * _DBS
 DETAIL_B_LABEL_XY = (
     DETAIL_B_CENTER[0],
-    DETAIL_B_CENTER[1] - DETAIL_B_CROP_RADIUS - 0.005,
+    DETAIL_B_CENTER[1] - DETAIL_B_CROP_RADIUS - 0.004,
 )
 # The circle's letter on the side view stands up-left of the under-head
 # corner, left of the head and right of the finish symbol's leader.
@@ -371,19 +372,19 @@ def _detail_b_xy(model_z_mm: float, radius_mm: float) -> tuple[float, float]:
 
 
 # The break's horizontal leg prints its .021 nominal, then its three callout
-# rows, with the dimension line under the last row (as the lead's): the line
-# 4 mm over the circle's top (5 mm above the title block), the block right of
-# both extension lines so the line runs to the arrows over open sheet and tops
-# out well below OverallLength's row.  The radius's block stands up-left of the
+# rows, with the dimension line under the last row: the line sits just above
+# the circle's top (6 mm over _BREAK_ON_OD) and the block stands right of both
+# extension lines so the line runs to the arrows over open sheet and tops out
+# clear below OverallLength's row.  The radius's block stands up-left of the
 # circle, on the round's centre side, where its leader reaches the arc through
 # air above the shoulder (its arc extension drawn).
 HEAD_CHAMFER_TEXT_WIDTH = 0.041
 DETAIL_B_KEEP = {
     "HeadChamfer": (
         _detail_b_xy(*_BREAK_ON_OD)[0] + 0.004 + HEAD_CHAMFER_TEXT_WIDTH / 2.0,
-        DETAIL_B_CENTER[1] + DETAIL_B_CROP_RADIUS + 0.004 + RELIEF_LEAD_LINE_DROP,
+        DETAIL_B_CENTER[1] + DETAIL_B_CROP_RADIUS + 0.0115,
     ),
-    "UnderHeadRadius": (0.135, 0.073),
+    "UnderHeadRadius": (0.135, 0.077),
 }
 # The running shoulder's upper flank, right of the Ø dimension line and its
 # callout block (farm r1 of eb22a22f1: at x - 0.050 the leader ran through

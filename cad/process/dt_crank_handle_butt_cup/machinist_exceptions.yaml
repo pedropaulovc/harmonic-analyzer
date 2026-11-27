@@ -1,6 +1,0 @@
-machinist_exceptions:
-  - id: TV-001
-    where: "Header note; Setup 2, the pocket plunged with the 1/4 end mill and pinned (C on the tag); Bench, the oil-and-tag op"
-    finding: "Drawing note 1 reads BORE TO THE MEASURED HEAD; the traveler makes the pocket first with a fixed 1/4 end mill and leaves the MHA-DT-32 head to be turned to the pocket's reading"
-    reason: "Owner ruling 2026-11-23 (tool audit Q6): 'B. End-mill the pocket with the owned 1/4 carbide end mill and turn the MHA-DT-32 head to it (pocket less .012 +/-.004); no boring bar.' The note's fit, clearance .008-.016, is kept by the MHA-DT-32 traveler, which turns the head to C - .012 within C - .015 to C - .009."
-    kind: accept

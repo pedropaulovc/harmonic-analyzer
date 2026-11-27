@@ -262,10 +262,10 @@ speed_kind = "spindle"
 tool = "end-mill"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle stopped, the end mill backed out: read the floor's depth with the calipers' depth rod beside the #20 hole. Spindle on: feed the end mill in by the difference to {{cad.pocket_depth_in:.3dot}} on the quill scale, back it out and read again; repeat until it reads {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}}."
+instruction = "Spindle stopped, the end mill backed out: read the floor's depth with the calipers' depth rod beside the #20 hole. Spindle on: feed the end mill in by the difference to {{cad.pocket_depth_in:.3dot}} on the quill scale, back it out and read again; repeat until it reads {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}}, and write that floor depth on this sheet as D."
 settings = "lathe-endmill-1-4-plunge-1018"
 cut_diameter_mm = 6.35
-inspection = "Pocket depth {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} to a flat floor (calipers' depth rod beside the #20 hole); short: feed on; deep: scrap."
+inspection = "Pocket depth D in {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} to a flat floor (calipers' depth rod beside the #20 hole), written on this sheet; short: feed on; deep: scrap."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pocket_depth_band_mm}}" }]
 
 [[setups.operations]]
@@ -274,15 +274,15 @@ speed_kind = "spindle"
 tool = "bore-em"
 drilling = "none"
 sizing = "other"
-instruction = "Clamp the 3/16 carbide square end mill on its shank in the AXA No. 2 V-groove boring holder on center height, parallel to the spindle axis, projecting about .40. Touch its end on the faced end to verify DRO Z0, then bring its cutting flute lightly against the .250 plunged pocket wall and zero the cross-slide. Bore the pocket wall out .0125 a side to Ø{{cad.pocket_ref_in:.3dot}} (.270–{{cad.pocket_dia_max_in:.3dot}}) in three light passes (.005, .005 and .0025 radial on the cross-slide) to Z-{{cad.pocket_depth_in:.3dot}}, kissing the flat floor cleanly; the square end-mill corner leaves the floor corner well inside R{{cad.pocket_corner_r_max_in:.3dot}} max."
+instruction = "Clamp the 3/16 carbide square end mill on its shank in the AXA No. 2 V-groove boring holder on center height, parallel to the spindle axis, projecting about .40. Spindle stopped: bring its end lightly onto Op 90's flat floor over a cigarette paper (~.001) and set DRO Z there to -D + .001 (so Z-D sits on the floor), then bring its cutting flute lightly against the .250 plunged pocket wall and zero the cross-slide. Spindle on: bore the pocket wall out .0125 a side to Ø{{cad.pocket_ref_in:.3dot}} (.270–{{cad.pocket_dia_max_in:.3dot}}) in three light passes (.005, .005 and .0025 radial on the cross-slide) to Z-D, matching Op 90's floor without leaving a ledge or deepening it; the square end-mill corner leaves the floor corner well inside R{{cad.pocket_corner_r_max_in:.3dot}} max."
 settings = "dt-lathe-bore-em-3-16-1018"
 cut_diameter_mm = "{{cad.pocket_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped, the pocket blown clean: try the .270 GO pin and the {{cad.pocket_dia_max_in:.3dot}} NO-GO pin of the set in the pocket by hand, clean and dry, no force."
-inspection = "Pocket Ø.270–{{cad.pocket_dia_max_in:.3dot}}: the .270 pin enters and the {{cad.pocket_dia_max_in:.3dot}} pin does not. Tight (.270 refuses): take a spring pass or .001 radial skim as Op 100 and recheck; {{cad.pocket_dia_max_in:.3dot}} enters: scrap."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.858, 7.112] }]
+instruction = "Spindle stopped, the pocket blown clean: try the .270 GO pin and the {{cad.pocket_dia_max_in:.3dot}} NO-GO pin of the set to the bottom of the pocket by hand, clean and dry, no force, and re-check the floor depth at the bored rim with the calipers' depth rod."
+inspection = "Pocket Ø.270–{{cad.pocket_dia_max_in:.3dot}}, depth {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} flat across the floor: the .270 pin bottoms cleanly and the {{cad.pocket_dia_max_in:.3dot}} pin does not enter. Tight (.270 refuses): take a spring pass or .001 radial skim to Z-D as Op 100 and recheck; {{cad.pocket_dia_max_in:.3dot}} enters or depth over {{cad.pocket_depth_max_in:.3dot}}: scrap."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.858, 7.112] }, { gauge = "calipers", band_mm = "{{cad.pocket_depth_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
