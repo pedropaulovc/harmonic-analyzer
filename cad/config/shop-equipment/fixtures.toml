@@ -528,3 +528,13 @@ status = "to_order"
 purchase = "McMaster-Carr 91251A344 (#10-32 x 5/8, head Ø5/16 x .19 high) and the 4-40 x 5/8 row of the same black-oxide alloy steel socket head screws (part number not read); one pack each, price not read."
 note = "Not owned: to buy. MHA-PD-18 transgear arm, Setup 3 (pd_transgear_arm/plan.toml): hold the arm on its 1/2 in 6061 sub-plate through the pivot bore (head on the spot face's floor) and the pin bore while AR05_outline cuts it free."
 cite = ["McMaster-Carr socket head screws, 10-32 thread, 91251A344 (read 2026-11-22): https://www.mcmaster.com/products/socket-head-cap-screws/thread-size~10-32/", "McMaster-Carr socket head screws, black-oxide alloy steel, UNRC (read 2026-11-22): https://www.mcmaster.com/products/socket-head-screws/thread-type~unrc/"]
+
+# --- MHA-DT-24 pinion return leaf spring (cad/process/dt_pinion_spring/plan.toml)
+[fixtures.dt-pinion-spring-drill-cover]
+name = "MHA-DT-24 drill cover: a 1 in length of the 1/2 x 3/4 in 6061 bar"
+kind = "fixture"
+status = "to_make"
+supply = "shop_made"
+purchase = "Saw a 1 in length off the owned 1/2 x 3/4 in 6061-T6511 bar (stock.6061-flat-1-2x3-4, OnlineMetals 1164, no allocation recorded) with the junior hacksaw and file the sawn ends' burrs off. Nothing else: its faces stay as supplied."
+note = "Not made: shop-made from owned stock. Bonded on its 1/2 in face over the MHA-DT-24 strip piece with consumables.hold-painters-tape-ca, so the #30 drill enters aluminium and leaves the .015 strip backed on both faces: the tool audit's (2026-11-23, row drill-30-cobalt) strip clamped between two scrap plates, with no breakthrough grab and no lobing; the spoil plate is the lower plate. Miked across its 3/4 in height before use (the traveler's gate)."
+pieces = 1

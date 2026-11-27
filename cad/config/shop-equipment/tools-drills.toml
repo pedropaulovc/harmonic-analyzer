@@ -276,6 +276,11 @@ kind = "drill"
 status = "on_hand"
 note = "The 27/64 of the owned 115-piece index (1/16-1/2 by 64ths, as the 13/32 and 7/16 above); its shank is the winding mandrel of MHA-DT-27 dt-crank-pin-ring (cad/process/dt_crank_pin_ring/plan.toml), never cut with."
 
+[tools.drill-2]
+kind = "drill"
+status = "on_hand"
+note = "The #2 (.221 in) of the owned 115-piece index (numbered #1-#60, as the #30 of tools.riser-drill-30); its plain shank is the bending mandrel of MHA-DT-24 dt-pinion-spring, both bends (cad/process/dt_pinion_spring/plan.toml), never cut with."
+
 [tools.drill-15-32]
 kind = "drill"
 status = "on_hand"

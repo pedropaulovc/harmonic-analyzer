@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 600" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="600"/>
+  <text class="title" x="20.00" y="22.00">Setup 4: the kink, tip end down, bent over the #2 drill's shank (end view along the shank, to scale, 8 px/mm)</text>
+  <text class="title" x="20.00" y="40.00">The bench vise's jaws are schematic (no record).</text>
+  <rect class="clamp" x="218.00" y="420.00" width="112.00" height="144.00"/>
+  <rect class="clamp" x="377.96" y="420.00" width="112.00" height="144.00"/>
+  <text class="label-on-clamp" x="222.00" y="556.00">fixed jaw</text>
+  <text class="label-on-clamp" x="381.96" y="556.00">moving jaw</text>
+  <path class="part-kept" d="M333.05 448.22 L333.05 431.96 L333.05 431.49 L333.07 431.03 L333.09 430.56 L333.13 430.10 L333.17 429.63 L333.22 429.17 L333.29 428.70 L333.36 428.24 L333.44 427.78 L333.53 427.33 L333.63 426.87 L333.74 426.42 L333.86 425.97 L333.99 425.52 L334.13 425.07 L334.28 424.63 L334.44 424.19 L334.60 423.75 L334.78 423.32 L334.96 422.89 L335.15 422.47 L335.36 422.05 L335.57 421.63 L335.78 421.22 L522.54 78.46 L519.87 77.00 L333.11 419.76 L332.86 420.23 L332.62 420.70 L332.39 421.18 L332.17 421.66 L331.96 422.15 L331.76 422.64 L331.58 423.13 L331.40 423.63 L331.23 424.14 L331.07 424.64 L330.93 425.15 L330.79 425.66 L330.66 426.18 L330.55 426.70 L330.45 427.22 L330.35 427.74 L330.27 428.26 L330.20 428.79 L330.14 429.31 L330.09 429.84 L330.05 430.37 L330.02 430.90 L330.01 431.43 L330.00 431.96 L330.00 448.22 Z"/>
+  <circle class="cutter" cx="355.50" cy="431.96" r="22.45"/>
+  <path class="fixture-support" d="M336.17 414.14 L384.78 324.92 L362.48 312.77 L313.87 401.99 Z"/>
+  <line class="arrow" x1="296.02" y1="334.41" x2="338.17" y2="357.38"/>
+  <text class="label" x="435.50" y="461.96">#2 drill's shank, its top {{process.shank_top_over_jaw_mm:in.3dot}} over the jaw tops</text>
+  <line class="leader" x1="433.50" y1="457.96" x2="371.22" y2="447.68"/>
+  <circle class="leader-dot" cx="371.22" cy="447.68" r="2"/>
+  <text class="label" x="18.00" y="414.00">kink's mark level</text>
+  <text class="label" x="18.00" y="430.00">with the jaw tops</text>
+  <line class="datum" x1="178.00" y1="420.00" x2="324.95" y2="420.00"/>
+  <text class="label" x="534.54" y="108.46">the blade, straight to the pad's end</text>
+  <text class="label" x="36.02" y="328.41">1/2 in parallel, pressing</text>
+  <text class="label" x="36.02" y="344.41">close to the shank</text>
+  <text class="label" x="435.50" y="281.96">{{process.kink_on_shank_deg:.1f}}° from upright</text>
+  <line class="centre-line" x1="328.48" y1="388.00" x2="328.48" y2="180.00"/>
+  <text class="label-on-clamp" x="222.00" y="440.00">tip end clamped</text>
+</svg>

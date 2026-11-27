@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 470" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="860" height="470"/>
+  <text class="title" x="20.00" y="22.00">Setup 3: the readings the outline is filed to, from above, pad end left (to scale, 300 px/in)</text>
+  <path class="part-arriving" d="M66.62 183.62 L184.38 183.62 L184.38 222.62 L703.31 222.62 L703.31 316.38 L66.62 316.38 Z"/>
+  <path class="part-kept" d="M76.00 193.00 L175.00 193.00 L175.00 232.00 L693.94 232.00 L693.94 307.00 L76.00 307.00 Z"/>
+  <circle class="cutter" cx="130.00" cy="250.00" r="19.28"/>
+  <text class="label" x="20.00" y="50.00">#30 drill's shank pushed through the hole</text>
+  <line class="leader" x1="170.00" y1="56.00" x2="132.00" y2="242.00"/>
+  <circle class="leader-dot" cx="132.00" cy="242.00" r="2"/>
+  <line class="dims" x1="76.00" y1="144.00" x2="149.28" y2="144.00"/>
+  <line class="dims" x1="76.00" y1="138.00" x2="76.00" y2="193.00"/>
+  <line class="dims" x1="149.28" y1="138.00" x2="149.28" y2="250.00"/>
+  <text class="label" x="76.00" y="134.00">{{process.end_reading_min_in:.3dot}}–{{process.end_reading_max_in:.3dot}}</text>
+  <line class="dims" x1="110.73" y1="108.00" x2="175.00" y2="108.00"/>
+  <line class="dims" x1="110.73" y1="102.00" x2="110.73" y2="250.00"/>
+  <line class="dims" x1="175.00" y1="102.00" x2="175.00" y2="193.00"/>
+  <text class="label" x="181.00" y="112.00">wing {{process.wing_reading_min_in:.3dot}}–{{process.wing_reading_max_in:.3dot}}</text>
+  <line class="dims" x1="62.00" y1="193.00" x2="62.00" y2="269.27"/>
+  <line class="dims" x1="56.00" y1="269.27" x2="130.00" y2="269.27"/>
+  <line class="dims" x1="56.00" y1="193.00" x2="76.00" y2="193.00"/>
+  <text class="label" x="46.00" y="351.00">{{process.edge_reading_min_in:.3dot}}–{{process.edge_reading_max_in:.3dot}}</text>
+  <line class="leader" x1="56.00" y1="339.00" x2="62.00" y2="275.27"/>
+  <circle class="leader-dot" cx="62.00" cy="275.27" r="2"/>
+  <line class="dims" x1="149.00" y1="193.00" x2="149.00" y2="307.00"/>
+  <text class="label" x="181.00" y="351.00">pad {{cad.pad_edge_width_min_in:.2dot}}–{{cad.pad_edge_width_max_in:.2dot}}</text>
+  <line class="leader" x1="179.00" y1="339.00" x2="150.00" y2="297.00"/>
+  <circle class="leader-dot" cx="150.00" cy="297.00" r="2"/>
+  <line class="dims" x1="394.33" y1="232.00" x2="394.33" y2="307.00"/>
+  <text class="label" x="400.33" y="222.00">strip {{cad.strip_edge_width_min_in:.2dot}}–{{cad.strip_edge_width_max_in:.2dot}}</text>
+  <text class="label" x="179.00" y="192.00">corner sharp, R{{cad.pad_relief_radius_max_in:.3dot}} MAX</text>
+  <line class="leader" x1="177.00" y1="196.00" x2="177.00" y2="230.00"/>
+  <circle class="leader-dot" cx="177.00" cy="230.00" r="2"/>
+  <line class="dims" x1="76.00" y1="387.00" x2="693.94" y2="387.00"/>
+  <line class="dims" x1="76.00" y1="307.00" x2="76.00" y2="433.00"/>
+  <line class="dims" x1="693.94" y1="307.00" x2="693.94" y2="393.00"/>
+  <text class="label" x="430.33" y="381.00" text-anchor="middle">tip {{process.tip_from_end_min_in:.3dot}}–{{process.tip_from_end_max_in:.3dot}}</text>
+  <line class="datum" x1="229.05" y1="299.00" x2="229.05" y2="315.00"/>
+  <line class="dims" x1="229.05" y1="315.00" x2="229.05" y2="433.00"/>
+  <text class="label" x="233.05" y="449.00" text-anchor="start">foot's mark {{process.foot_mark_from_end_in:.3dot}}</text>
+  <line class="datum" x1="652.28" y1="299.00" x2="652.28" y2="315.00"/>
+  <line class="dims" x1="652.28" y1="315.00" x2="652.28" y2="433.00"/>
+  <text class="label" x="648.28" y="449.00" text-anchor="end">kink's mark {{process.kink_mark_from_end_in:.3dot}}</text>
+  <line class="dims" x1="76.00" y1="427.00" x2="652.28" y2="427.00"/>
+  <text class="label" x="701.94" y="311.00">aft edge</text>
+  <text class="label" x="701.94" y="236.00">forward edge</text>
+  <text class="label" x="483.94" y="140.00">dashed: the sawn edges, filed back</text>
+</svg>

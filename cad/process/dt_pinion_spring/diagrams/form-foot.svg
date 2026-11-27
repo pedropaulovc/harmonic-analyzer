@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 520" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="520"/>
+  <text class="title" x="20.00" y="22.00">Setup 4: the foot bend, blade down, bent over the #2 drill's shank (end view along the shank, to scale, 8 px/mm)</text>
+  <text class="title" x="20.00" y="40.00">The bench vise's jaws are schematic (no record).</text>
+  <rect class="clamp" x="138.00" y="120.00" width="112.00" height="400.00"/>
+  <rect class="clamp" x="297.96" y="120.00" width="112.00" height="400.00"/>
+  <text class="label-on-clamp" x="142.00" y="512.00">fixed jaw</text>
+  <text class="label-on-clamp" x="301.96" y="512.00">moving jaw</text>
+  <path class="part-kept" d="M262.34 431.37 L255.47 416.64 L255.09 415.78 L254.74 414.90 L254.42 414.02 L254.14 413.12 L253.88 412.22 L253.66 411.30 L253.47 410.38 L253.32 409.45 L253.20 408.51 L253.12 407.58 L253.07 406.64 L253.05 405.70 L253.05 131.96 L253.10 130.44 L253.25 128.92 L253.51 127.42 L253.87 125.94 L254.33 124.49 L254.88 123.07 L255.53 121.69 L256.28 120.36 L257.11 119.08 L258.02 117.87 L259.02 116.71 L260.09 115.63 L261.23 114.62 L262.44 113.70 L263.71 112.85 L265.03 112.10 L266.40 111.43 L267.81 110.86 L269.26 110.39 L270.74 110.02 L272.24 109.74 L273.75 109.57 L275.27 109.51 L276.80 109.54 L353.24 113.96 L353.42 110.91 L276.97 106.50 L275.24 106.46 L273.51 106.54 L271.79 106.73 L270.09 107.04 L268.41 107.46 L266.77 108.00 L265.17 108.65 L263.61 109.40 L262.11 110.26 L260.67 111.22 L259.29 112.27 L258.00 113.42 L256.78 114.64 L255.65 115.95 L254.61 117.34 L253.67 118.79 L252.82 120.30 L252.08 121.86 L251.45 123.47 L250.93 125.12 L250.53 126.80 L250.23 128.51 L250.06 130.23 L250.00 131.96 L250.00 405.70 L250.02 406.75 L250.08 407.80 L250.17 408.85 L250.31 409.89 L250.48 410.93 L250.69 411.96 L250.93 412.98 L251.22 414.00 L251.54 415.00 L251.89 415.99 L252.28 416.97 L252.71 417.93 L259.58 432.66 Z"/>
+  <circle class="cutter" cx="275.50" cy="131.96" r="22.45"/>
+  <path class="fixture-support" d="M283.36 106.87 L331.28 109.64 L332.74 84.28 L284.82 81.51 Z"/>
+  <line class="arrow" x1="311.55" y1="34.97" x2="308.78" y2="82.89"/>
+  <text class="label" x="405.50" y="135.96">#2 drill's shank, top {{process.shank_top_over_jaw_mm:in.3dot}} over the jaw tops</text>
+  <line class="leader" x1="403.50" y1="131.96" x2="296.83" y2="135.96"/>
+  <circle class="leader-dot" cx="296.83" cy="135.96" r="2"/>
+  <text class="label" x="-2.00" y="114.00">foot's mark level</text>
+  <text class="label" x="-2.00" y="130.00">with the jaw tops</text>
+  <line class="datum" x1="108.00" y1="120.00" x2="244.95" y2="120.00"/>
+  <text class="label" x="405.50" y="81.96">the foot, {{process.bend_on_shank_deg:.1f}}°: just past square</text>
+  <text class="label" x="405.50" y="361.96">blade and kink below the jaw tops, between the jaws</text>
+  <line class="leader" x1="403.50" y1="357.96" x2="254.00" y2="350.00"/>
+  <circle class="leader-dot" cx="254.00" cy="350.00" r="2"/>
+</svg>

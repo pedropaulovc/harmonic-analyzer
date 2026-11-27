@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 540" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="540"/>
+  <text class="title" x="20.00" y="22.00">Setup 1: the piece marked on the roll's corner, and its first saw cut (to scale, 100 px/in)</text>
+  <path class="part-rest" d="M70.00 70.00 L430.00 70.00 L426.00 70.00 L434.00 90.83 L426.00 111.67 L434.00 132.50 L426.00 153.33 L434.00 174.17 L426.00 195.00 L70.00 195.00 Z"/>
+  <rect class="part-kept" x="70.00" y="70.00" width="250.00" height="60.00"/>
+  <text class="label" x="195.00" y="106.00" text-anchor="middle">the piece</text>
+  <line class="dims" x1="70.00" y1="56.00" x2="320.00" y2="56.00"/>
+  <line class="dims" x1="70.00" y1="50.00" x2="70.00" y2="64.00"/>
+  <line class="dims" x1="320.00" y1="50.00" x2="320.00" y2="64.00"/>
+  <text class="label" x="195.00" y="50.00" text-anchor="middle">{{process.blank_length_in:.2dot}}</text>
+  <line class="dims" x1="334.00" y1="70.00" x2="334.00" y2="130.00"/>
+  <text class="label" x="340.00" y="104.00">{{process.blank_width_in:.2dot}}</text>
+  <text class="label" x="444.00" y="76.00">the roll's long edge</text>
+  <text class="label" x="444.00" y="92.00">(6 in roll, break: it runs on)</text>
+  <text class="label" x="62.00" y="213.00">the roll's end</text>
+  <line class="axis" x1="110.00" y1="181.00" x2="310.00" y2="181.00"/>
+  <text class="label" x="110.00" y="173.00">rolling direction (the roll's length)</text>
+  <text class="title" x="20.00" y="250.00">From the front: the roll on edge between two wood blocks in the bench vise (blocks, jaw and blade schematic: no record)</text>
+  <rect class="clamp" x="70.00" y="420.00" width="400.00" height="70.00"/>
+  <text class="label-on-clamp" x="80.00" y="442.00">bench vise jaw</text>
+  <rect class="fixture-support" x="70.00" y="370.00" width="400.00" height="50.00"/>
+  <text class="label" x="480.00" y="400.00">wood block (one each</text>
+  <text class="label" x="480.00" y="416.00">side of the roll)</text>
+  <path class="part-rest" d="M320.00 370.00 L320.00 310.00 L530.00 310.00 L526.00 310.00 L534.00 325.00 L526.00 340.00 L534.00 355.00 L526.00 370.00 Z"/>
+  <rect class="part-kept" x="70.00" y="310.00" width="250.00" height="60.00"/>
+  <text class="label" x="195.00" y="345.00" text-anchor="middle">the piece</text>
+  <text class="label" x="545.00" y="345.00">roll</text>
+  <line class="active-face" x1="70.00" y1="370.00" x2="320.00" y2="370.00"/>
+  <path class="cutter" d="M0.00 356.00 L220.00 369.00 L220.00 373.00 L0.00 360.00 Z"/>
+  <line class="arrow" x1="100.00" y1="298.00" x2="300.00" y2="298.00"/>
+  <text class="label" x="100.00" y="290.00">saw along the line from the roll's end to {{process.blank_length_in:.2dot}}, kerf on the waste side</text>
+  <text class="label" x="70.00" y="520.00">junior hacksaw blade, seen edge on, low over the blocks on the line (frame not drawn)</text>
+  <line class="leader" x1="80.00" y1="508.00" x2="30.00" y2="360.00"/>
+  <circle class="leader-dot" cx="30.00" cy="360.00" r="2"/>
+</svg>
