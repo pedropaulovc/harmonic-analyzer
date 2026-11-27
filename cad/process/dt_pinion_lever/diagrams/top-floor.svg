@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 10 px/mm: a section along the rod through the hub's axis (Y0), seen from the front (looking +Y toward the fixed jaw: +X right toward the rod's tip, +Z up). Setup 2's frame, Z0 face B, X0 the hub's axis; the piece's left end at X-20.32. The section at Y0 after DT16_top_rough/_rod/_root: the frame's end X-20.32 to -13.462; behind the hub the back tab's column (its top at the lowest level that clears it, Z-3.782); the hub (R6.477) full height; the rod's top Z-2.032 (axis Z-5.08 + R3.048), its shadow below; all hatched, the bar running on to a break at X24. Behind the plane, plain: the window's far wall, and left of the piece the fixed jaw (its top Z-5.855: lying_grip_mm above the stacks), thickness not drawn; under the piece the fixed jaw's stack (3.175 thick, 1.5 in), to a break. The bore as the F drill left it (Ø6.5278 with its point's cone), then the 1/4 in HSS end mill (shop Ø6.35): plunged to Z-8.128 (L70), out to X0.114 (L71) and round one G2 circle (L72): its edge on Ø6.5786 (floor_dia_mm). Drawn at X0.114, starting the circle (clockwise from above: toward you here). -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 2, DT16_top_holes T6: the HSS end mill at the floor Z-8.128, on its Ø.259 circle (to scale, 10 px/mm)</text>
+  <path class="clamp" d="M40 248.55L136.8 248.55L136.8 377L129.35 374L121.91 377L114.46 374L107.02 377L99.57 374L92.12 377L84.68 374L77.23 377L69.78 374L62.34 377L54.89 374L47.45 377L40 377Z"/>
+  <path class="fixture-support" d="M136.8 317L580 317L580 377L572.97 374L565.93 377L558.9 374L551.86 377L544.83 374L537.79 377L530.76 374L523.72 377L516.69 374L509.65 377L502.62 374L495.58 377L488.55 374L481.51 377L474.48 374L467.44 377L460.41 374L453.37 377L446.34 374L439.3 377L432.27 374L425.23 377L418.2 374L411.16 377L404.13 374L397.09 377L390.06 374L383.02 377L375.99 374L368.95 377L361.92 374L354.88 377L347.85 374L340.81 377L333.78 374L326.74 377L319.71 374L312.67 377L305.64 374L298.6 377L291.57 374L284.53 377L277.5 374L270.46 377L263.43 374L256.39 377L249.36 374L242.32 377L235.29 374L228.25 377L221.22 374L214.18 377L207.15 374L200.11 377L193.08 374L186.04 377L179.01 374L171.97 377L164.94 374L157.9 377L150.87 374L143.83 377L136.8 377Z"/>
+  <path class="part-rest" d="M136.8 190L580 190L577 197.06L580 204.11L577 211.17L580 218.22L577 225.28L580 232.33L577 239.39L580 246.44L577 253.5L580 260.56L577 267.61L580 274.67L577 281.72L580 288.78L577 295.83L580 302.89L577 309.94L580 317L136.8 317Z"/>
+  <path class="section" d="M136.8 190L205.38 190L205.38 227.82L275.23 227.82L275.23 190L404.77 190L404.77 210.32L580 210.32L577 217.43L580 224.54L577 231.66L580 238.77L577 245.88L580 252.99L577 260.1L580 267.22L577 274.33L580 281.44L577 288.55L580 295.66L577 302.78L580 309.89L580 317L136.8 317Z"/>
+  <path class="holes" d="M307.36 190L372.64 190L372.64 249.13L340 268.74L307.36 249.13Z"/>
+  <path class="holes" d="M309.39 190L372.89 190L372.89 271.28L309.39 271.28Z"/>
+  <path class="cutter" d="M372.89 263.66L372.89 60L365.84 57L358.78 60L351.73 57L344.67 60L337.62 57L330.56 60L323.5 57L316.45 60L309.39 60L309.39 263.66A31.75 7.62 0 0 0 372.89 263.66Z"/>
+  <circle class="leader" cx="398.64" cy="100" r="7"/>
+  <circle class="leader-dot" cx="398.64" cy="100" r="2"/>
+  <line class="centre-line" x1="340" y1="40" x2="340" y2="357"/>
+  <text class="datum-label" x="334" y="48" text-anchor="end">X0</text>
+  <line class="datum" x1="134.8" y1="190" x2="114.8" y2="190"/>
+  <text class="datum-label" x="110.8" y="194" text-anchor="end">Z0 face B</text>
+  <text class="label" x="598" y="100">HSS end mill, toward you</text>
+  <text class="label" x="598" y="116">on its Ø.259 circle (L72)</text>
+  <line class="leader" x1="594" y1="96" x2="405.64" y2="100"/>
+  <circle class="leader-dot" cx="405.64" cy="100" r="2"/>
+  <text class="label" x="598" y="261.28">floor Z-8.128 (.320</text>
+  <text class="label" x="598" y="277.28">deep): flat, the drill's</text>
+  <text class="label" x="598" y="293.28">cone gone</text>
+  <line class="leader" x1="594" y1="257.28" x2="369.89" y2="269.28"/>
+  <circle class="leader-dot" cx="369.89" cy="269.28" r="2"/>
+  <text class="label" x="598" y="337">the fixed jaw's</text>
+  <text class="label" x="598" y="353">stack, behind</text>
+  <line class="leader" x1="594" y1="333" x2="574" y2="342"/>
+  <circle class="leader-dot" cx="574" cy="342" r="2"/>
+  <text class="label" x="30" y="218.55">fixed jaw</text>
+  <text class="label" x="30" y="234.55">(behind)</text>
+  <line class="leader" x1="64" y1="238.55" x2="60" y2="253.55"/>
+  <circle class="leader-dot" cx="60" cy="253.55" r="2"/>
+  <text class="label" x="30" y="145">back tab's</text>
+  <text class="label" x="30" y="161">column</text>
+  <line class="leader" x1="100" y1="141" x2="240" y2="230.82"/>
+  <circle class="leader-dot" cx="240" cy="230.82" r="2"/>
+  <line class="axis" x1="30" y1="66" x2="60" y2="66"/>
+  <text class="label" x="64" y="70">+X: toward the rod's tip</text>
+</svg>

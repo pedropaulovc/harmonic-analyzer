@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 450" width="760" height="450" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 6.4 px/mm: the finished lever (features nominal: hub Ø12.954, face B 5.08 above the rod's axis, SR10.319 crown to 7.366 below it, rod Ø6.096 to 86.106 from the hub's axis, root corners R0.7937 (the 1/16 end mill), bore Ø6.5278 F x 8.128 from face B). Top: seen from face B's side (down the hub's axis, the rod to the right). Below: seen from the rod's side (across it, face B up, the crown down), the bore dashed. The two tab stubs (tab_width_mm 3.048, tab_thickness_mm 2.032, on the rod's axis plane) filed: on the hub's back opposite the rod and on the rod's tip face, marked. Bands from the plan's Setup 4 inspections (features bands; tip_to_back_min/max_mm). -->
+  <rect class="paper" x="0" y="0" width="760" height="450"/>
+  <text class="title" x="20" y="22">Setup 4: the finished lever, where each size is measured (to scale, 6.4 px/mm)</text>
+  <path class="part-kept" d="M652.53 130.49L652.53 169.51L140.96 169.51L140.32 169.55L139.69 169.67L139.07 169.87L138.49 170.15L137.95 170.49L137.46 170.91L137.02 171.38L136.65 171.9L135.03 174.31L133.25 176.59L131.32 178.75L129.24 180.76L127.02 182.63L124.68 184.33L122.23 185.87L119.68 187.23L117.03 188.41L114.31 189.41L111.53 190.21L108.7 190.81L105.83 191.22L102.95 191.43L100.05 191.43L97.16 191.23L94.29 190.83L91.46 190.23L88.68 189.44L85.96 188.45L83.31 187.27L80.75 185.91L78.3 184.38L75.95 182.68L73.73 180.82L71.65 178.81L69.71 176.66L67.93 174.38L66.31 171.98L64.86 169.47L63.59 166.87L62.5 164.19L61.61 161.43L60.91 158.62L60.4 155.77L60.1 152.89L60 150L60.1 147.11L60.4 144.23L60.91 141.38L61.61 138.57L62.5 135.81L63.59 133.13L64.86 130.53L66.31 128.02L67.93 125.62L69.71 123.34L71.65 121.19L73.73 119.18L75.95 117.32L78.3 115.62L80.75 114.09L83.31 112.73L85.96 111.55L88.68 110.56L91.46 109.77L94.29 109.17L97.16 108.77L100.05 108.57L102.95 108.57L105.83 108.78L108.7 109.19L111.53 109.79L114.31 110.59L117.03 111.59L119.68 112.77L122.23 114.13L124.68 115.67L127.02 117.37L129.24 119.24L131.32 121.25L133.25 123.41L135.03 125.69L136.65 128.1L137.02 128.62L137.46 129.09L137.95 129.51L138.49 129.85L139.07 130.13L139.69 130.33L140.32 130.45L140.96 130.49Z"/>
+  <circle class="holes" cx="101.45" cy="150" r="20.89"/>
+  <line class="centre-line" x1="40.8" y1="150" x2="678.13" y2="150"/>
+  <path class="active-face" d="M61.16 140.25L60.29 145.09L60 150L60.29 154.91L61.16 159.75" fill="none"/>
+  <line class="active-face" x1="652.53" y1="140.25" x2="652.53" y2="159.75"/>
+  <line class="dims" x1="60" y1="82.55" x2="652.53" y2="82.55"/>
+  <line class="dims" x1="60" y1="76.55" x2="60" y2="146"/>
+  <line class="dims" x1="652.53" y1="76.55" x2="652.53" y2="126.49"/>
+  <text class="label" x="357.45" y="76.55" text-anchor="middle">over both stubs 3.630–3.660, calipers; less half the hub's Ø: 3.38–3.40</text>
+  <line class="dims" x1="44" y1="108.55" x2="44" y2="191.45"/>
+  <line class="dims" x1="40" y1="108.55" x2="101.45" y2="108.55"/>
+  <line class="dims" x1="40" y1="191.45" x2="101.45" y2="191.45"/>
+  <text class="label" x="40" y="213.45">hub Ø.500–.520, mics square</text>
+  <text class="label" x="40" y="229.45">to the rod, away from the stub</text>
+  <line class="dims" x1="191.05" y1="122.49" x2="191.05" y2="177.51"/>
+  <line class="dims" x1="376.99" y1="122.49" x2="376.99" y2="177.51"/>
+  <line class="dims" x1="614.13" y1="122.49" x2="614.13" y2="177.51"/>
+  <text class="label" x="316.99" y="195.51">rod Ø.230–.250, mics at these 3 places, across</text>
+  <text class="label" x="316.99" y="211.51">top-bottom and sides; their difference at the middle</text>
+  <text class="label" x="316.99" y="227.51">within ±.004 (the flip's check)</text>
+  <path class="part-kept" d="M60 362.51L60 297.49L142.91 297.49L142.91 310.49L652.53 310.49L652.53 349.51L142.91 349.51L142.91 362.51L141.14 363.89L139.32 365.2L137.47 366.46L135.57 367.65L133.63 368.77L131.66 369.83L129.65 370.82L127.6 371.74L125.53 372.6L123.43 373.38L121.31 374.09L119.16 374.72L116.99 375.29L114.8 375.78L112.6 376.19L110.39 376.54L108.16 376.8L105.93 376.99L103.69 377.1L101.45 377.14L99.21 377.1L96.97 376.99L94.74 376.8L92.52 376.54L90.3 376.19L88.1 375.78L85.92 375.29L83.75 374.72L81.6 374.09L79.47 373.38L77.37 372.6L75.3 371.74L73.26 370.82L71.25 369.83L69.27 368.77L67.34 367.65L65.44 366.46L63.58 365.2L61.77 363.89Z"/>
+  <path class="hidden" d="M80.56 297.49L80.56 349.51L122.34 349.51L122.34 297.49"/>
+  <line class="centre-line" x1="40.8" y1="330" x2="678.13" y2="330"/>
+  <line class="centre-line" x1="101.45" y1="278.29" x2="101.45" y2="383.54"/>
+  <line class="active-face" x1="60" y1="323.5" x2="60" y2="336.5"/>
+  <line class="active-face" x1="652.53" y1="323.5" x2="652.53" y2="336.5"/>
+  <line class="dims" x1="44" y1="297.49" x2="44" y2="377.14"/>
+  <line class="dims" x1="40" y1="297.49" x2="60" y2="297.49"/>
+  <line class="dims" x1="40" y1="377.14" x2="101.45" y2="377.14"/>
+  <text class="label" x="40" y="401.14">face B to the apex .480–.500, mics</text>
+  <text class="label" x="40" y="417.14">(SR .40–.42 checked on the mill)</text>
+  <line class="dims" x1="242.25" y1="297.49" x2="242.25" y2="330"/>
+  <line class="dims" x1="142.91" y1="297.49" x2="246.25" y2="297.49"/>
+  <text class="label" x="250.25" y="275.49">rod's station .190–.210 below face B: Setup 2's</text>
+  <text class="label" x="250.25" y="291.49">reading of its top + half its Ø top-bottom</text>
+  <text class="label" x="292.91" y="375.51">bore F (Ø.257) .32 deep,</text>
+  <text class="label" x="292.91" y="391.51">dashed: the MHA-DT-17</text>
+  <text class="label" x="292.91" y="407.51">rod enters by hand</text>
+  <line class="leader" x1="288.91" y1="371.51" x2="121.34" y2="350.51"/>
+  <circle class="leader-dot" cx="121.34" cy="350.51" r="2"/>
+  <text class="label" x="652.53" y="375.51" text-anchor="end">tab stubs (marked)</text>
+  <text class="label" x="652.53" y="391.51" text-anchor="end">filed: flush with the tip,</text>
+  <text class="label" x="652.53" y="407.51" text-anchor="end">to the hub's round</text>
+  <line class="leader" x1="650.53" y1="361.51" x2="652.53" y2="337.5"/>
+  <circle class="leader-dot" cx="652.53" cy="337.5" r="2"/>
+  <text class="label" x="20" y="438">Above: from face B's side. Below: from the rod's side, face B up. Edges R.010 / .010 max; the root's corner as cut.</text>
+</svg>
