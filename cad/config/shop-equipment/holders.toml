@@ -51,5 +51,5 @@ purchase = "J&B Tools JB-DS-ABS-9999-0013, $21.85 (sale; list $27.31), 20 in sto
 name = "1/2 in JT33 drill chuck on a 1/2 in straight-shank arbor (HHIP 9999-0013)"
 kind = "drill_chuck"
 status = "to_order"
-note = "Not owned: to buy. Held by its 1/2 in shank in the lathe's 3-jaw, whose grip starts at 3.0 mm (cad/process/shop workholding.chuck-3jaw-6): it carries the MHA-DT-11 drive-pin spot drill, #43 drill, .0930 reamer and #54 drill in the headstock (owner ruling 2026-11-22, option C2)."
+note = "Not owned: to buy. Held by its 1/2 in shank in the lathe's 3-jaw, inside that chuck's grip range (cad/process/shop workholding.chuck-3jaw-6): it carries the MHA-DT-11 drive-pin spot drill, #43 drill, .0930 reamer and #54 drill in the headstock (owner ruling 2026-11-22, option C2)."
 cite = ["J&B Tools, HHIP 9999-0013 (read 2026-11-22): 1/2 in JT33 drill chuck, 1/32-1/2 in capacity, with a 1/2 in straight shank arbor: https://www.jbtools.com/hhip-1-2-jt33-drill-chuck-with-1-2-straight-shank-arbor-9999-0013/"]

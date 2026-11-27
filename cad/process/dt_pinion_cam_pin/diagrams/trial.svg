@@ -1,3 +1,37 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- The trial offcut, its end faced and swept with the ball turner to set the radius. Shell: prechips.turned_shaft_diagrams; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="turned-shaft" data-hold="blank" data-out="far" data-work="face dome" data-wrap="shim" data-piece="offcut" data-dome-tool="ball-turner"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the split bush Ø.500 x .60 in the 3-jaw on .50, .10 proud of the jaw fronts, its nick at jaw 1; the trial offcut (process.trial_offcut_in) .40 out of the bush's face (process.end_stickout_in). The jaws, the chuck's body and the AR tool schematic (not on record), the tool's point on the face it cuts. Hatched: the face's stock. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 4, Op 90: the AR tool faces the offcut's end in the split bush (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="234" y="70" width="56" height="260"/>
+  <rect class="clamp" x="290" y="125" width="180" height="150"/>
+  <rect class="clamp" x="290" y="91" width="150" height="34"/>
+  <rect class="clamp" x="290" y="275" width="150" height="34"/>
+  <path class="datum" d="M464 126L470.5 126L470.5 132Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <rect class="part-kept" x="470" y="176.56" width="120" height="46.88"/>
+  <rect class="part-removed" x="590" y="176.56" width="6" height="46.88"/>
+  <line class="hidden" x1="470" y1="176.56" x2="296" y2="176.56"/>
+  <line class="hidden" x1="470" y1="223.44" x2="296" y2="223.44"/>
+  <line class="hidden" x1="296" y1="176.56" x2="296" y2="223.44"/>
+  <line class="datum" x1="590" y1="70" x2="590" y2="120"/>
+  <line class="dims" x1="470" y1="160" x2="590" y2="160"/>
+  <line class="dims" x1="470" y1="152" x2="470" y2="168"/>
+  <line class="dims" x1="590" y1="152" x2="590" y2="168"/>
+  <text class="label" x="598" y="164" text-anchor="start">{{process.end_stickout_in:.2dot}} out</text>
+  <text class="label" x="20" y="384">the rest of the offcut inside the bush (dashed), clear of the jaws' faces</text>
+  <line class="leader" x1="200" y1="372" x2="326" y2="223.44"/>
+  <circle class="leader-dot" cx="326" cy="223.44" r="2"/>
+  <text class="label" x="14" y="40">the split bush in the</text>
+  <text class="label" x="14" y="56">3-jaw on {{process.bush_grip_in:.2dot}}, its nick</text>
+  <text class="label" x="14" y="72">at jaw 1: the jaws</text>
+  <text class="label" x="14" y="88">never touch the offcut</text>
+  <line class="leader" x1="170" y1="52" x2="410" y2="143"/>
+  <circle class="leader-dot" cx="410" cy="143" r="2"/>
+  <path class="cutter" d="M590 216L620 228L620 336L612 333L604 336L596 336L596 240Z"/>
+  <line class="arrow" x1="634" y1="282" x2="634" y2="234"/>
+  <text class="datum-label" x="584" y="82" text-anchor="end">Z0 the faced end</text>
+  <text class="label" x="586" y="350" text-anchor="end">AR tool: face the offcut's end square,</text>
+  <text class="label" x="586" y="366" text-anchor="end">about .02 off; DRO Z0 on it</text>
+  <line class="leader" x1="590" y1="346" x2="612" y2="325"/>
+  <circle class="leader-dot" cx="612" cy="325" r="2"/>
+</svg>

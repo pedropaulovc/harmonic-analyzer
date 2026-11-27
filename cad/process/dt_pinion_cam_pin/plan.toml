@@ -2,15 +2,30 @@
 # ruling 2026-11-21: turned parts get lathe travelers, no NC). Route chosen
 # for speed: the O.D. is the 5/32 O1 ground drill rod as supplied (the
 # drawing's Ø.1558-.1568 band is the rod's own; registry: cut from drill rod,
-# crown turned), so nothing is turned on the diameter. Each pin is a blank
-# sawn a little long, faced at end A (the flat datum end) with under 3
-# diameters out of the 3-jaw (the shop's unsupported stickout limit: a .82
-# pin parted off the rod would stand over 5 diameters out), then turned
-# round: end B faced to the faced length (the root station plus the crown's
-# height, the apex staying on the faced plane) and crowned with the
-# LittleMachineShop 2569 ball turner swept to R.125, inside the drawing's
-# R.11-.13 band. Bench: break end A's edge, look for jaw marks (the O.D. is
-# accepted at Op 10 and never cut), oil.
+# crown turned), so nothing is turned on the diameter. The 3-jaw closes no
+# smaller than Ø.1750 (owner 2026-11-24; shop workholding.chuck-3jaw-6), so
+# the Ø.156 rod is never gripped in the jaws (#3499): Setup 2 makes a split
+# bush from the 1/2 in brass bar on hand, drilled #21 through in the 3-jaw
+# and slit, a nick on its rim against jaw 1, as the MHA-PD-23 traveler makes
+# one (delegated ruling 2026-11-27 (Main), no precedent (pattern: the transgear pin's
+# split bush, #3494); owner review #2144 (D57)); the jaws grip the bush's
+# Ø.50 and the bush closes on the rod, brass on the ground O.D. No reamer:
+# the #21's .159 clears the rod's .1558-.1568 by .002-.003, which the slit
+# closes. Each pin is a blank sawn a little long, faced at end A (the flat
+# datum end) with under 3 diameters out of the bush (the shop's unsupported
+# stickout limit: a .82 pin parted off the rod would stand over 5 diameters
+# out), then turned round in the same bush: end B faced to the faced length
+# (the root station plus the crown's height, the apex staying on the faced
+# plane) and crowned with the LittleMachineShop 2569 ball turner swept to
+# R.125, inside the drawing's R.11-.13 band. Bench: break end A's edge, look
+# for marks (the O.D. is accepted at Op 10 and never cut), oil.
+#
+# The bush goes back into the 3-jaw by its nick after it is slit, so its bore
+# runs out by the drill's drift and the chuck's repeatability (not measured:
+# #3754); no printed size of this pin reads it (an off-centre crown changes
+# its height reading by about the offset, against a .0064 band). The
+# tailstock chuck that carries the centre drill and the drill is not on
+# record either (#3754).
 #
 # The crown: owner ruling 2026-11-23 (tool audit Q5, option D): "buy the
 # LittleMachineShop 'Ball and Radius Turning Tool, Small' (SKU 2569,
@@ -18,25 +33,28 @@
 # is the fallback for any dome it cannot reach. Confirm each dome is convex
 # and reachable before buying." Reach test: the crown is convex, ball Ø.25
 # (2 x R.125) under the tool's .75; end B is free (no centre); the .40
-# stickout holds the crown's centre .40 - .13 = .27 out of the jaws (the
-# frame's arms need .25: R.13 + .25 = .38 at the band's top) and stays under
-# 3 x Ø.156 = .47; nothing over Ø.75 near it. Reachable. The radius is set
+# stickout holds the crown's centre .40 - .13 = .27 out of the split bush's
+# face, which stands .10 proud of the jaw fronts (the frame's arms need .25:
+# R.13 + .25 = .38 at the band's top) and stays under 3 x Ø.156 = .47;
+# nothing over Ø.75 near it. Reachable. The radius is set
 # once on a trial offcut and checked with the radius gauges' 1/8 leaf, the
 # one leaf inside R.11-.13. A crown .03 high or less is swept from the square
 # corner (no roughing chamfer).
 #
-# Flagged: the 5/32 O1 drill rod (stock-to-order.toml o1-drill-rod-5-32,
-# McMaster 8893K162), the ball turner (shop/lathe.toml
-# tools.ball-radius-turner-lms-2569) and the radius gauges
-# (gauges.radius-gauges) are to order. The O1 lathe settings in shop/dt.toml
-# are LittleMachineShop's low-end O1 row.
+# The 5/32 O1 drill rod is on hand (cad/config/shop-equipment/
+# stock-bought.toml o1-drill-rod-5-32, McMaster 8893K162, 36 in, PO
+# 1103PCAMPOS). Flagged: the ball turner (shop/lathe.toml
+# tools.ball-radius-turner-lms-2569), the radius gauges
+# (gauges.radius-gauges) and the junior hacksaw that slits the bush are to
+# order. The O1 lathe settings in shop/dt.toml are LittleMachineShop's
+# low-end O1 row.
 title = "Pinion Cam Pin"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI O1 drill rod, precision ground, 5/32 in"
-stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.4dot}} ground drill rod (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long per pin and one {{process.trial_offcut_in:.2dot}} in trial offcut (allow a saw kerf each)."
+stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.4dot}} ground drill rod, the 36 in rod on hand; one blank {{process.blank_length_in:.2dot}} in long per pin and one {{process.trial_offcut_in:.2dot}} in trial offcut (allow a saw kerf each). For the split bush that holds them: a {{process.bush_length_in:.2dot}} in piece of the Ø{{process.bush_dia_in:.2dot}} C360 brass bar on hand."
 shop = "../shop"
-stock_refs = ["o1-drill-rod-5-32"]
+stock_refs = ["o1-drill-rod-5-32", "c360-round-1-2"]  # the brass is the split bush's (#3499)
 material_key = "lathe-o1-drill-rod"
 
 standing = true
@@ -44,7 +62,7 @@ standing = true
 [[notes]]
 title = "This job"
 rows = [
-  ["O.D.", "The O.D. is left as supplied: the ground rod's own surface is the drawing's Ra 63 cam contact, so grip it over a brass shim wrap and never cut, file or stone it."],
+  ["O.D.", "The O.D. is left as supplied: the ground rod's own surface is the drawing's Ra 63 cam contact, so hold it only in the brass split bush and never cut, file or stone it."],
 ]
 
 [cad]
@@ -65,9 +83,9 @@ dome_form_radius_in = 0.125
 # (LittleMachineShop 2569 instructions): .125 + .1875.
 ball_turner_rule_in = 0.3125
 # A trial offcut of the same rod, sawn with the blanks, for setting the
-# radius: the .40 stickout plus about .6 in the jaws.
+# radius: the .40 stickout plus about .6 in the split bush.
 trial_offcut_in = 1.0
-# The crown's height band read in Op 230, from the drawing's R.11–.13 on the
+# The crown's height band read in Op 270, from the drawing's R.11–.13 on the
 # Ø.15625 rod (r .078125): .13 − √(.13² − r²) = .0261 and
 # .11 − √(.11² − r²) = .0326, printed inward at four places (.0261–.0325);
 # the gauge band is the adapter's exact cad.dome_far_height_band_mm.
@@ -76,8 +94,20 @@ crown_height_max_in = 0.0325
 # Sawn a little over the faced length: about .02 in to face off each end.
 blank_length_in = 0.86
 as_supplied_outer = 1
-# Out of the jaw fronts while an end is faced and crowned: under 3 × Ø.
+# Out of the split bush's face while an end is faced and crowned: under 3 × Ø.
 end_stickout_in = 0.4
+end_stickout_mm = 10.16
+# The split bush (#3499, as MHA-PD-23's): a piece of the 1/2 in C360 bar on
+# hand, held on bush_grip_in with the rest out of the jaws, drilled #21
+# through, then slit along one side. The 3-jaw grips its Ø.50, inside the
+# chuck's measured range. .60 long so a blank's .46 in it lies mostly inside
+# the jaws.
+bush_dia_in = 0.5
+bush_dia_mm = 12.7
+bush_length_in = 0.6
+bush_length_mm = 15.24
+bush_grip_in = 0.5
+bush_stickout_mm = 2.54
 
 [[tools]]
 id = "saw"
@@ -100,6 +130,22 @@ status = "to_order"
 id = "radius"
 name = "Radius gauges (to buy)"
 ref = "radius-gauges"
+
+[[tools]]
+id = "centre-drill"
+name = "Centre drill, carbide 60°, size 1"
+ref = "centre-drills-carbide-60"
+
+[[tools]]
+id = "drill-21"
+name = "#21 drill"
+ref = "drill-21"
+
+[[tools]]
+id = "hacksaw"
+name = "Junior hacksaw, 32 TPI"
+ref = "junior-hacksaw"
+status = "to_order"
 
 [[tools]]
 id = "file"
@@ -135,16 +181,14 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "lathe"
-title = "End A: face"
+title = "Split bush: face, drill, slit"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a brass shim wrap on the ground O.D., {{process.end_stickout_in:.2dot}} in out of the jaw fronts."
-datum = "Z0 (carriage DRO) end A, faced in Op 40."
-diagram = { file = "diagrams/end-a.svg", alt = "A blank in the 3-jaw, end A out: faced square." }
-# The 5/32 rod is under the 3-jaw's .1750 least grip (owner 2026-11-24;
-# workholding.chuck-3jaw-6): this hold is impossible as written, #3499.
-lathe_hold = "other"
+holding = "A {{process.bush_length_in:.2dot}} in piece sawn off the Ø{{process.bush_dia_in:.2dot}} brass bar with the metal-cutting saw, in the 3-jaw on {{process.bush_grip_in:.2dot}} in, the rest out of the jaw fronts. The Ø.156 rod is under the 3-jaw's least grip (Ø.175): this bush holds the blanks and the offcut in Setups 3 to 5."
+datum = "None read: the hole is drilled from the tailstock, on the spindle's axis, right through the piece."
+diagram = { file = "diagrams/bush.svg", alt = "To scale: the 1/2 in brass piece in the 3-jaw on {{process.bush_grip_in:.2dot}}, a nick on its rim at jaw 1; the AR tool facing its end; hatched, the hole drilled #21 right through." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{process.bush_stickout_mm}}", minimum_diameter_mm = "{{process.bush_dia_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -152,7 +196,65 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face end A square, about {{cad.face_stock_per_end_in:.3dot}} in off, to the centre with no pip; set DRO Z0 on it. Face the second blank's end A the same way."
+instruction = "Face the piece's end square in a light skim. Spindle stopped, file a nick on its rim in line with jaw 1: the bush goes back into the chuck with the nick at jaw 1 every time."
+rpm = 1200
+feed = "by hand, a light skim, dry"
+cut_diameter_mm = "{{process.bush_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre-drill"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock with the size 1 centre drill, only the point's cone, about Ø.12 across: under the #21 drill, so the drill removes it."
+rpm = 2000
+feed = "tailstock quill by hand"
+cut_diameter_mm = 3.0
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-21"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Drill #21 right through the piece from the tailstock, pecking: about .15 a peck, the drill drawn clear of the hole each time to shed its chips."
+diagram = { file = "diagrams/bush-drill.svg", alt = "To scale: the #21 drill from the tailstock right through the brass piece, into the chuck's bore." }
+rpm = 2000
+feed = "tailstock quill by hand, light and steady, dry"
+cut_diameter_mm = 4.0386
+hole_depth_mm = "{{process.bush_length_mm}}"
+peck = { step_mm = 3.81, retract = "full" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "hacksaw"
+drilling = "none"
+sizing = "other"
+instruction = "Take the piece out. In the bench vise, saw one slit along its whole length with the junior hacksaw, through one wall into the hole, directly opposite the nick (midway between the other two jaws when the nick is at jaw 1). Break the slit's edges and the hole's two mouths with the smooth file, and push the #21 drill through the hole by hand to clear the burr. Wipe the hole clean: a chip left in it marks the ground O.D."
+inspection = "A trial offcut slides through the bush by hand with no burr dragging on it."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "End A: face"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "A blank in the split bush, {{process.end_stickout_in:.2dot}} in out of the bush's front face; the bush in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the blank cannot be turned by hand. The jaws never touch the blank."
+datum = "Z0 (carriage DRO) end A, faced in Op 80."
+diagram = { file = "diagrams/end-a.svg", alt = "To scale: a blank in the split bush, the bush in the 3-jaw with its nick at jaw 1, end A .40 out: the AR tool faces it square." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{process.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face end A square, about {{cad.face_stock_per_end_in:.3dot}} in off, to the centre with no pip; set DRO Z0 on it. Slack the jaws a little, swap in the second blank at the same stick-out, close the jaws and face its end A the same way."
 settings = "lathe-ar-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -162,11 +264,10 @@ title = "Trial offcut: set the ball turner's radius"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over the brass shim wrap on the trial offcut, {{process.end_stickout_in:.2dot}} in out of the jaw fronts."
-datum = "Z0 (carriage DRO) the offcut's end, faced in Op 50, touched with the ball turner's tip in Op 80."
-diagram = { file = "diagrams/trial.svg", alt = "The trial offcut in the 3-jaw over the shim wrap, its end faced; the ball turner's pivot on the axis one radius behind the faced end, its bit swept from the apex toward you." }
-# Under the 3-jaw's .1750 least grip, as above: #3499.
-lathe_hold = "other"
+holding = "The trial offcut in the split bush, {{process.end_stickout_in:.2dot}} in out of the bush's front face; the bush in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the offcut cannot be turned by hand."
+datum = "Z0 (carriage DRO) the offcut's end, faced in Op 90, touched with the ball turner's tip in Op 120."
+diagram = { file = "diagrams/trial.svg", alt = "To scale: the trial offcut in the split bush, the bush in the 3-jaw with its nick at jaw 1, the end .40 out: the AR tool faces it square." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{process.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -192,7 +293,7 @@ instruction = "Inner frame parallel to the axis: bring the carriage up until the
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot). If they touch: chuck the offcut {{process.end_stickout_in:.2dot}} in out again and repeat Op 80."
+instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the bush's face and the jaws must miss the outer frame's arms (they reach .19 either side of the pivot). If they touch: set the offcut {{process.end_stickout_in:.2dot}} in out of the bush again and repeat Op 120."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -203,6 +304,7 @@ sizing = "other"
 instruction = "Spindle on. Cross slide in until the bit just touches the corner somewhere in the sweep. Sweep the frame from parallel to the axis round toward you to {{cad.dome_far_form_sweep_deg:.0f}}°, never toward the chuck; cross slide in .003 at most, sweep again. The last sweeps take .001."
 settings = "lathe-ball-turner-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
+diagram = { file = "diagrams/trial-crown.svg", alt = "To scale: the trial offcut in the split bush, its end faced; the ball turner's pivot on the axis one radius behind the faced end, its bit swept from the apex toward you." }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -216,7 +318,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Light at the leaf's ends (crown too round): reset the bit (Op 70) to a depth-rod reading .005 longer; light at its middle (too flat): .005 shorter. Face the crown off (Op 50), draw the offcut back out to {{process.end_stickout_in:.2dot}} in, and repeat Ops 80–120. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the bit's set screw alone until both pins are crowned."
+instruction = "Light at the leaf's ends (crown too round): reset the bit (Op 110) to a depth-rod reading .005 longer; light at its middle (too flat): .005 shorter. Face the crown off (Op 90), draw the offcut back out to {{process.end_stickout_in:.2dot}} in, and repeat Ops 120–160. Under .30 in left in the bush: saw a new trial offcut. Once it passes, leave the bit's set screw alone until both pins are crowned."
 
 [[setups]]
 machine_kind = "lathe"
@@ -224,11 +326,10 @@ title = "End B: face to length, form the crown"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Turned round: 3-jaw over the shim wrap, end B {{process.end_stickout_in:.2dot}} in out, end A toward the chuck."
-datum = "End B's length is read by micrometer across both faces (Op 150). For the crown the DRO Z is zeroed where the ball turner's tip touches end B's faced end (Op 170)."
-diagram = { file = "diagrams/end-b.svg", alt = "The blank turned round, end B out: faced to length, then crowned by the ball turner swept about its pivot on the axis." }
-# Under the 3-jaw's .1750 least grip, as above: #3499.
-lathe_hold = "other"
+holding = "Turned round in the split bush: end B {{process.end_stickout_in:.2dot}} in out of the bush's front face, end A toward the chuck; the bush in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the blank cannot be turned by hand."
+datum = "End B's length is read by micrometer across both faces (Op 190). For the crown the DRO Z is zeroed where the ball turner's tip touches end B's faced end (Op 210)."
+diagram = { file = "diagrams/end-b.svg", alt = "To scale: the blank turned round in the split bush, end B .40 out: the AR tool faces it to length." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{process.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -236,13 +337,13 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face end B square in light skims toward {{cad.faced_length_in:.3dot}}, reading the length between them (Op 150); stop inside {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}} ({{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} root + {{cad.dome_far_form_height_in:.4dot}} crown, rounded inward)."
+instruction = "Face end B square in light skims toward {{cad.faced_length_in:.3dot}}, reading the length between them (Op 190); stop inside {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}} ({{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} root + {{cad.dome_far_form_height_in:.4dot}} crown, rounded inward)."
 settings = "lathe-ar-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Between skims, stop the spindle, take the blank out and mike it across both faces, then chuck it again over the shim, end B {{process.end_stickout_in:.2dot}} in out."
+instruction = "Between skims, stop the spindle, slack the jaws a little, draw the blank out and mike it across both faces, then push it back into the bush, end B {{process.end_stickout_in:.2dot}} in out, and close the jaws."
 inspection = "Faced length {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.faced_length_band_mm}}" }]
 
@@ -252,11 +353,11 @@ instruction = "Faced under {{cad.faced_length_min_in:.3dot}}: scrap the blank an
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Ball turner in its holder, bit as set in Op 70 (set screw untouched), inner frame parallel to the axis: bring the carriage up until the tip just touches end B's faced end; lock the carriage and zero the DRO Z. It stays locked until the crown is done."
+instruction = "Ball turner in its holder, bit as set in Op 110 (set screw untouched), inner frame parallel to the axis: bring the carriage up until the tip just touches end B's faced end; lock the carriage and zero the DRO Z. It stays locked until the crown is done."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: cross slide out until the bit clears end B through the whole sweep. Swing the frame through it and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms."
+instruction = "Spindle stopped: cross slide out until the bit clears end B through the whole sweep. Swing the frame through it and turn the chuck one full turn by hand: the bush's face and the jaws must miss the outer frame's arms."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -267,6 +368,7 @@ sizing = "other"
 instruction = "Spindle on. Cross slide in until the bit just touches end B's corner somewhere in the sweep. Sweep from parallel to the axis round toward you to {{cad.dome_far_form_sweep_deg:.0f}}°, never toward the chuck; cross slide in .003 at most, sweep again. The last sweeps take .001."
 settings = "lathe-ball-turner-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
+diagram = { file = "diagrams/end-b-crown.svg", alt = "To scale: end B faced to length in the split bush; the ball turner's pivot on the axis one radius behind it, its bit swept from the apex toward you to form the crown." }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -274,13 +376,13 @@ instruction = "Between the last sweeps, spindle stopped, look at the apex under 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: look at the crown under the loupe. The {{cad.dome_far_form_radius_in:fraction}} leaf across it is a guide only (the trial set the radius); Op 230 reads the crown's height."
+instruction = "Spindle stopped: look at the crown under the loupe. The {{cad.dome_far_form_radius_in:fraction}} leaf across it is a guide only (the trial set the radius); Op 270 reads the crown's height."
 inspection = "No pip, flat or ring at the apex."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the apex: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 190), then Op 210 again. A ring or point at the apex: scrap the pin and make another from Setup 1."
+instruction = "A flat at the apex: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 230), then Op 250 again. A ring or point at the apex: scrap the pin and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -294,13 +396,13 @@ instruction = "Root length or crown height outside its band: scrap the pin and m
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Repeat Ops 140–240 on the second blank."
+instruction = "Repeat Ops 180–280 on the second blank."
 
 [[setups]]
 machine_kind = "other"
 title = "Bench: break the edge, check, oil"
 machine = "Bench"
-holding = "Bench vise with soft jaws, the pin gripped lightly over the brass shim wrap on its O.D., the end being filed just clear of the jaws."
+holding = "Bench vise with soft jaws closed lightly on the split bush, the pin in the bush, the end being filed just clear of the bush's face."
 indexing = "none"
 envelope = "other"
 vise_hold = "other"

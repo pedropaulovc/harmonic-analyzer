@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the Ø.500 x .60 brass piece (bush_dia_in, bush_length_in) in the 3-jaw on .50 (bush_grip_in), .10 out of the jaw fronts; the jaws drawn .50 long, schematic (their sizes are not on record), the chuck's body behind them schematic, its bore open behind the piece. The nick at jaw 1 filed on the rim. Z0 the faced end (no DRO reading is kept). The AR tool schematic (not on record), its point on the face. Hatched: the hole this setup drills and reams through. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool faces the brass piece's end in a light skim (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="234" y="70" width="56" height="260"/>
+  <rect class="part-kept" x="290" y="125" width="180" height="150"/>
+  <rect class="part-removed" x="290" y="181.1" width="180" height="37.8"/>
+  <rect class="clamp" x="290" y="91" width="150" height="34"/>
+  <rect class="clamp" x="290" y="275" width="150" height="34"/>
+  <path class="datum" d="M464 126L470.5 126L470.5 132Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="cutter" d="M470 248L500 260L500 368L492 365L484 368L476 368L476 272Z"/>
+  <line class="arrow" x1="514" y1="304" x2="514" y2="258"/>
+  <text class="label" x="534" y="384">AR, a light skim</text>
+  <line class="leader" x1="532" y1="380" x2="488" y2="340"/>
+  <circle class="leader-dot" cx="488" cy="340" r="2"/>
+  <text class="label" x="520" y="60">the nick filed on the rim in line with</text>
+  <text class="label" x="520" y="76">jaw 1: the bush goes back in with it there</text>
+  <line class="leader" x1="518" y1="56" x2="467" y2="129"/>
+  <circle class="leader-dot" cx="467" cy="129" r="2"/>
+  <text class="label" x="20" y="384">3-jaw on {{process.bush_grip_in:.2dot}} of the Ø{{process.bush_dia_in:.2dot}} x {{process.bush_length_in:.2dot}} brass piece</text>
+  <line class="leader" x1="120" y1="372" x2="365" y2="305"/>
+  <circle class="leader-dot" cx="365" cy="305" r="2"/>
+  <text class="label" x="20" y="60">hatched: the hole drilled #31 and reamed .1260</text>
+  <text class="label" x="20" y="76">right through</text>
+  <line class="leader" x1="120" y1="74" x2="335" y2="192"/>
+  <circle class="leader-dot" cx="335" cy="192" r="2"/>
+</svg>

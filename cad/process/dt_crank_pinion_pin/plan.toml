@@ -2,25 +2,38 @@
 # get lathe travelers, no NC; bench and trivially cut parts get travelers
 # too). Route chosen for speed: the fewest honest steps. Nothing is turned: the
 # 1/8 in drill rod's diameter is the drawing's STOCK, AS SUPPLIED reference.
-# Each end is faced on the manual PM-1127VF-LB with under 3 diameters out of
-# the 3-jaw (the shop's unsupported stickout limit; a .56 pin parted off the
-# rod would stand .81 out), so the pin is sawn, not parted. Setup 1: face the
-# rod end (Z0). Setup 2 at the saw: a .58 piece off the faced end. Setup 3:
-# the piece turned round, the sawn end faced to the .55-.57 length, measured
-# between skims. Bench: break the edges, check the length, oil (FINISH:
-# bright, oiled). The hole it drives into is match-drilled at assembly
-# (MHA-DT-10).
+# The 3-jaw closes no smaller than Ø.1750 (owner 2026-11-24; shop
+# workholding.chuck-3jaw-6), so the Ø.125 rod is never gripped in the jaws
+# (#3498): Setup 1 makes a split bush from the 1/2 in brass bar on hand,
+# drilled #31 and reamed .1260 in the 3-jaw and slit, a nick on its rim
+# against jaw 1, as the MHA-PD-23 traveler makes one (delegated ruling
+# 2026-11-27 (Main), no precedent (pattern: the transgear pin's split bush, #3494); owner
+# review #2144 (D57)). The jaws grip the bush's Ø.50 and the bush closes on
+# the rod. Each end is faced on the manual PM-1127VF-LB with under 3 diameters
+# out of the bush (the shop's unsupported stickout limit; a .56 pin parted off
+# the rod would stand .81 out), so the pin is sawn, not parted. Setup 2: face
+# the rod end (Z0). Setup 3 at the saw: a .58 piece off the faced end. Setup 4:
+# the piece turned round in the same bush, the sawn end faced to the .55-.57
+# length, measured between skims. Bench: break the edges, check the length,
+# oil (FINISH: bright, oiled). The hole it drives into is match-drilled at
+# assembly (MHA-DT-10).
 #
-# Stock: 1/8 in drill rod is to order (cad/config/shop-equipment/
-# stock-to-order.toml drill-rod-1-8, a 3 in piece); none is on hand, and no
-# 1/8 in 1018 CF round (the drawing's other choice) is owned either.
+# The bush goes back into the 3-jaw by its nick after it is slit, so its bore
+# runs out by the drill's drift and the chuck's repeatability (not measured:
+# #3754); no printed size of this pin reads it (the length only). The
+# tailstock chuck that carries the centre drill, the drill and the reamer is
+# not on record either (#3754).
+#
+# Stock: the 1/8 in O1 drill rod is on hand (cad/config/shop-equipment/
+# stock-bought.toml drill-rod-1-8, 36 in, PO 1103PCAMPOS); the pin works
+# from a 3 in piece of it.
 title = "Crank Pinion Pin"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "Drill rod, 1/8 in (drawing: AISI 1018 CF or drill rod, 1/8 in)"
-stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} drill rod, a 3 in piece (to order, not on hand); the pin takes {{process.saw_length_in:.2dot}} in of it."
+stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} drill rod, a 3 in piece off the 36 in rod on hand; the pin takes {{process.saw_length_in:.2dot}} in of it. For the split bush that holds it: a {{process.bush_length_in:.2dot}} in piece of the Ø{{process.bush_dia_in:.2dot}} C360 brass bar on hand."
 shop = "../shop"
-stock_refs = ["drill-rod-1-8"]
+stock_refs = ["drill-rod-1-8", "c360-round-1-2"]  # the brass is the split bush's (#3498)
 material_key = "lathe-o1-drill-rod"
 
 # The shop's standing page carries what every traveler shares (units, lathe
@@ -38,19 +51,52 @@ stock_dia_in = 0.125
 # Sawn off the faced end: the .56 pin and the facing allowance left on the
 # sawn end, which also takes up the saw's squareness.
 saw_length_in = 0.58
-# Facing allowance: squares the rod's end in Setup 1.
+# Facing allowance: squares the rod's end in Setup 2.
 face_allowance_in = 0.02
-# Left on the sawn end for Setup 3 to face the pin to length.
+# Left on the sawn end for Setup 4 to face the pin to length.
 regrip_allowance_in = 0.02
 # The saw's kerf (authored; the blade is not measured on record).
 part_kerf_in = 0.09
-# How much of the piece the 3-jaw takes in Setup 3.
+# How much of the piece the split bush takes in Setup 4.
 regrip_grip_in = 0.4
+# The split bush (#3498, as MHA-PD-23's): a piece of the 1/2 in C360 bar on
+# hand, held on bush_grip_in with the rest out of the jaws, drilled #31 and
+# reamed .1260 through, then slit along one side. The 3-jaw grips its Ø.50,
+# inside the chuck's measured range. .60 long so the Setup 4 piece's .40 in
+# it lies mostly inside the jaws.
+bush_dia_in = 0.5
+bush_dia_mm = 12.7
+bush_length_in = 0.6
+bush_length_mm = 15.24
+bush_grip_in = 0.5
+bush_stickout_mm = 2.54
 
 [[tools]]
 id = "ar"
 name = "AR turning tool"
 ref = "lathe-ar"
+
+[[tools]]
+id = "centre-drill"
+name = "Centre drill, carbide 60°, size 1"
+ref = "centre-drills-carbide-60"
+
+[[tools]]
+id = "drill-31"
+name = "#31 drill"
+ref = "drill-31"
+
+[[tools]]
+id = "reamer"
+name = ".1260 chucking reamer"
+ref = "reamer-1260"
+status = "to_order"
+
+[[tools]]
+id = "hacksaw"
+name = "Junior hacksaw, 32 TPI"
+ref = "junior-hacksaw"
+status = "to_order"
 
 [[tools]]
 id = "saw"
@@ -64,16 +110,84 @@ ref = "jig-files"
 
 [[setups]]
 machine_kind = "lathe"
+title = "Split bush: face, drill, ream, slit"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "A {{process.bush_length_in:.2dot}} in piece sawn off the Ø{{process.bush_dia_in:.2dot}} brass bar with the metal-cutting saw, in the 3-jaw on {{process.bush_grip_in:.2dot}} in, the rest out of the jaw fronts. The pin's Ø.125 rod is under the 3-jaw's least grip (Ø.175): this bush holds it in Setups 2 and 4."
+datum = "None read: the hole is drilled and reamed from the tailstock, on the spindle's axis, right through the piece."
+diagram = { file = "diagrams/bush.svg", alt = "To scale: the 1/2 in brass piece in the 3-jaw on {{process.bush_grip_in:.2dot}}, a nick on its rim at jaw 1; the AR tool facing its end; hatched, the hole drilled #31 and reamed .1260 right through." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{process.bush_stickout_mm}}", minimum_diameter_mm = "{{process.bush_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the piece's end square in a light skim. Spindle stopped, file a nick on its rim in line with jaw 1: the bush goes back into the chuck with the nick at jaw 1 every time."
+rpm = 1200
+feed = "by hand, a light skim, dry"
+cut_diameter_mm = "{{process.bush_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre-drill"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock with the size 1 centre drill, only the point's cone, about Ø.08 across: under the #31 drill, so the drill removes it."
+rpm = 2000
+feed = "tailstock quill by hand"
+cut_diameter_mm = 2.0
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-31"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Drill #31 right through the piece from the tailstock, pecking: about .12 a peck, the drill drawn clear of the hole each time to shed its chips."
+diagram = { file = "diagrams/bush-drill.svg", alt = "To scale: the #31 drill from the tailstock right through the brass piece, into the chuck's bore." }
+rpm = 2000
+feed = "tailstock quill by hand, light and steady, dry"
+cut_diameter_mm = 3.048
+hole_depth_mm = "{{process.bush_length_mm}}"
+peck = { step_mm = 3.048, retract = "full" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "reamer"
+drilling = "none"
+sizing = "other"
+instruction = "Ream .1260 right through from the tailstock, spindle running, in one slow feed; withdraw with the spindle still running."
+diagram = { file = "diagrams/bush-ream.svg", alt = "To scale: the .1260 reamer from the tailstock right through the #31 hole; its lead chamfer drawn schematic (no size on record)." }
+rpm = 600
+feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
+cut_diameter_mm = 3.2004
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "hacksaw"
+drilling = "none"
+sizing = "other"
+instruction = "Take the piece out. In the bench vise, saw one slit along its whole length with the junior hacksaw, through one wall into the hole, directly opposite the nick (midway between the other two jaws when the nick is at jaw 1). Break the slit's edges with the smooth file and push the reamer through the hole by hand to clear the burr. Wipe the hole clean."
+inspection = "The rod slides through the bush by hand with no burr dragging on it."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
 title = "Lathe: face the rod end"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a brass shim wrap on the Ø{{process.stock_dia_in:.3dot}} rod (the jaws close on the pin's as-supplied O.D.), {{cad.outer_stickout_datum_mm:in.2dot}} in out of the jaw fronts; the rest of the 3 in piece runs back through the jaws into the spindle bore."
-datum = "Z0 (carriage DRO) the rod end faced in Op 10."
-diagram = { file = "diagrams/bar.svg", alt = "The 1/8 in drill rod in the 3-jaw over a shim wrap with little out: its end faced square." }
-# The 1/8 rod is under the 3-jaw's .1750 least grip (owner 2026-11-24;
-# workholding.chuck-3jaw-6): this hold is impossible as written, #3498.
-lathe_hold = "other"
+holding = "The Ø{{process.stock_dia_in:.3dot}} rod through the split bush, {{cad.outer_stickout_datum_mm:in.2dot}} in out of the bush's front face; the bush in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the rod cannot be turned by hand. The rest of the 3 in piece runs back through the bush into the spindle bore. The jaws never touch the rod."
+datum = "Z0 (carriage DRO) the rod end faced in Op 60."
+diagram = { file = "diagrams/bar.svg", alt = "To scale: the 1/8 in drill rod through the split bush, the bush in the 3-jaw with its nick at jaw 1, the rod end .18 out: the AR tool faces it square." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{cad.outer_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -89,7 +203,7 @@ cut_diameter_mm = "{{cad.outer_dia_mm}}"
 machine_kind = "other"
 title = "Saw: the pin's piece off the faced end"
 machine = "Evolution 14 in metal-cutting saw"
-holding = "The rod flat on the saw bed, its long end clamped in the saw's vise, the faced end free beyond the blade."
+holding = "The rod flat on the saw bed, its long end clamped in the saw's vise, the faced end free beyond the blade. The split bush stays in the 3-jaw, its nick at jaw 1, for Setup 4."
 envelope = "other"
 indexing = "none"
 diagram = { file = "diagrams/saw.svg", alt = "Plan of the saw bed: the 1/8 rod's long end in the vise, the blade on the far side of a line .58 from the faced end." }
@@ -101,7 +215,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Scribe the rod {{process.saw_length_in:.2dot}} in from the faced end and saw on the far side of the line, the long end clamped in the saw's vise; let the piece drop clear onto the saw base and pick it up only after the blade has stopped. File the burr off the sawn end."
+instruction = "Draw the rod out of the bush. Scribe it {{process.saw_length_in:.2dot}} in from the faced end and saw on the far side of the line, the long end clamped in the saw's vise; let the piece drop clear onto the saw base and pick it up only after the blade has stopped. File the burr off the sawn end."
 feed = "hand"
 
 [[setups]]
@@ -110,11 +224,10 @@ title = "Lathe: turned round, face to length"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a brass shim wrap on the piece turned round, the faced end {{process.regrip_grip_in:.2dot}} in in the jaws; the sawn end {{cad.outer_stickout_far_mm:in.2dot}} in out."
-datum = "The Op 10 face, in the jaws: the length is measured across both faces."
-diagram = { file = "diagrams/second-end.svg", alt = "The piece turned round, the faced end in the jaws over a shim wrap: the sawn end faced to the pin's length." }
-# Under the 3-jaw's .1750 least grip, as the first lathe setup: #3498.
-lathe_hold = "other"
+holding = "The piece turned round in the split bush, the faced end {{process.regrip_grip_in:.2dot}} in in the bush; the sawn end {{cad.outer_stickout_far_mm:in.2dot}} in out of the bush's front face. The bush in the 3-jaw as in Setup 2, the jaws closed until the piece cannot be turned by hand. The jaws never touch the piece."
+datum = "The Op 60 face, in the bush: the length is measured across both faces."
+diagram = { file = "diagrams/second-end.svg", alt = "To scale: the .58 piece turned round in the split bush, the faced end inside it, the sawn end .18 out: the AR tool faces it to the pin's length." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -122,7 +235,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the sawn end square in light cuts toward the {{cad.length_nominal_in:.2dot}} length: between cuts, stop the spindle, take the piece out and caliper it across both faces, then chuck it again over the shim. Stop inside {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}; Op 50 is the acceptance."
+instruction = "Face the sawn end square in light cuts toward the {{cad.length_nominal_in:.2dot}} length: between cuts, stop the spindle, slack the jaws a little, draw the piece out and caliper it across both faces, then push it back to the same stick-out and close the jaws. Stop inside {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}; Op 100 is the acceptance."
 settings = "lathe-ar-o1"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -151,7 +264,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Over {{cad.length_max_in:.2dot}}: face it again as in Setup 3, then repeat Ops 40 and 50. Under {{cad.length_min_in:.2dot}}: scrap it, not reworked; make another by repeating Setups 1 to 3 on the rest of the rod."
+instruction = "Over {{cad.length_max_in:.2dot}}: face it again as in Setup 4, then repeat Ops 90 and 100. Under {{cad.length_min_in:.2dot}}: scrap it, not reworked; make another by repeating Setups 2 to 4 on the rest of the rod (the split bush is reused)."
 feed = "hand"
 
 [[setups.operations]]

@@ -1,29 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, from above (the cross-slide at the bottom), to scale at 200 px/in along and across the axis: the Ø.125 rod (process.stock_dia_in), the jaw fronts 0.160 behind Z0 (cad.outer_regrip_jaw_z_datum_mm), the end 0.18 out (cad.outer_stickout_datum_mm); the rest of the 3 in piece runs back through the jaws into the spindle bore, drawn to a break line. The AR holder and insert are schematic (no size on record), its point on the face it cuts. The 3-jaw's body and jaws are schematic (their sizes are not on record). The brass shim wrap's thickness is not on record: drawn 2 px. Hatched: the .02 faced off (process.face_allowance_in). -->
-  <rect class="paper" x="0" y="0" width="760" height="360"/>
-  <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool faces the rod end square, .02 off (to scale, 200 px/in)</text>
-  <rect class="fixture-vise" x="472" y="119.5" width="56" height="121"/>
-  <path class="part-rest" d="M40 167.5L600 167.5L600 192.5L40 192.5L37 184.17L40 175.83Z"/>
-  <rect class="part-removed" x="600" y="167.5" width="4" height="25"/>
-  <rect class="clamp" x="528" y="131.5" width="40" height="34"/>
-  <rect class="clamp" x="528" y="194.5" width="40" height="34"/>
-  <rect class="fixture-support" x="528" y="165.5" width="40" height="29"/>
-  <rect class="part-rest" x="528" y="167.5" width="40" height="25"/>
-  <line class="centre-line" x1="20" y1="180" x2="740" y2="180"/>
-  <path class="cutter" d="M600 184L630 196L630 294L622 291L614 294L606 294L606 208Z"/>
-  <line class="arrow" x1="648" y1="254" x2="648" y2="204"/>
-  <line class="datum" x1="600" y1="70" x2="600" y2="120"/>
-  <text class="datum-label" x="594" y="82" text-anchor="end">Z0 the faced end</text>
-  <text class="label" x="440" y="330" text-anchor="end">AR tool: face square in light cuts,</text>
-  <text class="label" x="440" y="346" text-anchor="end">{{process.face_allowance_in:.2dot}} off; DRO Z0 on it</text>
-  <line class="leader" x1="442" y1="326" x2="618" y2="264"/>
-  <circle class="leader-dot" cx="618" cy="264" r="2"/>
-  <text class="label" x="200" y="60">3-jaw over a brass shim wrap on the Ø{{process.stock_dia_in:.3dot}} rod,</text>
-  <text class="label" x="200" y="76">{{cad.outer_stickout_datum_mm:in.2dot}} out of the jaw fronts</text>
-  <line class="leader" x1="300" y1="82" x2="548" y2="135.5"/>
-  <circle class="leader-dot" cx="548" cy="135.5" r="2"/>
-  <text class="label" x="40" y="300">the rest of the 3 in piece back through</text>
-  <text class="label" x="40" y="316">the jaws into the spindle bore</text>
-  <line class="leader" x1="150" y1="288" x2="200" y2="190.5"/>
-  <circle class="leader-dot" cx="200" cy="190.5" r="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the split bush Ø.500 x .60 (bush_dia_in, bush_length_in) in the 3-jaw on .50 (bush_grip_in), .10 proud of the jaw fronts, its nick at jaw 1; the Ø.125 rod (process.stock_dia_in) through it, its end .18 out of the bush's face (cad.outer_stickout_datum_mm); the rest of the 3 in piece runs back through the bush and the chuck into the spindle bore (hidden). The jaws and the chuck's body schematic (their sizes are not on record). The AR holder and insert schematic (no size on record), its point on the face it cuts. Hatched: the .02 faced off (process.face_allowance_in). -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 2, Op 60: the AR tool faces the rod end square, .02 off (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="234" y="70" width="56" height="260"/>
+  <rect class="clamp" x="290" y="125" width="180" height="150"/>
+  <rect class="clamp" x="290" y="91" width="150" height="34"/>
+  <rect class="clamp" x="290" y="275" width="150" height="34"/>
+  <path class="datum" d="M464 126L470.5 126L470.5 132Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <rect class="part-kept" x="470" y="181.25" width="54" height="37.5"/>
+  <rect class="part-removed" x="524" y="181.25" width="6" height="37.5"/>
+  <line class="hidden" x1="470" y1="181.25" x2="30" y2="181.25"/>
+  <line class="hidden" x1="470" y1="218.75" x2="30" y2="218.75"/>
+  <path class="cutter" d="M524 212L554 224L554 332L546 329L538 332L530 332L530 236Z"/>
+  <line class="arrow" x1="568" y1="278" x2="568" y2="230"/>
+  <line class="datum" x1="524" y1="70" x2="524" y2="120"/>
+  <text class="datum-label" x="518" y="82" text-anchor="end">Z0 the faced end</text>
+  <line class="dims" x1="470" y1="165" x2="524" y2="165"/>
+  <line class="dims" x1="470" y1="157" x2="470" y2="173"/>
+  <line class="dims" x1="524" y1="157" x2="524" y2="173"/>
+  <text class="label" x="532" y="169" text-anchor="start">{{cad.outer_stickout_datum_mm:in.2dot}} out of the bush's face</text>
+  <text class="label" x="520" y="350" text-anchor="end">AR tool: face square in light cuts,</text>
+  <text class="label" x="520" y="366" text-anchor="end">{{process.face_allowance_in:.2dot}} off; DRO Z0 on it</text>
+  <line class="leader" x1="524" y1="346" x2="546" y2="320"/>
+  <circle class="leader-dot" cx="546" cy="320" r="2"/>
+  <text class="label" x="20" y="384">the rod (dashed) through the bush and the chuck into the spindle bore</text>
+  <line class="leader" x1="200" y1="372" x2="200" y2="218.75"/>
+  <circle class="leader-dot" cx="200" cy="218.75" r="2"/>
+  <text class="label" x="14" y="40">the split bush in the</text>
+  <text class="label" x="14" y="56">3-jaw on {{process.bush_grip_in:.2dot}}, its nick</text>
+  <text class="label" x="14" y="72">at jaw 1: the jaws</text>
+  <text class="label" x="14" y="88">never touch the rod</text>
+  <line class="leader" x1="170" y1="52" x2="410" y2="143"/>
+  <circle class="leader-dot" cx="410" cy="143" r="2"/>
 </svg>

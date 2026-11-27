@@ -23,7 +23,7 @@ import export_features
 
 IN = 25.4
 # The ends sawn before facing: the handle's piece is sawn at both ends, the
-# pin's off a rod end faced first (Setup 1).
+# pin's off a rod end faced first (Setup 2, in its split bush).
 SAWN_ENDS = {"dt_crank_pinion_pin": 1, "dt_pinion_handle": 2}
 
 

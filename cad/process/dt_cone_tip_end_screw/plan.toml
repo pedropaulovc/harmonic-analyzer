@@ -4,20 +4,31 @@
 # concentric in its threaded end (owner decision C1, PR #1992; owner ruling
 # 2026-11-24, fit audit question 11: drilled #52, no longer reamed .0630).
 # On the manual PM-1127VF-LB (owner ruling 2026-11-21: turned parts get
-# lathe travelers, no NC). Route chosen for speed: one chucking.
-# Setup 1: the 6 in 4-jaw (on hand, cad/config/shop-equipment/fixtures.toml
-# chuck-4jaw-6) on the threaded shank over a brass shim wrap, on the jaws'
-# front step only, the head behind it clear of the jaws; the thread crests
-# dialled in with the DTI. The hole's wall to the thread's minimum minor is
-# .0659 at a centred hole at the drilled row's largest .0675 against the
-# printed .065 MIN, so the hole may sit only .0009 off the thread's axis: the
-# crests are dialled to .0005 TIR (an offset of .00025) before anything
-# cuts. The threaded end is left as supplied (the sheet keeps all purchased
-# geometry). Spot, drill #52 by the quill scale, check the depth with the
-# drill's own shank before unchucking. Bench: break the hole's mouth, clean.
+# lathe travelers, no NC). Route chosen for speed: one chucking of the screw.
+# The 6 in 4-jaw (on hand, cad/config/shop-equipment/fixtures.toml
+# chuck-4jaw-6) closes no smaller than Ø.2865 (owner 2026-11-24), over the
+# shank's .2435-.2489 crests (#3496), so Setup 1 makes a split bush in the
+# 4-jaw from the 1/2 in brass bar on hand: faced, drilled E (.250) through and
+# slit (delegated ruling 2026-11-27 (Main), no precedent (pattern: the transgear pin's
+# split bush, #3494); owner review #2144 (D57)). Its bore need not run true:
+# Setup 2 dials the screw, not the bush. Setup 2: the screw's shank in the
+# bush, the head behind it inside the jaws' opening, the bush on the jaws'
+# front step with its slit between two jaws; the thread crests dialled in
+# with the DTI. The hole's wall to the thread's minimum minor is .0659 at
+# a centred hole at the drilled row's largest .0675 against the printed
+# .065 MIN, so the hole may sit only .0009 off the
+# thread's axis: the crests are dialled to .0005 TIR (an offset of .00025)
+# before anything cuts. The threaded end is left as supplied (the sheet
+# keeps all purchased geometry). Spot, drill #52 by the quill scale, check
+# the depth with the drill's own shank before unchucking. Bench: break the
+# hole's mouth, clean. The 4-jaw's jaw-step depth and the tailstock chuck
+# that carries the drills are not on record (#3754).
 #
 # Bought, not stock (owner ruling 2026-11-20, #2368, as MHA-DT-09): no stock
-# row; the stock BOM reads the registry SKU. Every tool is on hand: the #52
+# row; the stock BOM reads the registry SKU, which a stock_refs entry would
+# replace, so the bush's brass (stock-bought.toml c360-round-1-2, a .30 in
+# piece) is named in the stock line only. Every
+# tool but the junior hacksaw that slits the bush is on hand: the #52
 # drill is in the owned 115-piece index (tools-drills.toml drill-52). The
 # .0630 reamer and its Class ZZ pins (reamer-0630, zz-pins-0630-0635) are no
 # longer needed.
@@ -25,7 +36,7 @@ title = "Cone Tip End Screw"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "18-8 stainless steel, McMaster-Carr 91794A559 (1/4-28 x 3/4 in slotted fillister head screw), as supplied"
-stock = "Lot: {{process.quantity:d}} screw, bought: McMaster-Carr 91794A559, used as supplied but for the added hole."
+stock = "Lot: {{process.quantity:d}} screw, bought: McMaster-Carr 91794A559, used as supplied but for the added hole. For the split bush that holds it: a {{process.bush_length_in:.2dot}} in piece of the Ø{{process.bush_dia_in:.2dot}} C360 brass bar on hand."
 shop = "../shop"
 material_key = "lathe-18-8"
 
@@ -51,10 +62,21 @@ quantity = 1
 blank_x_in = 0.414
 blank_y_in = 0.987
 blank_z_in = 0.414
-# How far the threaded end stands out of the jaws' front step: room for the
+# How far the threaded end stands out of the bush's front face: room for the
 # DTI's tip on the crests and for the drill chuck, the head and .35 of the
 # shank behind it.
 stickout_in = 0.4
+# The split bush (#3496): a piece of the 1/2 in C360 bar on hand, faced
+# and drilled E (.250) through standing .10 out of the 4-jaw's jaw fronts
+# (so the AR tool clears the jaws), then slit along one side. The 4-jaw
+# grips its Ø.50, inside the chuck's measured range; it closes on the crests.
+# .30 long: the screw's .75 shank less the .40 out leaves .35, and .05 of it
+# stays clear between the bush and the head.
+bush_face_out_in = 0.1
+bush_dia_in = 0.5
+bush_dia_mm = 12.7
+bush_length_in = 0.3
+bush_length_mm = 7.62
 # The #52 drill's quill reading, from the lips touching the spot's rim: its
 # full diameter then stands about .007 above the face (the Ø.04 spot under
 # the drill's 118-degree point), so .125 on the scale leaves about .118 at
@@ -72,20 +94,106 @@ name = "#52 drill"
 ref = "drill-52"
 
 [[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "drill-e"
+name = "Letter E drill (.250)"
+ref = "drill-e"
+
+[[tools]]
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
+
+[[tools]]
+id = "hacksaw"
+name = "Junior hacksaw, 32 TPI"
+ref = "junior-hacksaw"
+status = "to_order"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[tools]]
 id = "deburr"
 name = "Deburring countersink"
 ref = "deburring-set"
 
 [[setups]]
 machine_kind = "lathe"
-title = "4-jaw on the thread: dial in, spot and drill the end hole"
+title = "Split bush in the 4-jaw: face, drill, slit"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "6 in 4-jaw on the threaded shank over a wrap of brass shim (it keeps the jaws off the thread), on the jaws' front step only: the head sits behind that step, clear of the jaws, and the threaded end stands {{process.stickout_in:.2dot}} in out of the jaw fronts. Jaws snug, then dialled in (Op 10) and tightened in turn."
-datum = "The threaded end face as bought: the hole's depth is measured from it (the tailstock quill scale zeroed on it)."
+holding = "A {{process.bush_length_in:.2dot}} in piece sawn off the Ø{{process.bush_dia_in:.2dot}} brass bar with the metal-cutting saw, in the 6 in 4-jaw on the jaws' front step, its sawn face {{process.bush_face_out_in:.2dot}} in out of the jaw fronts (the AR tool's room), centred by eye on the chuck's face rings: it need not run true, as Setup 2 dials the screw. The screw's .249 crests are under the 4-jaw's least grip (Ø.2865): this bush holds it in Setup 2."
+datum = "None read: the hole is drilled from the tailstock right through the piece."
+# Independent jaws set by hand (shop workholding.chuck-4jaw-6).
 lathe_hold = "other"
-diagram = { file = "diagrams/lathe.svg", alt = "Op 30, to scale: the bought screw in the 4-jaw on the jaws' front step over brass shim, the head behind the step, the threaded end .40 out; the #52 drill from the tailstock, its full diameter .118 deep in the end." }
+diagram = { file = "diagrams/bush.svg", alt = "To scale: the 1/2 in brass piece in the 4-jaw on the front step, its face .10 out of the jaw fronts; the AR tool facing it; hatched, the E hole drilled right through." }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the piece's end square in a light skim."
+rpm = 1200
+feed = "by hand, a light skim, dry"
+cut_diameter_mm = "{{process.bush_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock with the No. 1 centre drill, only the point's cone, about Ø.12 across: under the E drill, so the drill removes it."
+rpm = 2000
+feed = "tailstock quill by hand"
+cut_diameter_mm = 3.0
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-e"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Drill E right through the piece from the tailstock in one steady feed (it is only 1.2 diameters deep), backing out once if chips pack."
+diagram = { file = "diagrams/bush-drill.svg", alt = "To scale: the E drill from the tailstock right through the brass piece, into the chuck's bore." }
+rpm = 1200
+feed = "tailstock quill by hand, light and steady, dry"
+cut_diameter_mm = 6.35
+hole_depth_mm = "{{process.bush_length_mm}}"
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "hacksaw"
+drilling = "none"
+sizing = "other"
+instruction = "Take the piece out. In the bench vise, saw one slit along its whole length with the junior hacksaw, through one wall into the hole. Break the slit's edges and the hole's mouths with the smooth file. Wipe the hole clean."
+inspection = "The screw's shank slides into the bush by hand, the thread catching nowhere."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "4-jaw on the split bush: dial in, spot and drill the end hole"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "The screw's threaded shank in the split bush, the threaded end {{process.stickout_in:.2dot}} in out of the bush's front face and the head behind the bush; the bush in the 6 in 4-jaw on the jaws' front step, its face at the jaw fronts and its slit midway between two jaws, the head inside the jaws' opening, clear of them. The jaws never touch the thread. Jaws snug, then dialled in (Op 50) and tightened in turn."
+datum = "The threaded end face as bought: the hole's depth is measured from it (the tailstock quill scale zeroed on it)."
+# Independent jaws dialled in by hand (shop workholding.chuck-4jaw-6).
+lathe_hold = "other"
+diagram = { file = "diagrams/lathe.svg", alt = "Op 70, to scale: the bought screw in the split bush, the bush in the 4-jaw on the jaws' front step, the head behind it, the threaded end .40 out; the #52 drill from the tailstock, its full diameter .118 deep in the end." }
 
 [[setups.operations]]
 cut_kind = "other"
