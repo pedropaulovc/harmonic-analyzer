@@ -1,0 +1,41 @@
+# The reducer S-K setting's trial checks (tolerance-policy.md, "Checks in spec
+# modules and tests"; cad/scripts/check_register.py). Entered for #3636:
+# necessity/pd-paper-drive-assembly.yaml N-17 cites these gates as the source
+# of step 12T's trial move. Every N here is the S-to-N centre distance at a
+# setting the trial reaches, TRUE's radial error (TRUE_RADIAL_ERROR_MM, .00078:
+# the DRO's vendor .0002 per axis along S-K, shop equipment dro.pm-30mv, plus
+# half of each .0005 indicator sweep, owner ruling 2026-11-08 (Pedro), #2144
+# item 5.3) charged against it in full. The centre is set on the DRO and
+# indicator at step 12 (and moved by 12T), so every check is after_setting:
+# the setting covers the stack; TRUE's error is what it cannot see.
+checks:
+  - id: C-01
+    check: "TRIAL_MOVE_TOWARD_MM"
+    kind: mesh
+    reason: "shake over .008 cannot be taken up toward S"
+    source: "owner ruling 2026-11-24, fit audit part 2 question C1: \"Yes, the trial may move the plate within those limits.\" (.001 toward S if the shake reads over .008; never below -.001 of DETAIL K, pd_rack_pinion_spec.CENTRE_DISTANCE_TRIAL_BAND). The move is whole DRO counts (DRO_COUNT_MM, .0002: the 5 um scale of cad/process/shop/common.toml gauges.mill-x-dro / mill-y-dro resolution_mm, read in inch mode) nearest the ruled .001 along S-K whose setting passes C-02 and C-05; the guard raises when no such move reaches TRIAL_MOVE_MIN_IN (.0005), the module's own figure for the least move a hobby mill sets (DRO count, gib and backlash take-up), no ruling. Today .0006 along and .0006 across (.00085 along S-K)"
+    basis: after_setting
+  - id: C-02
+    check: "a trial setting lets N pass DETAIL K's limits"
+    kind: mesh
+    reason: "past either limit the reducer binds or loses contact"
+    source: "owner ruling 2026-11-24, fit audit part 2 question C1 (\"within those limits\" holds for N itself, every setting indicated TRUE again: Codjiflo r2 on #3539); limits from pd_rack_pinion_spec.CENTRE_DISTANCE_TRIAL_BAND (the set band's +x, the trial's -.001). N spans TRIAL_LOWEST_CENTRE_MM (-.00069) to TRIAL_HIGHEST_CENTRE_MM (+.00172) with no away move (the .00028 of away room is under TRIAL_MOVE_MIN_IN)"
+    basis: after_setting
+  - id: C-03
+    check: "TRIAL_LOWEST_MESH"
+    kind: mesh
+    reason: "at the lowest N the gears bind or interfere"
+    source: "paper_drive_mesh_check.reducer_mesh(TRIAL_LOWEST_CENTRE_MM).require(): every reducer gate at the lowest N the trial reaches: contact ratio over CONTACT_RATIO_FLOOR 1.2 (AGMA's recommended minimum for spur gears), the runout extreme over RUNOUT_CONTACT_RATIO_FLOOR 1.1 (user decision 2026-10-11; read at three places, owner ruling 2026-11-24, audit part 2 question C3), positive backlash, root clearance over its floor, no interference. Today 1.316 (1.223 at the runout extreme)"
+    basis: after_setting
+  - id: C-04
+    check: "TRIAL_HIGHEST_MESH"
+    kind: mesh
+    reason: "at the highest N a tooth pair lets go"
+    source: "paper_drive_mesh_check.reducer_mesh(TRIAL_HIGHEST_CENTRE_MM) with contact_ratio_floor=None, .require(): at the highest N the one contact-ratio gate is the runout extreme's 1.1 (owner ruling 2026-11-24, audit part 2 question C3, as reducer_band_meshes reads the band top), with backlash, root clearance and interference. Today 1.112 at the runout extreme"
+    basis: after_setting
+  - id: C-05
+    check: "the trial's move toward S lets the pressed-shut mesh bind"
+    kind: mesh
+    reason: "both running fits pressed shut, the reducer binds"
+    source: "binds(): reducer backlash at N less PRESSED_CLOSURE_MM, half of each greatest diametral clearance (the knob journal in the MHA-PD-28 bush, the MHA-PD-10 sleeve on the pin), must stay positive at TRIAL_LOWEST_CENTRE_MM; it fails below N -.00079 (N-17)"
+    basis: after_setting
