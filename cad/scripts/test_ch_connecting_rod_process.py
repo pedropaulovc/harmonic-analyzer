@@ -408,10 +408,23 @@ def test_the_plate_is_faced_on_the_stacked_pairs_above_the_jaws() -> None:
     assert faced_top - p["support_plate_face_mm"] - jaw >= cam_nc.jaw_clearance_min_mm()
 
 
+def test_the_thickness_gate_is_the_flats_tolerance_row() -> None:
+    """#3731, D58: Setup 1's thickness gate is the 1/4 x 2 in 1018 flat as
+    bought, +.000/-.005 (ASTM A108 Annex A1 Table A1.1: flats over 1-1/2 to
+    3 in wide, carbon 0.28 % max; width governs thickness)."""
+    p = PLAN["parameters"]
+    assert p["blank_thickness_max_mm"] == pytest.approx(p["blank_thickness_in"] * 25.4)
+    assert p["blank_thickness_min_mm"] == pytest.approx(
+        (p["blank_thickness_in"] - 0.005) * 25.4
+    )
+
+
 @pytest.mark.parametrize(
     ("changes", "detail"),
     [
         ({"fork_thickness_mm": 6.2}, "fork_thickness_mm"),
+        # The thinnest blank the gate passes must clean up over the fork.
+        ({"blank_thickness_min_mm": 6.096}, "does not clean up at the fork's thickness"),
         ({"crown_x_mm": 186.0}, "crown_x_mm"),
         ({"slot_floor_x_mm": 171.0}, "slot_floor_x_mm"),
         # The reamer's tip 0.42 past the far face: its .0070 in chamfer plus

@@ -160,9 +160,14 @@ blank_length_min_mm = 188.468
 blank_length_max_mm = 189.992
 blank_width_in = 2.0
 blank_thickness_in = 0.25
-# ASTM A108 cold-drawn flat, 2 in wide: thickness +.000/-.004.
+# The thickness gate (Setup 1): the flat as bought, +.000/-.005: ASTM A108
+# Annex A1 Table A1.1, as reproduced by Wisconsin Steel & Tube's flat-bar
+# tolerance sheet: flats over 1-1/2 to 3 in wide, C 0.28 % max, -.005;
+# width governs thickness (note d). Delegated ruling 2026-11-27 (Main),
+# precedent: stock gates follow the supplier standard's tolerance row; owner
+# review #2144 (D58). cam.py's fork guard needs it over the fork's .240.
 blank_thickness_max_mm = 6.35
-blank_thickness_min_mm = 6.2484
+blank_thickness_min_mm = 6.223
 # The width gate (Setup 1): the same flat's width +.000/-.005 (ASTM A29
 # cold-finished carbon flats, over 1-1/2 to 3 in wide; width governs), with
 # .002 over: 1.995-2.002. cam.py holds the support plate's width and the
