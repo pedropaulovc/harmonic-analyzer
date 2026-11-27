@@ -522,7 +522,7 @@ def test_a_dowel_that_slides_into_the_arm_is_bonded() -> None:
         for row in drawing.SETTING_DETAIL_CAPTIONS["H"].split("\n")
     )
     assert check == (
-        "CHECK: A BONDED DOWEL, PUSHED, STILL READS AS "
+        "CHECK, CURED 24 H: A BONDED DOWEL, PUSHED, STILL READS AS "
         f"{drawing.sub_step('arm-plate-fitted', 5)}."
     )
     assert remedy.endswith(f"RENEW AS {drawing.sub_step('arm-plate-fitted', 22)}.")
