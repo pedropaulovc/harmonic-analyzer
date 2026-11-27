@@ -312,14 +312,17 @@ instruction = "At once wipe any squeeze-out off both strap faces and the hub's o
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Leave the joint untouched on its blocks for 30 min. Then lift it off by the strap, peel the paper off the hub's lathe-faced end and set it aside untouched until 24 h from the bond. Wipe the blocks with isopropyl alcohol and oil them. Nothing loads the joint (Setups 2–3) before the 24 h."
+instruction = "Leave the joint untouched on its blocks for 30 min. Then lift it off by the strap, peel the paper off the hub's lathe-faced end and set it aside untouched until 24 h from the bond, the shop at room temperature (a cold shop cures far slower: LOCTITE 638 TDS). Wipe the blocks with isopropyl alcohol and oil them. Nothing loads the joint (Setups 2–3) before the 24 h."
 feed = "hand"
 inspection = "At 24 h: the hub does not turn or shift in the strap when twisted hard by hand; no 638 on the hub's ends or in its bore."
 gauge_checks = "other"
 
+# Drawing note 2 (#3646; delegated ruling 2026-11-26 (Main), D54): a hub
+# that turns is not held, so it pushes out cold and is bonded again on
+# bare metal; the dry fit still stands, so the pair stays together.
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "The hub moves in the strap: stop and tell the owner (do not re-bond over cured 638)." },
+  { kind = "action", text = "The hub moves in the strap: push it out by hand, clean the land and the strap's hub hole to bare metal (no cured 638 left), then bond the same pair again from the degrease above." },
 ]
 feed = "hand"
 
