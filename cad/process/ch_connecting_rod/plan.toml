@@ -163,8 +163,8 @@ blank_thickness_in = 0.25
 # The thickness gate (Setup 1): the flat as bought, +.000/-.005: ASTM A108
 # Annex A1 Table A1.1, as reproduced by Wisconsin Steel & Tube's flat-bar
 # tolerance sheet: flats over 1-1/2 to 3 in wide, C 0.28 % max, -.005;
-# width governs thickness (note d). Delegated ruling 2026-11-27 (Main),
-# precedent: stock gates follow the supplier standard's tolerance row; owner
+# width governs thickness (note d). Delegated ruling 2026-11-27 (Main), no
+# precedent (stock gates follow the supplier standard's tolerance row); owner
 # review #2144 (D58). cam.py's fork guard needs it over the fork's .240.
 blank_thickness_max_mm = 6.35
 blank_thickness_min_mm = 6.223
@@ -242,8 +242,8 @@ support_plate_thickness_mm = 12.7
 # where the jaws grip it (#3732). cam.py checks the jaws grip it the shop's
 # minimum and its faced top stands the jaw-clearance floor over them.
 # Option C of the 2026-11-27 analysis: delegated ruling 2026-11-27 (Main),
-# precedent D44 (ch_channel_lever faces its plate on the same stack, #3647);
-# owner review #2144 (D58).
+# no precedent (D44's fix on ch_channel_lever, which faces its plate on the
+# same stack, #3647); owner review #2144 (D58).
 facing_stack_mm = 38.1
 support_plate_face_mm = 0.254
 support_plate_width_mm = 100.33
@@ -638,12 +638,12 @@ instruction_detailed = "Once per batch, before the first load, the parallels out
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Once per batch: open the vise, lift the plate out and take the shim pair out; the plate's width. Then the 1 in parallels on the vise bed, one against each jaw, and the plate on them as in the Holding, its milled edge toward the moving jaw."
+instruction = "Once per batch: open the vise, lift the plate out and take the shim pair out; the plate's width."
 inspection = "3.940–3.960 (the calipers across the plate, at both ends and the middle): under the narrowest pair (3.990), so the jaws grip the blanks and never the plate, and at least .061 onto the 1/8 in moving parallel on the widest (4.004). Over 3.960: stand it back on the shim pair and take the edge again as in the op before (touch, three passes, the table moving right), with the LEFT-end reading in place of W, and recheck. Under 3.940: saw a new plate and start again from the op before."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.support_plate_width_min_mm}}", "{{process.support_plate_width_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "Once per batch, before the Y pick-up: face the support plate's top on the 1 in pair stacked on the 1/2 in pair, its top above the jaws. Take the plate and the 1 in pair out; set the 1 in pair on the 1/2 in pair against each jaw and the plate on them, LEFT edge to the left, milled edge toward the moving jaw; clamp it alone and face its top {{process.support_plate_face_mm:in.3dot}} with T1 by hand jog in overlapping passes, the cutter running off both long edges. Unclamp; the 1 in pair and the plate back as in the Holding."
+instruction = "Once per batch, before the Y pick-up: face the support plate's top on the 1 in pair stacked on the 1/2 in pair, its top above the jaws. Set the 1 in pair on the 1/2 in pair against each jaw and the plate on them, LEFT edge to the left, milled edge toward the moving jaw; clamp it alone, set 2650 and start the spindle, and face its top {{process.support_plate_face_mm:in.3dot}} with T1 by hand jog in overlapping passes, the cutter running off both long edges. Lift Z clear and stop the spindle; unclamp and take the plate and both pairs out, then the 1 in pair on the vise bed, one against each jaw, and the plate on them as in the Holding, faced side up."
 feed = "hand"
 
 [[setups.operations]]

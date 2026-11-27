@@ -402,6 +402,14 @@ def test_the_plate_is_faced_on_the_stacked_pairs_above_the_jaws() -> None:
     assert "the 1 in pair stacked on the 1/2 in pair, its top above the jaws" in facing
     assert "running off both long edges" in facing
     assert "{{process.support_plate_face_mm:in.3dot}}" in facing
+    # The width op before leaves the vise empty (T19: nothing set up there
+    # only for this op to take out); this op names its speed, stops the
+    # spindle and takes both pairs out before the plate goes back.
+    ops = [op["instruction"] for op in PLAN["setups"][1]["operations"]]
+    width_op = ops[ops.index(facing) - 1]
+    assert "the plate's width" in width_op and "parallels" not in width_op
+    assert "set 2650 and start the spindle" in facing
+    assert "stop the spindle" in facing and "both pairs out" in facing
     jaw = SHOP["workholding"]["vise-pm-6"]["jaw_height_mm"]
     assert jaw - p["facing_stack_mm"] >= SHOP["limits"]["vise_grip_min_mm"]
     faced_top = p["facing_stack_mm"] + p["support_plate_thickness_mm"]
