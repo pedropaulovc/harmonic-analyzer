@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 490" width="840" height="490" font-family="sans-serif" font-size="13">
-  <!-- Setup 3. Hand picture, both views at 2.4 px/mm (61 px/in). From the plan's [parameters]: blanks 2 x 1/4 in (blank_width_in, blank_thickness_max_mm), two side by side across the jaws, 50.8 mm apart (blank_pitch_mm); the jaws X 12.0 to 170.674 (jaw_start_mm, jaw_end_mm), their tops 6.845 mm over the plate (jaw_top_mm); the support plate 100.33 x 152.4 (one long edge milled) x 12.7 mm (support_plate_*_mm) from X0, centred across the load (its place across is not stated), on two 1 in parallels (parallel_height_mm), 1/8 in thick (the parallel set's thickness as the shaft plans' parallel_thickness_mm restates it). Not on record, drawn schematic: the jaws' depth (6 mm drawn), the vise body, the parallels' length (drawn jaw to jaw). The part outline in the view from above is main's picture, rescaled. Z0 here is face D, the top of the blank against the fixed jaw (6.35 over the plate). CR02's first cut on the part: T1, the 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 30.5 px), its first row along blank 1 at Y -21.946, Z -0.381 (ring_rough_1_mm), fed +X from X -8.890 to 162.435; drawn at X 100. Its square end 12 % deep; drawn short to a break line (1.12 in out of the collet; the collet is not drawn). In the section the F side's Setup 2 rough (.025 off the ring zone and band) is under the blank, on the plate, and too thin to draw at this scale. -->
+  <!-- Setup 3. Hand picture, both views at 2.4 px/mm (61 px/in). From the plan's [parameters]: blanks 2 x 1/4 in (blank_width_in, blank_thickness_max_mm), two side by side across the jaws, 50.8 mm apart (blank_pitch_mm); the jaws X 12.0 to 170.674 (jaw_start_mm, jaw_end_mm), their tops 6.845 mm over the plate (jaw_top_mm); the support plate 100.33 x 152.4 (one long edge milled) x 12.7 mm (support_plate_*_mm) from X0, centred across the load (its place across is not stated), on two 1 in parallels (parallel_height_mm), 1/8 in thick (the parallel set's thickness as the shaft plans' parallel_thickness_mm restates it). Not on record, drawn schematic: the jaws' depth (6 mm drawn), the vise body, the parallels' length (drawn jaw to jaw). The part outline in the view from above is main's picture, rescaled. The labels 1 and 2 are the pair's lower and higher numbers: turned over as one stack, 2 lies against the fixed jaw (#3728). Z0 here is face D, the top of the blank against the fixed jaw (6.35 over the plate). CR02's first cut on the part: T1, the 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 30.5 px), its first row along blank 2 (against the fixed jaw) at Y -21.946, Z -0.381 (ring_rough_1_mm), fed +X from X -8.890 to 162.435; drawn at X 100. Its square end 12 % deep; drawn short to a break line (1.12 in out of the collet; the collet is not drawn). In the section the F side's Setup 2 rough (.025 off the ring zone and band) is under the blank, on the plate, and too thin to draw at this scale. -->
   <rect class="paper" x="0" y="0" width="840" height="490"/>
-  <text class="title" x="20" y="24">Setup 3, CR02 rows ring zone 1, D up: from above (2.4 px/mm)</text>
+  <text class="title" x="20" y="24">Setup 3, CR02 rows ring zone 2, D up: from above (2.4 px/mm)</text>
   <rect class="part-rest" x="40" y="80" width="454.1" height="121.9"/>
   <path class="part-removed" fill-rule="evenodd" d="M 40 84.3 L 167.53 84.3 L 167.53 117.32 L 445.1 117.32 L 445.1 98.62 L 476.47 98.62 L 476.47 117.32 L 494.1 117.32 L 494.1 164.58 L 476.47 164.58 L 476.47 183.37 L 445.1 183.37 L 445.1 164.58 L 167.53 164.58 L 167.53 197.68 L 40 197.68 Z M 445.1 129.08 L 476.47 129.08 A 11.92 11.92 0 0 1 476.47 152.83 L 445.1 152.83 Z"/>
   <path class="part-kept" d="M 445.1 129.08 L 476.47 129.08 A 11.92 11.92 0 0 1 476.47 152.83 L 445.1 152.83 Z"/>
@@ -15,13 +15,13 @@
   <path class="hidden" d="M40 81.52H405.76V322.32H40Z"/>
   <line class="datum" x1="40" y1="51.2" x2="40" y2="347.84"/>
   <text class="datum-label" x="38" y="360.84" text-anchor="middle">X0</text>
-  <text class="label" x="26" y="144.96" text-anchor="middle">1</text>
-  <text class="label" x="26" y="266.88" text-anchor="middle">2</text>
+  <text class="label" x="26" y="144.96" text-anchor="middle">2</text>
+  <text class="label" x="26" y="266.88" text-anchor="middle">1</text>
   <circle class="cutter" cx="280" cy="132.67" r="15.24"/>
   <line class="arrow" x1="284" y1="108.67" x2="324" y2="108.67"/>
   <text class="label" x="328" y="112.67">+X</text>
   <text class="label" x="20" y="378">The 1/2 in end mill rows each ring zone and shank band along X, first</text>
-  <text class="label" x="20" y="394">row at Y −21.946 mm, to Z {{process.ring_rough_1_mm:in.3dot}} in (Z0 face D); blank 2 the same;</text>
+  <text class="label" x="20" y="394">row at Y −21.946 mm, to Z {{process.ring_rough_1_mm:in.3dot}} in (Z0 face D); blank 1 the same;</text>
   <text class="label" x="20" y="410">the 1/8 in band round each ring has its own picture. The 1-2-3 block</text>
   <text class="label" x="20" y="426">flushes the left ends with the plate's edge, then is taken away.</text>
   <rect class="fixture-vise" x="531.76" y="406.68" width="272.64" height="16"/>

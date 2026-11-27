@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 490" width="840" height="490" font-family="sans-serif" font-size="13">
-  <!-- Setup 3, T2. Hand picture, both views at 2.4 px/mm (61 px/in). From the plan's [parameters]: blanks 2 x 1/4 in (blank_width_in, blank_thickness_max_mm), two side by side across the jaws, 50.8 mm apart (blank_pitch_mm); the jaws X 12.0 to 170.674 (jaw_start_mm, jaw_end_mm), their tops 6.845 mm over the plate (jaw_top_mm); the support plate 100.33 x 152.4 (one long edge milled) x 12.7 mm (support_plate_*_mm) from X0, centred across the load (its place across is not stated), on two 1 in parallels (parallel_height_mm), 1/8 in thick (the parallel set's thickness as the shaft plans' parallel_thickness_mm restates it). Not on record, drawn schematic: the jaws' depth (6 mm drawn), the vise body, the parallels' length (drawn jaw to jaw). The part outline in the view from above is main's picture, rescaled. CR02's T2: the 1/8 in end mill to scale (eighth_cutter_dia_mm 3.175 = 7.6 px), on ring 1's band, a circle of radius 22.034 about (23.500, -25.400) clockwise (G3 from X 45.534), at its last level Z -0.762 (floor_rough_1_mm, below face D); drawn at X 45.534, the circle's right point and its start, on the section through the cutter. Its square end 12 % deep; drawn short to a break line (at least .75 in out of the collet, eighth_mill_projection_min_mm; the collet is not drawn). Ring 2 the same at Y -76.200. -->
+  <!-- Setup 3, T2. Hand picture, both views at 2.4 px/mm (61 px/in). From the plan's [parameters]: blanks 2 x 1/4 in (blank_width_in, blank_thickness_max_mm), two side by side across the jaws, 50.8 mm apart (blank_pitch_mm); the jaws X 12.0 to 170.674 (jaw_start_mm, jaw_end_mm), their tops 6.845 mm over the plate (jaw_top_mm); the support plate 100.33 x 152.4 (one long edge milled) x 12.7 mm (support_plate_*_mm) from X0, centred across the load (its place across is not stated), on two 1 in parallels (parallel_height_mm), 1/8 in thick (the parallel set's thickness as the shaft plans' parallel_thickness_mm restates it). Not on record, drawn schematic: the jaws' depth (6 mm drawn), the vise body, the parallels' length (drawn jaw to jaw). The part outline in the view from above is main's picture, rescaled. The labels 1 and 2 are the pair's lower and higher numbers: turned over as one stack, 2 lies against the fixed jaw (#3728). CR02's T2: the 1/8 in end mill to scale (eighth_cutter_dia_mm 3.175 = 7.6 px), on ring 2's band (against the fixed jaw), a circle of radius 22.034 about (23.500, -25.400) clockwise (G3 from X 45.534), at its last level Z -0.762 (floor_rough_1_mm, below face D); drawn at X 45.534, the circle's right point and its start, on the section through the cutter. Its square end 12 % deep; drawn short to a break line (at least .75 in out of the collet, eighth_mill_projection_min_mm; the collet is not drawn). Ring 1 the same at Y -76.200. -->
   <rect class="paper" x="0" y="0" width="840" height="490"/>
-  <text class="title" x="20" y="24">Setup 3, CR02 T2 on ring 1's band: from above (2.4 px/mm)</text>
+  <text class="title" x="20" y="24">Setup 3, CR02 T2 on ring 2's band: from above (2.4 px/mm)</text>
   <rect class="part-rest" x="40" y="80" width="454.1" height="121.9"/>
   <path class="part-removed" fill-rule="evenodd" d="M 40 84.3 L 167.53 84.3 L 167.53 117.32 L 445.1 117.32 L 445.1 98.62 L 476.47 98.62 L 476.47 117.32 L 494.1 117.32 L 494.1 164.58 L 476.47 164.58 L 476.47 183.37 L 445.1 183.37 L 445.1 164.58 L 167.53 164.58 L 167.53 197.68 L 40 197.68 Z M 445.1 129.08 L 476.47 129.08 A 11.92 11.92 0 0 1 476.47 152.83 L 445.1 152.83 Z"/>
   <path class="part-kept" d="M 445.1 129.08 L 476.47 129.08 A 11.92 11.92 0 0 1 476.47 152.83 L 445.1 152.83 Z"/>
@@ -15,13 +15,13 @@
   <path class="hidden" d="M40 81.52H405.76V322.32H40Z"/>
   <line class="datum" x1="40" y1="51.2" x2="40" y2="347.84"/>
   <text class="datum-label" x="38" y="360.84" text-anchor="middle">X0</text>
-  <text class="label" x="26" y="144.96" text-anchor="middle">1</text>
-  <text class="label" x="26" y="266.88" text-anchor="middle">2</text>
+  <text class="label" x="26" y="144.96" text-anchor="middle">2</text>
+  <text class="label" x="26" y="266.88" text-anchor="middle">1</text>
   <path class="hidden" d="M149.28 140.96A52.88 52.88 0 1 0 43.52 140.96A52.88 52.88 0 1 0 149.28 140.96"/>
   <circle class="cutter" cx="149.28" cy="140.96" r="3.81"/>
   <line class="arrow" x1="159.28" y1="138.96" x2="159.28" y2="110.96"/>
-  <text class="label" x="20" y="378">The 1/8 in end mill (T2) round ring 1's band to its floor, Z -0.762 mm,</text>
-  <text class="label" x="20" y="394">anticlockwise seen from above (G3), in levels; ring 2 the same.</text>
+  <text class="label" x="20" y="378">The 1/8 in end mill (T2) round ring 2's band to its floor, Z -0.762 mm,</text>
+  <text class="label" x="20" y="394">anticlockwise seen from above (G3), in levels; ring 1 the same.</text>
   <text class="label" x="20" y="410">Drawn at the band's right point (X 45.534), where it starts.</text>
   <rect class="fixture-vise" x="531.76" y="406.68" width="272.64" height="16"/>
   <rect class="clamp" x="790" y="298.81" width="14.4" height="107.87"/>

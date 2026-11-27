@@ -324,17 +324,64 @@ def test_each_setup_places_the_pair_by_blank_number() -> None:
     """#3728: loads are paired by thickness and all wait between Setups 2
     and 3, so each holding names which number goes against the fixed jaw:
     the lower in Setups 2 and 4, the higher in Setup 3 (the pair turned over
-    as one stack), and Setup 2's unclamp step repeats it for the next pair."""
+    as one stack). Each setup's step that clamps the next pair repeats it,
+    and Setups 2 and 3 keep the unclamped load's two together."""
     face_f, face_d, finish_f = PLAN["setups"][1:4]
+    outline = PLAN["setups"][5]
     assert "the lower number against the fixed jaw" in face_f["holding"]
     assert "the higher number against the fixed jaw" in face_d["holding"]
     assert "the lower number against the fixed jaw" in finish_f["holding"]
-    unclamp = next(
-        op["instruction"]
-        for op in face_f["operations"]
-        if op["instruction"].startswith("Unclamp the load")
+
+    def unclamp(setup: dict) -> str:
+        (step,) = [
+            op["instruction"]
+            for op in setup["operations"]
+            if op["instruction"].startswith("Unclamp the load")
+        ]
+        return step
+
+    for setup, number in ((face_f, "lower"), (face_d, "higher")):
+        assert "keep its two together" in unclamp(setup)
+        assert f"{number} number against the fixed jaw" in unclamp(setup)
+    assert (
+        "Clamp the next pair as in Setup 4, its lower number against the fixed jaw"
+        in unclamp(outline)
     )
-    assert "lower number against the fixed jaw" in unclamp
+
+
+_NUMBER_LABEL = re.compile(
+    r'<text class="label" x="[\d.]+" y="([\d.]+)" text-anchor="middle">([12])</text>'
+)
+_FIXED_JAW = re.compile(
+    r'<text class="[\w-]+" x="[\d.]+" y="([\d.]+)" text-anchor="middle">fixed jaw</text>'
+)
+
+
+@pytest.mark.parametrize(
+    ("picture", "at_fixed_jaw"),
+    [
+        ("face_f", "1"),
+        ("face_f-band", "1"),
+        ("face_d", "2"),
+        ("face_d-band", "2"),
+        ("face_f_finish", "1"),
+        ("face_f_finish-band", "1"),
+        ("fork", "1"),
+        ("outline", "1"),
+    ],
+)
+def test_the_top_views_label_the_pair_by_its_numbers(picture, at_fixed_jaw) -> None:
+    """#3728: a top view's 1 and 2 are the pair's lower and higher numbers,
+    so the label at the fixed jaw is 1 in Setups 2 and 4-6 and 2 in Setup 3
+    (the pair turned over as one stack)."""
+    svg = (
+        _process_plans.plan_path(STEM).parent / "diagrams" / f"{picture}.svg"
+    ).read_text(encoding="utf-8")
+    fixed_y = float(_FIXED_JAW.search(svg).group(1))
+    labels = {text: float(y) for y, text in _NUMBER_LABEL.findall(svg)}
+    assert set(labels) == {"1", "2"}
+    nearer = min(labels, key=lambda text: abs(labels[text] - fixed_y))
+    assert nearer == at_fixed_jaw
 
 
 @pytest.mark.parametrize(
