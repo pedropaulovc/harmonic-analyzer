@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400">
-  <!-- Hand picture, the blank and the tap's diameter to scale at 20 px/mm from the 5 mm square (square_mm). #0-80 plug tap Ø.060 (the thread's major diameter, the hole it makes), its point .15 deep (plug_tap_reach_in). The tap's length, the T-handle wrench and the MT3 dead centre are not on record: schematic. The wrench and the dead centre are drawn in the tool's colour: they travel with the tap (the quill follows it). The 4-jaw and its shims are schematic. -->
+  <!-- Hand picture, the blank and the tap's diameter to scale at 20 px/mm from the 5 mm square (square_mm). #0-80 plug tap Ø.060 (the thread's major diameter, the hole it makes), its point .15 deep (plug_tap_reach_in). The tap's length, the T-handle wrench and the MT3 dead centre are not on record: schematic. The wrench and the dead centre are drawn in the tool's colour: they travel with the tap (the quill follows it). The 4-jaw is schematic. The four packing strips (#3495) drawn .063 thick (1.6 mm, 32 px: the offcut example; any .050-.125 does), their length schematic; the jaws drawn short to keep their outer faces. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="24">Top end, the blank to scale (20 px/mm): the plug tap by hand, the dead centre in the wrench</text>
   <rect class="fixture-vise" x="70" y="65" width="110" height="250"/>
-  <rect class="clamp" x="180" y="66" width="120" height="70"/>
-  <rect class="part-rest" x="180" y="136" width="120" height="4"/>
-  <rect class="clamp" x="180" y="244" width="120" height="70"/>
-  <rect class="part-rest" x="180" y="240" width="120" height="4"/>
-  <text class="label" x="70" y="370">4-jaw (schematic) on the flats over brass shims;</text>
+  <rect class="clamp" x="180" y="66" width="120" height="42"/>
+  <rect class="part-rest" x="180" y="108" width="120" height="32"/>
+  <rect class="clamp" x="180" y="272" width="120" height="42"/>
+  <rect class="part-rest" x="180" y="240" width="120" height="32"/>
+  <text class="label" x="70" y="370">4-jaw (schematic) on the flats over packing strips;</text>
   <text class="label" x="70" y="386">indicate each pair of flats within {{process.indicate_tir_in:.3dot}} TIR</text>
   <path class="part-kept" d="M528.6 140L528.6 240L20 240L17 235.83L20 231.67L17 227.5L20 223.33L17 219.17L20 215L17 210.83L20 206.67L17 202.5L20 198.33L17 194.17L20 190L17 185.83L20 181.67L17 177.5L20 173.33L17 169.17L20 165L17 160.83L20 156.67L17 152.5L20 148.33L17 144.17L20 140Z"/>
   <rect class="part-removed" x="391.44" y="178.09" width="137.16" height="23.81"/>

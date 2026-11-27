@@ -3,22 +3,40 @@
 # C360 key stock (the drawing: SQ as supplied, McMaster-Carr 90457A730):
 #
 # - Saw a blank; mike both pairs of flats (the square is left as bought).
-# - 4-jaw on the flats, the top end out, the square indicated to run true
-#   within the shop's .001 TIR (the #0-80's .067 TAP WALL): face the
-#   top end, spot, drill 3/64, tap #0-80 with the plug then the bottoming
-#   tap from the tailstock centre.
-# - Turned round in the 4-jaw, indicated again, the pivot end out: face to
+# - 4-jaw on the flats over four soft packing strips, the top end out, the
+#   square indicated to run true within the shop's .001 TIR (the #0-80's
+#   .067 TAP WALL): face the top end, spot, drill 3/64, tap #0-80 with the
+#   plug then the bottoming tap from the tailstock centre.
+# - Turned round in the 4-jaw over the strips, indicated again, the pivot end out: face to
 #   the overall length, turn the Ø.125 pivot, square its shoulder corner with
 #   the 1/16 P1 blade (R.008 MAX; the AR insert's R0.4 nose cannot) and
 #   plunge the set-screw groove with it in three overlapping plunges.
 # - Bench: deburr, check, oil (FINISH: square as supplied; ends, pivot
 #   machined; oiled).
 #
-# Flagged: the key stock (stock-to-order.toml c360-square-5mm-key) and the
-# .040 pin gauge of Op 70's depth check (gauges.pin-gauges) are to order.
-# The groove's stations are read off a gauge block standing in it (Op 250). The placeholder's sharp-nose tool and ignition wrenches are not
-# needed: the P1 blade cuts the R.008 MAX corner sharp, and the taps turn in
-# a tap wrench.
+# Packing (#3495): the 6 in 4-jaw closes no smaller than Ø.2865 (owner
+# 2026-11-24, cad/process/shop/common.toml workholding.chuck-4jaw-6), and
+# the square is .1950-.1970 across its flats, so each jaw bears on a soft
+# strip on its flat that brings the jaws out inside that range (delegated
+# ruling 2026-11-27 (Main), precedent: the transgear pin's split bush,
+# #3494; owner review #2144 (D57)). Any strip .050-.125 thick does: at
+# .050 on the smallest square the jaws stand .295 apart, .0085 over the
+# least grip; at .125 a strip no wider than .18 still lies flat. No wider
+# than .18, under the .1950 flat, so neighbouring strips never touch at a
+# corner; about .5 long. The example is four strips from the offcut of the
+# owned .063 brass sheet (stock-bought.toml c260-sheet-063-6x6), about
+# .80 x .50 of it with the saw kerfs (jaws .321-.323 apart); it is a strip
+# from the offcut, not an allocation of that sheet (its packing list names
+# MHA-PD-12 and MHA-FR-04). How the least grip was measured, the jaws' tip
+# width and the offcut's size are owner facts to measure (#3754).
+#
+# Flagged: the key stock (stock-to-order.toml c360-square-5mm-key), the
+# .040 pin gauge of Op 70's depth check (gauges.pin-gauges) and the junior
+# hacksaw that cuts the strips (junior-hacksaw) are to order. The groove's
+# stations are read off a gauge block standing in it (Op 250). The
+# placeholder's sharp-nose tool and ignition wrenches are not needed: the
+# P1 blade cuts the R.008 MAX corner sharp, and the taps turn in a tap
+# wrench.
 title = "Pen Rod"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -39,6 +57,7 @@ standing = true
 title = "This job"
 rows = [
   ["Square", "The square is the bar as bought: never cut it."],
+  ["Packing", "Four soft packing strips, one between each jaw and its flat (the jaws cannot close on the bare square): brass, copper or aluminium, any thickness {{process.packing_min_in:.3dot}}–{{process.packing_max_in:.3dot}}, no wider than {{process.packing_width_max_in:.2dot}} (narrower than a flat, so neighbouring strips never touch), about {{process.packing_length_in:.2dot}} long. For example, four strips sawn with the junior hacksaw from the offcut of the .063 brass sheet, about .80 x .50 of it in all; file the burrs off so each lies flat. The same four strips serve Setups 2 and 3."],
 ]
 
 [cad]
@@ -89,6 +108,15 @@ drill_scale_in = 0.384
 # the shop table's runout floor: the hole then sits within .0005 of the
 # square's centre, inside the .067 TAP WALL's margin.
 indicate_tir_in = 0.001
+# The soft packing strips under the 4-jaw (#3495): at the thinnest, the
+# smallest .1950 square plus two strips stands .295 across the jaws, over
+# the 4-jaw's .2865 least grip; at the thickest a strip at the widest still
+# lies flat (no thicker than about 2/3 of its width); no wider than the
+# smallest flat less .015, so the strips on two neighbouring flats never meet.
+packing_min_in = 0.05
+packing_max_in = 0.125
+packing_width_max_in = 0.18
+packing_length_in = 0.5
 # The tap drill: spotted to about Ø.055 with the No. 1 centre drill (a lead
 # for the tap), then the 3/64 to full diameter .26-.28 deep, pecked every
 # .040 (under one diameter). The taps' points stop by pencil marks: the plug at .15 deep, the
@@ -174,6 +202,12 @@ id = "file"
 name = "Smooth file"
 ref = "jig-files"
 
+[[tools]]
+id = "hacksaw"
+name = "Junior hacksaw, 32 TPI"
+ref = "junior-hacksaw"
+status = "to_order"
+
 [[setups]]
 machine_kind = "other"
 title = "Saw the blank"
@@ -207,9 +241,9 @@ title = "Top end: face, drill and tap #0-80"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "6 in 4-jaw, each jaw on a flat over a brass shim, the top end {{process.top_stickout_in:.2dot}} in out of the jaw fronts, the rest of the blank back through the spindle bore. Indicate two adjacent flats next to the jaws with the dial test indicator, turning the chuck by hand, and adjust opposite jaws until each pair reads within {{process.indicate_tir_in:.3dot}} TIR."
+holding = "6 in 4-jaw, each jaw on a flat over a soft packing strip (This job: Packing; the 4-jaw cannot close on the bare square), the top end {{process.top_stickout_in:.2dot}} in out of the jaw fronts, the rest of the blank back through the spindle bore. Indicate two adjacent flats next to the jaws with the dial test indicator, turning the chuck by hand, and adjust opposite jaws until each pair reads within {{process.indicate_tir_in:.3dot}} TIR."
 datum = "Z0 (carriage DRO) the top face, faced in Op 50. The tailstock quill's scale for the drill's depth, zeroed in Op 70."
-diagram = { file = "diagrams/top.svg", alt = "The square in the 4-jaw on its flats over brass shims, the top end .50 in out: the AR tool faces it to Z0, the top face. Drawn to scale but for the chuck and the tool." }
+diagram = { file = "diagrams/top.svg", alt = "The square in the 4-jaw on its flats over four packing strips, the top end .50 in out: the AR tool faces it to Z0, the top face. Drawn to scale but for the chuck and the tool." }
 lathe_hold = "other"
 turning_support = { kind = "chuck_only", chuck_z_mm = -12.7 }
 
@@ -299,7 +333,7 @@ title = "Pivot end: face to length, turn the pivot, groove"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Turned round: the 4-jaw on the flats over the shims, the sawn pivot end {{process.pivot_stickout_in:.2dot}} + (L − {{process.overall_in:.2dot}}) in out of the jaw fronts (L from Op 120), set with the calipers' depth rod, the beam's end on the jaw fronts, so the faced end stands {{process.pivot_stickout_in:.2dot}} out; the tapped end back through the spindle bore; indicated again as Setup 2 to {{process.indicate_tir_in:.3dot}} TIR."
+holding = "Turned round: the 4-jaw on the flats over the same packing strips, the sawn pivot end {{process.pivot_stickout_in:.2dot}} + (L − {{process.overall_in:.2dot}}) in out of the jaw fronts (L from Op 120), set with the calipers' depth rod, the beam's end on the jaw fronts, so the faced end stands {{process.pivot_stickout_in:.2dot}} out; the tapped end back through the spindle bore; indicated again as Setup 2 to {{process.indicate_tir_in:.3dot}} TIR."
 datum = "Z0 (carriage DRO) the pivot end's finished plane, {{process.overall_in:.3dot}} from the top face: the DRO preset from L (Op 120) in Op 150, the blade touched on it again in Op 190. The shoulder at Z−{{process.pivot_len_in:.3dot}}."
 diagram = { file = "diagrams/pivot.svg", alt = "The square turned round in the 4-jaw, the pivot end .60 in out: the AR tool faces it to Z0; the Ø.125 x .41 pivot and the groove it and the blade cut next hatched. Drawn to scale but for the chuck and the tool." }
 lathe_hold = "other"

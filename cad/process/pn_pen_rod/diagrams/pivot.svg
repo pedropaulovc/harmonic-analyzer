@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420">
-  <!-- Hand picture, the blank to scale at 20 px/mm from the 5 mm square (square_mm). The faced end .60 in (pivot_stickout_in) out of the jaw fronts; the Ø.125 x .41 pivot (pivot_aim_dia_mm, pivot_len_in) and the groove .165-.315 from the shoulder, floor Ø.106 (groove_plunge_1_in, groove_aim_dia_in, the drawing) hatched: cut later in this setup. The sawn excess over the length L read in Op 120 varies blank to blank: drawn .05 in, schematic. The 4-jaw, its shims and the AR tool (its TCMT insert size is not on record) are schematic. -->
+  <!-- Hand picture, the blank to scale at 20 px/mm from the 5 mm square (square_mm). The faced end .60 in (pivot_stickout_in) out of the jaw fronts; the Ø.125 x .41 pivot (pivot_aim_dia_mm, pivot_len_in) and the groove .165-.315 from the shoulder, floor Ø.106 (groove_plunge_1_in, groove_aim_dia_in, the drawing) hatched: cut later in this setup. The sawn excess over the length L read in Op 120 varies blank to blank: drawn .05 in, schematic. The 4-jaw and the AR tool (its TCMT insert size is not on record) are schematic. The four packing strips (#3495) drawn .063 thick (1.6 mm, 32 px: the offcut example; any .050-.125 does), their length schematic; the jaws drawn short to keep their outer faces. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="20" y="24">Pivot end out of the 4-jaw, to scale (20 px/mm) bar the chuck and the AR tool: facing to Z0</text>
   <rect class="fixture-vise" x="70" y="65" width="110" height="250"/>
-  <rect class="clamp" x="180" y="66" width="120" height="70"/>
-  <rect class="part-rest" x="180" y="136" width="120" height="4"/>
-  <rect class="clamp" x="180" y="244" width="120" height="70"/>
-  <rect class="part-rest" x="180" y="240" width="120" height="4"/>
-  <text class="label" x="70" y="390">4-jaw (schematic) on the flats over brass shims;</text>
+  <rect class="clamp" x="180" y="66" width="120" height="42"/>
+  <rect class="part-rest" x="180" y="108" width="120" height="32"/>
+  <rect class="clamp" x="180" y="272" width="120" height="42"/>
+  <rect class="part-rest" x="180" y="240" width="120" height="32"/>
+  <text class="label" x="70" y="390">4-jaw (schematic) on the flats over packing strips;</text>
   <text class="label" x="70" y="406">indicate each pair of flats within {{process.indicate_tir_in:.3dot}} TIR</text>
   <path class="part-kept" d="M604.8 140L604.8 240L20 240L17 235.83L20 231.67L17 227.5L20 223.33L17 219.17L20 215L17 210.83L20 206.67L17 202.5L20 198.33L17 194.17L20 190L17 185.83L20 181.67L17 177.5L20 173.33L17 169.17L20 165L17 160.83L20 156.67L17 152.5L20 148.33L17 144.17L20 140Z"/>
   <rect class="part-removed" x="604.8" y="140" width="25.4" height="100"/>
