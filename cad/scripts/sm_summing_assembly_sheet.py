@@ -272,13 +272,22 @@ DOWEL_PROUD = _length(knife_dowel.PROUD, 3)
 BOND_NOTE_A = (
     f"BOND NOTE A, {BOND_GRADE} (STEPS 1E-1G): DEGREASE DOWEL AND HOLE; COAT "
     "THE DOWEL, NEVER THE BLIND HOLE; SEAT IT WITHIN THE FIXTURE TIME AND "
-    "LEAVE IT UNDISTURBED; CURE 24 H BEFORE STEP 5. ACCEPT AT STEP 1H."
+    "LEAVE IT UNDISTURBED; CURE 24 H AT ROOM TEMPERATURE BEFORE STEP 5. "
+    "ACCEPT AT STEP 1H."
 )
+# Note B's acceptance is step 8C's, once the cured plug carries the seated
+# shoulder screw, with its remedy at 8D (8B keeps its number for the screw
+# that sm-summing.yaml and joint_retention cite): a
+# plug that turns or pulls out is not held, so it still comes out and is
+# bonded again (delegated ruling 2026-11-26 (Main), no precedent; owner
+# review #2144 (D54); #3646).  The cure is 24 h at
+# room temperature (LOCTITE 638 TDS, May 2024: about 85-90 % of full
+# strength at 24 h on steel at 22-23 C, gap 0.05 mm or less).
 BOND_NOTE_B = (
     "BOND NOTE B, LOCTITE 638 (STEP 8): DEGREASE THE MHA-SM-05 SPIGOT AND THE "
     "MHA-SM-01 BORE; COAT THE SPIGOT; PUSH IT IN UNTIL THE HEAD SEATS SQUARE "
-    "AND FLUSH ON THE TUBE'S FACED END; CURE 24 H BEFORE STEP 8A. ACCEPT: IT "
-    "DOES NOT TURN OR PULL OUT BY HAND."
+    "AND FLUSH ON THE TUBE'S FACED END; CURE 24 H AT ROOM TEMPERATURE BEFORE "
+    "STEP 8A. ACCEPT AT STEP 8C."
 )
 # The fitter's order; sm_summing_explode_spec.EXPLODE_STEPS runs it backwards.
 # A step does one thing (rule 22): a numbered step's own sub-steps carry a
@@ -332,7 +341,19 @@ ASSEMBLY_STEPS = (
     "1H. AFTER THE CURE, CHECK THAT THE BONDED DOWEL DOES NOT TURN OR SLIDE BY "
     f"HAND AND STANDS AT THE DOWEL PROUD SET ON {DETAIL_TITLE}, SHEET 1 "
     "(CALIPER DEPTH ROD).",
-    "1J. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
+    # Delegated ruling 2026-11-27 (Main), no precedent; owner review #2144
+    # (D54 item 4): a dowel that moves is not held, so it
+    # pulls out cold and is bonded again from 1B; a held dowel that stands
+    # high is stoned down (the mount's slip hole clears the tip by
+    # SLIP_DEPTH_CLEARANCE_MIN, 1.78 mm, at the printed maximum proud).  A
+    # held dowel that stands low has no printed remedy yet: its repair (an
+    # oversize dowel with its own number, ream, bond and acceptance) or
+    # accepting it (widening the printed proud) is the owner's (#3646).
+    "1J. IF A DOWEL TURNS OR SLIDES, PULL IT OUT OF ITS HOLE.",
+    "1K. IF PULLED AT 1J, CLEAN THE DOWEL AND ITS HOLE TO BARE METAL.",
+    "1L. IF PULLED AT 1J, REDO FROM 1B.",
+    "1M. IF A HELD DOWEL STANDS ABOVE THE DOWEL PROUD, STONE ITS END DOWN TO IT.",
+    "1N. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
     "2. THREAD MHA-SM-VN-50 INTO THE TAPPED BOSS OF MHA-SM-03 UNTIL ITS CUT "
     "END IS WITHIN HALF A TURN OF FLUSH WITH THE BOSS UNDERSIDE, FINISHING "
     "WITH THE EYE OPENING TOWARD THE KNIFE EDGE AND THE EYE PLANE SQUARE TO IT.",
@@ -380,6 +401,14 @@ ASSEMBLY_STEPS = (
     "8A. PASS MHA-SM-VN-56 THROUGH THE UPPER LOOP OF MHA-SM-VN-51.",
     "8B. TURN MHA-SM-VN-56 INTO MHA-SM-05 UNTIL ITS SHOULDER SEATS ON THE END "
     "FACE; NO THREADLOCKER.",
+    # 8C accepts the cured bond after 8B's seat, the joint's largest assembly
+    # load, so a bond the seating breaks is caught too.  A plug that turns
+    # cannot hold the screw back, so it is pulled out by the screw first.
+    "8C. CHECK THAT MHA-SM-05 DOES NOT TURN OR PULL OUT OF MHA-SM-01 BY HAND.",
+    "8D. IF IT DOES, PULL MHA-SM-05 OUT OF MHA-SM-01 BY MHA-SM-VN-56.",
+    "8E. IF PULLED AT 8D, TURN MHA-SM-VN-56 OUT OF MHA-SM-05.",
+    "8F. IF PULLED AT 8D, CLEAN MHA-SM-05 AND THE MHA-SM-01 BORE TO BARE METAL.",
+    "8G. IF PULLED AT 8D, REDO FROM STEP 8.",
     "9. AT FINAL ASSEMBLY (MHA-HA-00): DROP THE MHA-SM-01 POST INTO THE "
     "FRAME'S GOOSENECK HUB WITH THE HUB SET SCREW MHA-FR-VN-52 (FITTED PER "
     "MHA-FR-00) BACKED CLEAR.",
