@@ -396,9 +396,9 @@ def test_the_shoulder_screw_goes_in_after_the_end_plug_bond() -> None:
     assert steps["8D"] == (
         "8D. IF IT DOES, PULL MHA-SM-05 OUT OF MHA-SM-01 BY MHA-SM-VN-56."
     )
-    assert steps["8E"] == "8E. IF PULLED, TURN MHA-SM-VN-56 OUT OF MHA-SM-05."
+    assert steps["8E"] == "8E. IF PULLED AT 8D, TURN MHA-SM-VN-56 OUT OF MHA-SM-05."
     assert "TO BARE METAL" in steps["8F"]
-    assert steps["8G"] == "8G. IF PULLED, REDO FROM STEP 8."
+    assert steps["8G"] == "8G. IF PULLED AT 8D, REDO FROM STEP 8."
     assert steps["10A"].startswith("10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52")
     assert "SNUG, 9 IN-LB MAX" in steps["10A"]
     bond_note = notes.BOND_NOTE_B
@@ -430,19 +430,16 @@ def test_a_bonded_loose_dowel_is_held_at_its_proud_and_re_read_after_cure() -> N
     assert "DOES NOT TURN OR SLIDE BY HAND" in steps["1H"]
     assert f"DOWEL PROUD SET ON {notes.DETAIL_TITLE}" in steps["1H"]
     # D54 item 4 (Main, 2026-11-27): a dowel that moves pulls out and is
-    # bonded again; a held one standing high is stoned down.  D56: one
-    # standing low is accepted down to the 1.5 D floor, under it the frame
-    # goes back.
+    # bonded again; a held one standing high is stoned down, one standing
+    # low goes back with the top frame (no acceptance number is printed).
     assert steps["1J"] == "1J. IF A DOWEL TURNS OR SLIDES, PULL IT OUT OF ITS HOLE."
-    assert steps["1L"] == "1L. IF PULLED, REDO FROM 1B."
+    assert steps["1L"] == "1L. IF PULLED AT 1J, REDO FROM 1B."
     assert steps["1M"].endswith("STONE ITS END DOWN TO IT.")
-    assert notes.DOWEL_PROUD_FLOOR == ".204"
-    assert f"AT LEAST {notes.DOWEL_PROUD_FLOOR} PROUD, ACCEPT IT." in steps["1N"]
-    assert steps["1P"].startswith(
-        f"1P. IF ONE STANDS UNDER {notes.DOWEL_PROUD_FLOOR}, RETURN"
+    assert steps["1N"].startswith(
+        "1N. IF A HELD DOWEL STANDS BELOW THE DOWEL PROUD, RETURN THE TOP FRAME"
     )
-    assert steps["1Q"].startswith("1Q. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54")
-    labels = "1B 1C 1D 1E 1F 1G 1H 1J 1K 1L 1M 1N 1P 1Q".split()
+    assert steps["1P"].startswith("1P. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54")
+    labels = "1B 1C 1D 1E 1F 1G 1H 1J 1K 1L 1M 1N 1P".split()
     for label in labels:
         assert steps[label].count(". ") == 1, steps[label]
     bond_note = notes.BOND_NOTE_A
