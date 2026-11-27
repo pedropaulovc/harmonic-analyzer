@@ -399,10 +399,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "drilled-hole row (no native band; D27): indexed for the seam web, "
         "the relief wall and the hub's float on the stub"
     ),
-    ("dt_crank_handle_butt_cup_spec", "POCKET_DIA_BAND"): (
-        "the pocket's own .248-.257 as deviations on the modelled .250; the sheet "
-        "and export carry dia_ref and dia_max (POCKET_DIA_LIMITS), fit audit Q15"
-    ),
     ("_sprocket_seat_geometry", "PLATE_BAND"): (
         "the wheel plate's thickness deviations, indexed for the hub-to-sprocket "
         "air and the chain envelope's reach"

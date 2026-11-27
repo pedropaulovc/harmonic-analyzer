@@ -323,12 +323,12 @@ requirement(
         "at": ([0.0, 0.0, 0.0], ("POCKET_DIA",)),
         "span": ([-POCKET_DEPTH, 0.0], ("POCKET_DEPTH",)),
         # The traveler's turned_bush adapter takes a pocket as its reference
-        # size, its upper limit and the head's clearance in it: the owned 1/4
-        # end mill cuts .248 or over (the band's lower limit), the .257 pin
-        # that must not enter checks the upper one, and the head clears it by
-        # .007-.026 unmatched (fit audit Q15).
+        # size, its upper limit and the head's clearance in it: bored to
+        # .275 +/-.005 (.270-.280) at the title block's .XXX row (#3743),
+        # checked by .270 GO and .280 NO-GO pins, and cleared by the head by
+        # .003-.023 unmatched.
         "dia_ref": (POCKET_DIA, ("POCKET_DIA", (_SELF, "SECTION_KEEP"))),
-        "dia_max": (POCKET_DIA_MAX, ("POCKET_DIA_MAX", "POCKET_DIA_BAND")),
+        "dia_max": (POCKET_DIA_MAX, ("POCKET_DIA_MAX", "POCKET_DIA_TOL")),
         "diametral_clearance": (list(POCKET_CLEARANCE), ("POCKET_CLEARANCE",)),
         "mate": (
             f"{SCREW_NUMBER} {SCREW_NAME} HEAD",

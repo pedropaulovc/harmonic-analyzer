@@ -121,9 +121,18 @@ diameter_mm = 0.9271
 [tools.reamer-0625]  # MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20; MHA-DT-38 .0625 +.0005/.0000 REAM THRU (#2469)
 description = ".0625 in HSS chucking reamer"
 diameter_mm = 1.5875
-[tools.chamfer-mill-3-16-90]  # MHA-DT-35 #20 hole's floor-side chamfer inside the pocket (inventory: to order)
-description = "3/16 in 90° pointed 2-flute carbide chamfer cutter (Harvey Tool 902345-C3)"
+# Owner ruling 2026-11-26 (#3743, option A): owned 3/16 in carbide square end
+# mill clamped in the AXA No. 2 V-groove boring holder on center height to bore
+# MHA-DT-35's .250 plunged pocket .0125/side out to Ø.275 +/-.005, leaving its
+# floor corner inside R.015 MAX (inventory tools.endmill-carbide-3fl-3-16).
+[tools.endmill-carbide-3fl-3-16]
+description = "3/16 in 3-flute uncoated carbide square end mill, 2 in OAL (McMaster 88815A23), in the AXA No. 2 V-groove boring holder"
 diameter_mm = 4.7625
+[settings.dt-lathe-bore-em-3-16-1018]
+tool = "endmill-carbide-3fl-3-16"
+material = "lathe-1018-cold-finished"
+sfm = 350
+feed = "carriage by hand, light passes to the floor, cutting oil"
 [tools.reamer-3740]  # inventory tools.reamer-3740
 description = ".3740 in HSS straight-flute chucking reamer (McMaster 3087A55)"
 diameter_mm = 9.4996

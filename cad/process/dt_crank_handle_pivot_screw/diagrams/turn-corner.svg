@@ -1,16 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, from above (the cross-slide at the bottom), to scale at 200 px/in along and across the axis: the Ø1/4 rod (process.stock_dia_in) 3.067 out of the jaw fronts (process.stickout_mm: S = P + .33 for the drawn M), Z0 the tip; the head Ø.236 (process.head_aim_dia_mm), the shoulder Ø.156 (process.shoulder_aim_dia_mm) to the under-head face at Z-2.463 (process.under_head_z_mm, U for the drawn M), the #4-40 blank Ø.1085 (process.thread_aim_dia_mm) to the seat at Z-.380 (process.seat_z_in), the part-off at Z-2.620 (process.part_off_z_mm, P). The 3-jaw's body and jaws are schematic (their sizes are not on record). The MT3 dead centre is schematic (its sizes are not on record). The head and the shoulder finished (Ops 70–100; the shoulder to .010 short of U). The P1 blade to scale across (shop cutoff-blade-p1, 1/16 = 12.5 px), on centre height, its chuck-side face at Z-2.463 (U), plunged to the shoulder's Ø; its length runs on to a break line. The dead centre in the tip. -->
+  <!-- Hand picture, from above (the cross-slide at the bottom), to scale at 200 px/in along and across the axis: the Ø3/8 rod (process.stock_dia_in) 3.067 out of the jaw fronts (process.stickout_mm: S = P + .33 for the drawn M), Z0 the tip; the head Ø.262 (process.head_aim_dia_mm), the shoulder Ø.156 (process.shoulder_aim_dia_mm) to the under-head face at Z-2.463 (process.under_head_z_mm, U for the drawn M), the #4-40 blank Ø.1085 (process.thread_aim_dia_mm) to the seat at Z-.380 (process.seat_z_in), the part-off at Z-2.620 (process.part_off_z_mm, P). The 3-jaw's body and jaws are schematic (their sizes are not on record). The MT3 dead centre is schematic (its sizes are not on record). The head and the shoulder finished (Ops 70–100; the shoulder to .010 short of U). The P1 blade to scale across (shop cutoff-blade-p1, 1/16 = 12.5 px), on centre height, its chuck-side face at Z-2.463 (U), plunged to the shoulder's Ø; its length runs on to a break line. The dead centre in the tip. -->
   <rect class="paper" x="0" y="0" width="760" height="380"/>
   <text class="title" x="20" y="22">Setup 3, Op 120: the P1 blade plunges to the shoulder, its chuck-side face on Z−U (to scale, 200 px/in)</text>
-  <rect class="fixture-vise" x="-19.39" y="123" width="56" height="134"/>
-  <path class="part-rest" d="M40 165L146.69 165L146.69 215L40 215L37 207.86L40 200.71L37 193.57L40 186.43L37 179.29L40 172.14Z"/>
-  <rect class="part-kept" x="146.69" y="166.4" width="19.31" height="47.2"/>
-  <rect class="part-kept" x="166" y="166.4" width="31.4" height="47.2"/>
+  <rect class="fixture-vise" x="-19.39" y="110.5" width="56" height="159"/>
+  <path class="part-rest" d="M40 152.5L146.69 152.5L146.69 227.5L40 227.5L37 216.79L40 206.07L37 195.36L40 184.64L37 173.93L40 163.21Z"/>
+  <rect class="part-kept" x="146.69" y="163.8" width="19.31" height="52.4"/>
+  <rect class="part-kept" x="166" y="163.8" width="31.4" height="52.4"/>
   <rect class="part-kept" x="197.4" y="174.4" width="492.6" height="31.2"/>
-  <rect class="clamp" x="36.61" y="135" width="40" height="30"/>
-  <rect class="clamp" x="36.61" y="215" width="40" height="30"/>
+  <rect class="clamp" x="36.61" y="122.5" width="40" height="30"/>
+  <rect class="clamp" x="36.61" y="227.5" width="40" height="30"/>
   <line class="centre-line" x1="20" y1="190" x2="740" y2="190"/>
-  <rect class="part-removed" x="197.4" y="166.4" width="2" height="47.2"/>
+  <rect class="part-removed" x="197.4" y="163.8" width="2" height="52.4"/>
   <path class="clamp" d="M684 190L725.57 166L750 166L750 214L725.57 214Z"/>
   <path class="cutter" d="M197.4 375L197.4 205.6L209.9 205.6L209.9 375L203.65 372Z"/>
   <line class="arrow" x1="181.4" y1="365" x2="181.4" y2="325"/>
@@ -22,8 +22,8 @@
   <line class="leader" x1="450" y1="116" x2="450" y2="174.4"/>
   <circle class="leader-dot" cx="450" cy="174.4" r="2"/>
   <text class="label" x="100" y="60">head Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}</text>
-  <line class="leader" x1="160" y1="66" x2="176" y2="166.4"/>
-  <circle class="leader-dot" cx="176" cy="166.4" r="2"/>
+  <line class="leader" x1="160" y1="66" x2="176" y2="163.8"/>
+  <circle class="leader-dot" cx="176" cy="163.8" r="2"/>
   <text class="label" x="590" y="150">dead centre in the tip</text>
   <line class="leader" x1="630" y1="156" x2="730" y2="182"/>
   <circle class="leader-dot" cx="730" cy="182" r="2"/>

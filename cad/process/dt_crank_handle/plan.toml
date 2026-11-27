@@ -34,7 +34,7 @@ ref = "drill-20"  # Drills #20: #20 DRILL THRU
 [[tools]]
 id = "boring-bars-meda-6045000"
 name = "Lathe boring bars"
-ref = "boring-bars-meda-6045000"  # drawing cross-check 2026-11-19: (.426) butt counterbore to the measured mate
+ref = "boring-bars-meda-6045000"  # drawing cross-check 2026-11-19; #3743: (.451) butt counterbore to the measured mate
 
 [[setups]]
 machine_kind = "other"

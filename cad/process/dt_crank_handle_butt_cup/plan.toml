@@ -2,35 +2,28 @@
 # PM-1127VF-LB (owner ruling 2026-11-21: turned parts get lathe travelers, no
 # NC). Route chosen for speed, two chuckings of the 1/2 in 1018 bar on hand.
 # Order of manufacture: this cup first (bonded into the handle), the MHA-DT-32
-# screw last. Owner ruling 2026-11-23 (tool audit Q6): "End-mill the pocket
-# with the owned 1/4 carbide end mill ... no boring bar." Owner ruling
-# 2026-11-24, fit audit question 15 (no matching): the pocket keeps its own
-# limits .248-.257 and is not read for the screw; the MHA-DT-32 head is
-# turned to its own .231-.241 and clears any such pocket. First the
+# screw last. Owner ruling 2026-11-26 (#3743, option A): plunge the pocket
+# .250 to the .217 floor with the owned 1/4 carbide square end mill from the
+# tailstock, then bore .0125/side out to Ø.275 +/-.005 (.270-.280) with the
+# owned 3/16 carbide square end mill clamped in the AXA No. 2 V-groove boring
+# holder (its square corner leaves the floor corner well inside R.015 MAX),
+# check with .270 GO / .280 NO-GO pins, and chamfer the #20 floor-hole mouth
+# with the owned 1/4 in 90° 330CH chamfer mill (retiring the $67 Harvey
+# 902345-C3 3/16 chamfer cutter and tight band N-01). First the
 # MHA-DT-08 counterbore is measured (note 2 turns the body to it). Setup 1
 # saws a 3 in piece off the bar: the lathe never runs the whole bar, whose
 # length behind the jaws would pass the spindle's rear end (#3424; limit
 # cad/config/shop-equipment/ machines.pm-1127vf-lb
 # bar_behind_jaw_fronts_max_in). Setup 2, the piece pocket end out: face (Z0), turn the body to the measured
 # counterbore less its clearance, spot, drill #20 through past the parting
-# line, drill #1 short of the pocket floor, then plunge the pocket to the
-# floor depth with the 1/4 carbide square end mill from the tailstock (its
-# square corner leaves the floor corner inside R.003 MAX) and check its
-# upper limit with one pin. A 3/16 in 90° chamfer
-# cutter chamfers the #20 hole's edge on the floor. Part off .02 long. Setup
-# 3, the cup turned round on its body over a shim wrap: mike its length,
-# touch the AR on the parted end and preset the DRO from that length (nothing
-# seats the cup axially), face the far end to length and chamfer its outside
-# edge. Bench: deburr and check.
-#
-# Pocket: the end mill is 1/4 in -.002/0 (McMaster 88815A43's page,
-# common.toml tools.endmill-carbide-3fl-1-4), so the pocket comes out .248 or
-# over; run-out in the chuck could open it, so the .257 pin of the set, the
-# sheet's upper limit, must not enter. The wall at the face at that limit,
-# (.417 - .257)/2 less the two .010 edge breaks, is .060, note 1's .060 MIN.
-#
-# Not on hand (cad/config/shop-equipment/tools-cutting.toml, to order): the
-# Harvey Tool 902345-C3 3/16 in chamfer cutter.
+# line, drill #1 short of the pocket floor, plunge the pocket to the floor
+# depth with the 1/4 carbide end mill from the tailstock, bore the pocket wall
+# out to Ø.270-.280 with the 3/16 carbide end mill in AXA #2, check with .270
+# and .280 pins, and chamfer the #20 hole's floor-side edge with the owned 1/4
+# 90° chamfer mill. Part off .02 long. Setup 3, the cup turned round on its
+# body over a shim wrap: mike its length, touch the AR on the parted end and
+# preset the DRO from that length (nothing seats the cup axially), face the far
+# end to length and chamfer its outside edge. Bench: deburr and check.
 title = "Crank Handle Butt Cup"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -48,7 +41,7 @@ standing = true
 [[notes]]
 title = "This job"
 rows = [
-  ["To order", "To order (not on hand): the 3/16 in 90° chamfer cutter and the Class ZZ pin-gauge set (.061–.500 minus) for the pocket's upper limit and the #20 hole check."],
+  ["To order", "To order (not on hand): the Class ZZ pin-gauge set (.061–.500 minus) for the pocket's .270/.280 check and the #20 hole check."],
   ["Make first", "Make this cup before the MHA-DT-32 screw, which is fitted to the bonded handle."],
 ]
 
@@ -113,12 +106,18 @@ id = "drill-1"
 name = "#1 drill"
 ref = "drill-1"
 
-# The owned 1/4 in carbide square end mill (owner ruling 2026-11-23, tool
-# audit Q6: "End-mill the pocket with the owned 1/4 carbide end mill").
+# The owned 1/4 in carbide square end mill plunges the pocket to depth, then
+# the owned 3/16 in carbide square end mill in AXA #2 bores .0125/side out to
+# Ø.275 +/-.005 (owner ruling 2026-11-26, #3743 option A).
 [[tools]]
 id = "end-mill"
 name = "1/4 in 3-flute carbide square end mill, in the tailstock drill chuck"
 ref = "endmill-carbide-3fl-1-4"
+
+[[tools]]
+id = "bore-em"
+name = "3/16 in 3-flute carbide square end mill, in the AXA No. 2 boring holder"
+ref = "endmill-carbide-3fl-3-16"
 
 [[tools]]
 id = "pins"
@@ -128,8 +127,8 @@ status = "to_order"
 
 [[tools]]
 id = "chamfer-mill"
-name = "3/16 90° chamfer cutter"
-ref = "chamfer-mill-3-16-90"
+name = "1/4 in 90° 2-flute chamfer mill, in the tailstock drill chuck"
+ref = "chamfer-mill-330ch-1-4-90"
 
 [[tools]]
 id = "cutoff"
@@ -167,7 +166,7 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "lathe"
-title = "Bar, pocket end out: turn the body, drill, plunge the pocket with the end mill, part off long"
+title = "Bar, pocket end out: turn the body, drill, plunge and bore the pocket, part off long"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
@@ -263,7 +262,7 @@ speed_kind = "spindle"
 tool = "end-mill"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle stopped, the end mill backed out: read the floor's depth with the calipers' depth rod beside the #20 hole. Spindle on: feed the end mill in by the difference to {{cad.pocket_depth_in:.3dot}} on the quill scale, back it out and read again; repeat until it reads {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}}. The end mill's square corner leaves the floor corner inside R{{cad.pocket_corner_r_max_in:.3dot}} max."
+instruction = "Spindle stopped, the end mill backed out: read the floor's depth with the calipers' depth rod beside the #20 hole. Spindle on: feed the end mill in by the difference to {{cad.pocket_depth_in:.3dot}} on the quill scale, back it out and read again; repeat until it reads {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}}."
 settings = "lathe-endmill-1-4-plunge-1018"
 cut_diameter_mm = 6.35
 inspection = "Pocket depth {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} to a flat floor (calipers' depth rod beside the #20 hole); short: feed on; deep: scrap."
@@ -271,9 +270,19 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pocket_depth_band_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped, the pocket blown clean: try the .257 pin of the set in the pocket by hand, clean and dry, no force."
-inspection = "The .257 pin does not enter (the pocket under its drawn .257 limit; the 1/4 end mill cuts .248 or over). It enters: stop and report (the end mill is running out in the chuck)."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.2992, 6.5278] }]
+speed_kind = "spindle"
+tool = "bore-em"
+drilling = "none"
+sizing = "other"
+instruction = "Clamp the 3/16 carbide square end mill on its shank in the AXA No. 2 V-groove boring holder on center height, parallel to the spindle axis, projecting about .40. Touch its end on the faced end to verify DRO Z0, then bring its cutting flute lightly against the .250 plunged pocket wall and zero the cross-slide. Bore the pocket wall out .0125 a side to Ø{{cad.pocket_ref_in:.3dot}} (.270–{{cad.pocket_dia_max_in:.3dot}}) in three light passes (.005, .005 and .0025 radial on the cross-slide) to Z-{{cad.pocket_depth_in:.3dot}}, kissing the flat floor cleanly; the square end-mill corner leaves the floor corner well inside R{{cad.pocket_corner_r_max_in:.3dot}} max."
+settings = "dt-lathe-bore-em-3-16-1018"
+cut_diameter_mm = "{{cad.pocket_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped, the pocket blown clean: try the .270 GO pin and the {{cad.pocket_dia_max_in:.3dot}} NO-GO pin of the set in the pocket by hand, clean and dry, no force."
+inspection = "Pocket Ø.270–{{cad.pocket_dia_max_in:.3dot}}: the .270 pin enters and the {{cad.pocket_dia_max_in:.3dot}} pin does not. Tight (.270 refuses): take a spring pass or .001 radial skim as Op 100 and recheck; {{cad.pocket_dia_max_in:.3dot}} enters: scrap."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.858, 7.112] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -281,9 +290,9 @@ speed_kind = "spindle"
 tool = "chamfer-mill"
 drilling = "none"
 sizing = "other"
-instruction = "Chamfer the #20 hole's edge on the pocket floor with the 3/16 90° chamfer cutter from the tailstock: touch the edge, then feed about .007 by the quill scale (drawn {{cad.chamfer_bore_leg_min_in:.3dot}} MIN × 45°; the title block's chamfer {{cad.chamfer_bore_leg_max_in:.3dot}} max caps it)."
-settings = "lathe-chamfer-3-16-1018"
-cut_diameter_mm = 4.7625
+instruction = "Chamfer the #20 hole's edge on the pocket floor with the 1/4 in 90° chamfer mill from the tailstock (its .250 body clears the .270–{{cad.pocket_dia_max_in:.3dot}} pocket wall): touch the edge, then feed about .007 by the quill scale (drawn {{cad.chamfer_bore_leg_min_in:.3dot}} MIN × 45°; the title block's chamfer {{cad.chamfer_bore_leg_max_in:.3dot}} max caps it)."
+settings = "lathe-chamfer-1-4-1018"
+cut_diameter_mm = 6.35
 
 [[setups.operations]]
 cut_kind = "other"
@@ -301,8 +310,8 @@ title = "Turned round on the body: face to length, chamfer the far edge"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a shim wrap on the body, {{process.regrip_grip_in:.2dot}} in of it in the jaws from the pocket end, closed lightly (the pocket wall is about .08); the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the cup axially: Op 130 locates the pocket end by the miked length instead."
-datum = "The pocket end (in the jaws), located through the miked length: Op 130 presets the DRO so the pocket end is Z-{{cad.length_in:.3dot}} and the faced far end Z0. The setting error, about .002 (the micrometer reading and the tool's touch on the face), stays inside the {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} band; a cup pushed back in the light grip only comes out long."
+holding = "3-jaw over a shim wrap on the body, {{process.regrip_grip_in:.2dot}} in of it in the jaws from the pocket end, closed lightly (the pocket wall is about .08); the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the cup axially: Op 140 locates the pocket end by the miked length instead."
+datum = "The pocket end (in the jaws), located through the miked length: Op 140 presets the DRO so the pocket end is Z-{{cad.length_in:.3dot}} and the faced far end Z0. The setting error, about .002 (the micrometer reading and the tool's touch on the face), stays inside the {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} band; a cup pushed back in the light grip only comes out long."
 diagram = { file = "diagrams/regrip.svg", alt = "The cup turned round, its pocket end in the jaws over a shim wrap: the parted end faced to length from the miked pocket end and its outside edge chamfered." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
@@ -312,7 +321,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Before chucking, mike the cup's length across both ends and write it on this sheet as L0 (about {{cad.part_off_in:.2dot}}). Chuck it, then with the spindle running bring the AR in until it just marks the parted end and set the DRO Z there to L0 less {{cad.length_in:.3dot}}. Face the parted end in light skims to Z0: the length is then {{cad.length_in:.3dot}} within the .002 setting error (miked at the bench, Op 160)."
+instruction = "Before chucking, mike the cup's length across both ends and write it on this sheet as L0 (about {{cad.part_off_in:.2dot}}). Chuck it, then with the spindle running bring the AR in until it just marks the parted end and set the DRO Z there to L0 less {{cad.length_in:.3dot}}. Face the parted end in light skims to Z0: the length is then {{cad.length_in:.3dot}} within the .002 setting error (miked at the bench, Op 170)."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -359,7 +368,7 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A cup long in Op 160 goes back to Op 130 (a new L0, chucked, touched, preset and faced to Z0), then Op 140 (the far chamfer cut and checked again), Op 150 (the far end deburred again), then Op 160. One short in Op 160 or failing the hole check in Op 170 is scrapped, not reworked: make another from a new sawn piece (Setups 1 and 2)."
+instruction = "A cup long in Op 170 goes back to Op 140 (a new L0, chucked, touched, preset and faced to Z0), then Op 150 (the far chamfer cut and checked again), Op 160 (the far end deburred again), then Op 170. One short in Op 170 or failing the hole check in Op 180 is scrapped, not reworked: make another from a new sawn piece (Setups 1 and 2)."
 feed = "hand"
 
 [[setups.operations]]

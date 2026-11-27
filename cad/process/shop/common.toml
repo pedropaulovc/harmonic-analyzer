@@ -774,6 +774,12 @@ description = "Carbide 60° centre drills, trade sizes 1, 3 and 6"
 description = "Carbide 1/4 in 90° chamfering end mill, 2-flute (McMaster 3073A46)"
 diameter_mm = 6.35
 flute_length_mm = 3.175
+# Shared by MHA-PD-13 (countersinking #29 tap hole) and MHA-DT-35 (chamfering
+# the #20 floor hole inside the Ø.275 pocket, #3743); inventory
+# tools.chamfer-mill-330ch-1-4-90.
+[tools.chamfer-mill-330ch-1-4-90]
+description = "330CH 1/4 in 90° included 2-flute chamfer mill"
+diameter_mm = 6.35
 # The set McMaster-Carr sells as 4289A78 is Noga's SP1007 (owner 2026-11-23,
 # tool audit Q12: "the mcmaster kit sold is actually noga sp1007"; "check Noga
 # SP1007"). Noga_Deburring-2017.pdf (noga.com) p.53 lists the RD16.5

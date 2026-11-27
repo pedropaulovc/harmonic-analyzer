@@ -1,16 +1,11 @@
 # Why each band tighter than the title block stays on MHA-DT-35
 # (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
-# not on the sheet).  The pocket's own limits .248-.257 and its R.003 MAX
-# floor corner, the MHA-DT-32 head unmatched, are owner ruling 2026-11-24,
-# fit audit question 15.
+# not on the sheet).  Owner ruling 2026-11-26 (#3743, option A) retires the
+# tight Ø.248/.257 pocket band (now Ø.275 at the title block's .XXX +/-.005)
+# and opens the pocket floor corner from R.003 MAX to R.015 MAX.
 necessity:
   - id: N-01
-    feature: "sheet 1, section A-A, Ø.248/.257 pocket"
-    kind: gap
-    reason: "a larger pocket leaves the face wall under .060"
-    source: "owner ruling 2026-11-24, fit audit question 15; the 1/4 end mill cuts .248 or over"
-  - id: N-02
-    feature: "sheet 1, section A-A, pocket floor corner R.003 MAX"
+    feature: "sheet 1, section A-A, pocket floor corner R.015 MAX"
     kind: gap
     reason: "a larger corner props the MHA-DT-32 head off the floor"
-    source: "owner ruling 2026-11-24, fit audit question 15"
+    source: "owner ruling 2026-11-26, issue #3743"

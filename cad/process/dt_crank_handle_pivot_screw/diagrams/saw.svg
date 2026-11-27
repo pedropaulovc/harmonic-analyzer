@@ -1,16 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, from above, to scale at 60 px/in: the Ø1/4 rod (process.stock_dia_in) and the blank B = P + .90 (process.blank_over_p_in), drawn 3.52 for the M the stations above assume (B between process.blank_min_in and process.blank_max_in), sawn on the waste side of the scribe. The saw's vise jaws are schematic; the blade's kerf is not on record: drawn as a heavy line. The rod runs on to a break line. -->
+  <!-- Hand picture, from above, to scale at 60 px/in: the Ø3/8 rod (process.stock_dia_in) and the blank B = P + .90 (process.blank_over_p_in), drawn 3.52 for the M the stations above assume (B between process.blank_min_in and process.blank_max_in), sawn on the waste side of the scribe. The saw's vise jaws are schematic; the blade's kerf is not on record: drawn as a heavy line. The rod runs on to a break line. -->
   <rect class="paper" x="0" y="0" width="760" height="250"/>
-  <text class="title" x="20" y="22">Setup 2, Op 30: the blank B off the 1/4 rod, from above (to scale, 60 px/in)</text>
+  <text class="title" x="20" y="22">Setup 2, Op 30: the blank B off the 3/8 rod, from above (to scale, 60 px/in)</text>
   <rect class="fixture-table" x="20" y="62.5" width="720" height="125"/>
-  <rect class="part-kept" x="40" y="132.5" width="211.2" height="15"/>
-  <path class="part-rest" d="M251.2 132.5L730 132.5L727 140L730 147.5L251.2 147.5Z"/>
-  <rect class="clamp" x="341.2" y="98.5" width="130" height="34"/>
-  <rect class="clamp" x="341.2" y="147.5" width="130" height="34"/>
-  <text class="label-on-clamp" x="349.2" y="120.5">saw vise</text>
-  <text class="label" x="341.2" y="88.5">saw vise on the long end (jaws schematic)</text>
+  <rect class="part-kept" x="40" y="128.75" width="211.2" height="22.5"/>
+  <path class="part-rest" d="M251.2 128.75L730 128.75L727 140L730 151.25L251.2 151.25Z"/>
+  <rect class="clamp" x="341.2" y="94.75" width="130" height="34"/>
+  <rect class="clamp" x="341.2" y="151.25" width="130" height="34"/>
+  <text class="label-on-clamp" x="349.2" y="116.75">saw vise</text>
+  <text class="label" x="341.2" y="84.75">saw vise on the long end (jaws schematic)</text>
   <rect class="cutter" x="251.2" y="95" width="3" height="90"/>
-  <text class="label" x="40" y="126">blank B = P + {{process.blank_over_p_in:.2dot}} (Setup 1)</text>
+  <text class="label" x="40" y="122">blank B = P + {{process.blank_over_p_in:.2dot}} (Setup 1)</text>
   <text class="label" x="40" y="212">sawn on the waste side of the scribe; pick it up only once the blade has stopped;</text>
   <text class="label" x="40" y="228">deburr both sawn ends</text>
 </svg>

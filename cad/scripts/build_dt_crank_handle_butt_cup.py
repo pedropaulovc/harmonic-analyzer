@@ -50,7 +50,6 @@ from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _fit_deviations import deviations
-from _limit_tolerance import set_limits
 from _single_limit_tolerance import set_single_limit
 from dt_crank_handle_butt_cup_notes import ISOMETRIC_VIEW_NOTE
 from dt_crank_handle_butt_cup_spec import (
@@ -60,11 +59,9 @@ from dt_crank_handle_butt_cup_spec import (
     OVERALL_LENGTH,
     POCKET_DEPTH,
     POCKET_DIA,
-    POCKET_DIA_LIMITS,
     POCKET_FLOOR_CORNER_R_BAND,
     POCKET_FLOOR_CORNER_R_MAX,
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
-    UNIT,
 )
 from dt_crank_handle_butt_cup_seat_spec import (
     CUP_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
@@ -341,16 +338,6 @@ def build(adapter) -> dict[str, str]:
         limit=FLOOR_HOLE_CHAMFER,
         band=(FLOOR_HOLE_CHAMFER_LIMITS[1] - FLOOR_HOLE_CHAMFER, 0.0),
         tol_type=MIN_TOL_TYPE,
-    )
-    # The pocket's own limits .248-.257, the end mill's .250 modelled
-    # (owner ruling 2026-11-24, fit audit question 15).
-    set_limits(
-        adapter,
-        "CupProfile",
-        "PocketDia",
-        limits=POCKET_DIA_LIMITS,
-        places=DRAWING_PRECISION["CupProfile"]["PocketDia"],
-        display_unit=UNIT,
     )
     apply_drawing_properties(
         adapter,

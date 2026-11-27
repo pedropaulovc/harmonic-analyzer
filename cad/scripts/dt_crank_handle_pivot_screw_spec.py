@@ -80,17 +80,27 @@ def inch_text(value_mm: float, places: int) -> str:
 EDGE_BREAK_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
 _GENERAL_2PL = printed_band_mm(2, unit=UNIT)
 _GENERAL_3PL = printed_band_mm(3, unit=UNIT)
-STOCK_DIA = 0.25 * MM_PER_IN
+# Owner ruling 2026-11-26 (#3743, option A): turned from owned 3/8-in 1018 CF
+# bar so the enlarged Ø.262 head cleans up cleanly.
+STOCK_DIA = 0.375 * MM_PER_IN
 
 # User ruling 2026-09-29 (ch11 p.14): the head sits recessed in the MHA-DT-35
 # butt cup's pocket, which it clears unmatched (owner ruling 2026-11-24, fit
 # audit question 15), and bears on the cup floor.
-# Its .XXX band keeps a bearing annulus outside the drilled floor hole at the
-# worst case, after an edge break on each.  User ruling 2026-09-30 (ch30
-# eight-views-4): the photographed head, which lets the cup and the butt
-# shrink to the photographed size.
-HEAD_DIA = 5.9944  # .236
+# Owner ruling 2026-11-26 (#3743, option A): Ø.262 at .XXX (+/-.005, .257-.267)
+# inside MHA-DT-35's .275 +/-.005 pocket (.270-.280), with a .021 +/-.005 x 45
+# degree outer rim break (.016-.026) on the under-head side so the smallest
+# break (.016) clears MHA-DT-35's R.015 MAX pocket-floor corner at zero radial
+# gap while the smallest head under the largest break still leaves >= 0.1 mm of
+# flat bearing annulus outside the broken #20 floor hole.
+HEAD_DIA = 6.6548  # .262
 HEAD_DIA_TOL = _GENERAL_3PL
+HEAD_CHAMFER = 0.5334  # .021
+HEAD_CHAMFER_TOL = _GENERAL_3PL
+HEAD_CHAMFER_LIMITS = (
+    round(HEAD_CHAMFER - HEAD_CHAMFER_TOL, 6),
+    round(HEAD_CHAMFER + HEAD_CHAMFER_TOL, 6),
+)  # .016-.026
 # User ruling 2026-09-29 (MHA-DT-32 machinist review): with the slot's own
 # band below, the worst case leaves a real web under the slot.  Banded (Codex
 # P2 on #1139, user ruling 2026-09-30): a looser head, at the widest fitted end
@@ -310,14 +320,17 @@ SLOT_WEB_MIN = round(
 )
 TIP_CHAMFER_MAX = TIP_CHAMFER  # the printed single limit
 # Under-head bearing annulus on the cup floor at the worst case: the smallest
-# head over the largest drilled floor hole, less a title-block edge break on
-# each, on the narrow side with the head pushed off-centre as far as its
-# running play allows (local review of fbf82ad96: the concentric figure
-# overstated it).  The play is the smaller of the head's in the pocket and
-# the shoulder's in the floor hole.
+# head less its largest under-head outer break, over the largest drilled floor
+# hole plus its largest mouth break (the cup sheet's edge break), on the narrow
+# side with the head pushed off-centre as far as its running play allows (local
+# review of fbf82ad96: the concentric figure overstated it).  The play is the
+# smaller of the head's in the pocket and the shoulder's in the floor hole.
 _FLOOR_HOLE_MAX = CUP_FLOOR_HOLE_DIA + drilled_oversize_mm(unit=CUP_UNIT)
 HEAD_BEARING_RADIAL_CONCENTRIC_MIN = round(
-    ((HEAD_DIA - HEAD_DIA_TOL) - _FLOOR_HOLE_MAX) / 2.0 - 2.0 * EDGE_BREAK_MAX_MM, 6
+    ((HEAD_DIA - HEAD_DIA_TOL) - _FLOOR_HOLE_MAX) / 2.0
+    - HEAD_CHAMFER_LIMITS[1]
+    - edge_break_chamfer_mm(unit=CUP_UNIT),
+    6,
 )
 HEAD_RUNNING_OFFSET_MAX = round(
     min(CUP_POCKET_CLEARANCE[1] / 2.0, (_FLOOR_HOLE_MAX - (SHOULDER_DIA + SHOULDER_DIA_BAND[1])) / 2.0),
@@ -498,11 +511,11 @@ for _ok, _what in (
         "tip chamfer and relief leave no full thread",
     ),
     (HEAD_DIA > HANDLE_BORE_MAX, "head passes through the handle bore"),
-    (HEAD_DIA + HEAD_DIA_TOL < STOCK_DIA, "head is not turnable from 1/4-in rod"),
+    (HEAD_DIA + HEAD_DIA_TOL < STOCK_DIA, "head is not turnable from 3/8-in rod"),
     (
-        # Owner ruling B on #1375: the cup body grows; the head stays unchanged.
+        # Owner ruling B on #1375 & option A on #3743: the cup body holds >= .060.
         CUP_POCKET_WALL_MIN >= CUP_POCKET_WALL_FLOOR_MM,
-        "the MHA-DT-35 pocket at its .257 limit leaves under its .060 "
+        "the MHA-DT-35 pocket at its .280 limit leaves under its .060 "
         "wall at the cup's broken face",
     ),
     (

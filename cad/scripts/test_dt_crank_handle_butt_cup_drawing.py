@@ -122,15 +122,19 @@ def test_face_walls_charge_every_exposed_break() -> None:
     # Codjiflo on #2102 (#2170): at the outer face the pocket mouth and the OD
     # edge each take the title block's break, so the governing wall is the
     # straight one less both, and the callout prints that, not the straight.
-    # Owner ruling 2026-11-08 (Pedro), #2144 item 7.1 (#2170, option B): the body grows to
-    # .422, so the face holds the .060 floor (RV-01) and the straight the target.
+    # Owner ruling 2026-11-08 (Pedro), #2144 item 7.1 (#2170, option B) and
+    # owner ruling 2026-11-26 (#3743, option A): the body grows to .447 around
+    # the .275 +/-.005 pocket so the face holds .061 (>= .060 floor, RV-01) and
+    # the straight wall holds .081 (>= .080 target).
     brk = edge_break_chamfer_mm(unit=spec.UNIT)
     assert spec.EDGE_BREAK_MAX_MM == brk == pytest.approx(0.010 * 25.4)
-    assert spec.BODY_DIA == pytest.approx(0.422 * 25.4)
+    assert spec.BODY_DIA == pytest.approx(0.447 * 25.4)
     assert spec.POCKET_WALL_MIN == pytest.approx(spec.POCKET_STRAIGHT_WALL_MIN - 2.0 * brk)
-    assert spec.POCKET_WALL_MIN == pytest.approx(WALL_FLOOR_MM)
-    assert spec.POCKET_STRAIGHT_WALL_MIN == pytest.approx(WALL_TARGET_MM)
-    assert notes.POCKET_FIT_CALLOUT.splitlines()[-1] == "WALL .060 MIN"
+    assert spec.POCKET_WALL_MIN == pytest.approx(0.061 * 25.4)
+    assert spec.POCKET_WALL_MIN >= WALL_FLOOR_MM
+    assert spec.POCKET_STRAIGHT_WALL_MIN == pytest.approx(0.081 * 25.4)
+    assert spec.POCKET_STRAIGHT_WALL_MIN >= WALL_TARGET_MM
+    assert notes.POCKET_FIT_CALLOUT.splitlines()[-1] == "WALL .061 MIN"
     exceptions = {
         row["id"]: row for row in _config.parts("dt-crank-handle-butt-cup")["machinist_exceptions"]
     }
@@ -146,18 +150,22 @@ def test_face_walls_charge_every_exposed_break() -> None:
 
 
 def test_ruling_b_keeps_the_head_pocket_and_axial_geometry() -> None:
-    # The pocket is end-milled to its own limits; the head at its own band
-    # clears it (owner ruling 2026-11-24, fit audit question 15).
+    # Owner ruling 2026-11-26 (#3743, option A): pocket .275 at .XXX (.270-.280),
+    # unmatched to the head (.257-.267), with R.015 MAX floor corner cleared by
+    # MHA-DT-32's .021 +/-.005 x 45 deg under-head rim break.
+    import dt_crank_handle_head_seat_spec as head_seat
+
     low, high = spec.POCKET_CLEARANCE
     pocket_min, pocket_max = spec.POCKET_DIA_LIMITS
-    assert (pocket_min, pocket_max) == pytest.approx((0.248 * 25.4, 0.257 * 25.4))
+    assert (pocket_min, pocket_max) == pytest.approx((0.270 * 25.4, 0.280 * 25.4))
     assert pocket_min < spec.POCKET_DIA < pocket_max
+    assert spec.POCKET_DIA == pytest.approx(0.275 * 25.4)
     assert low == pytest.approx(pocket_min - (screw.HEAD_DIA + screw.HEAD_DIA_TOL))
     assert high == pytest.approx(pocket_max - (screw.HEAD_DIA - screw.HEAD_DIA_TOL))
     assert low > 0.0
     assert spec.POCKET_DIA_MAX == pocket_max
-    assert spec.POCKET_FLOOR_CORNER_R_MAX == pytest.approx(0.003 * 25.4)
-    assert spec.POCKET_FLOOR_CORNER_R_MAX <= low / 2.0
+    assert spec.POCKET_FLOOR_CORNER_R_MAX == pytest.approx(0.015 * 25.4)
+    assert head_seat.HEAD_CHAMFER_LIMITS[0] > spec.POCKET_FLOOR_CORNER_R_MAX
     assert spec.FLOOR_THICKNESS == pytest.approx(spec.OVERALL_LENGTH - spec.POCKET_DEPTH)
     assert spec.FLOOR_HOLE_DIA > screw.SHOULDER_DIA_MAX
 
@@ -190,7 +198,9 @@ def test_pocket_and_floor_hole_read_on_a_section() -> None:
 
 
 def test_floor_corner_retains_its_native_functional_limit() -> None:
-    assert spec.POCKET_FLOOR_CORNER_R_MAX <= spec.POCKET_CLEARANCE[0] / 2
+    import dt_crank_handle_head_seat_spec as head_seat
+
+    assert head_seat.HEAD_CHAMFER_LIMITS[0] > spec.POCKET_FLOOR_CORNER_R_MAX
     assert spec.POCKET_FLOOR_CORNER_R_BAND == (0.0, -spec.POCKET_FLOOR_CORNER_R_MAX)
     assert spec.POCKET_FLOOR_CORNER_R_TOL_TYPE == 6  # swTolMAX
     assert "PocketFloorRadius" in spec.DRAWING_DIMENSIONS["CupProfile"]
