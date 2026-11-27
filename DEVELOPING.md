@@ -1170,6 +1170,40 @@ Binding the 52 missing manifests of the 6d349882fd outputs with the tasks'
 `export_features.py` took 226 s (about 4.3 s each), so all 133 take about ten
 minutes; the doit invocation adds one graph load of about a minute.
 
+After publication the release agent merges the generated-only follow-up PR
+(the `cad/config/release.yaml` `next_revision` bump and README images). That
+bump re-keys almost the whole remote cache, because `release.yaml` is an input
+of every part, assembly and drawing recipe (#3734). A seat-free key dump of
+9047b8cce8 with `next_revision` bumped re-keys 493 of 639 cache rows:
+
+| family | re-keyed / total |
+|---|---|
+| `part` | 185 / 185 |
+| `assembly` | 13 / 13 |
+| `drawing` | 146 / 146 |
+| `package:features` | 133 / 133 |
+| `verify_soundness` | 13 / 13 |
+| `verify:kinematics`, `export`, `package:release` | 3 / 3 |
+
+The 146 `check:machinist_review` keys move with their PDFs but carry their
+verdicts (the BUILD/REV values are masked), so no reviewer runs for the bump;
+in the v53 warm-up, 136 of the 146 carried. Every open PR's farm proof made
+before the bump stops matching main's keys.
+
+So the release procedure ends with a warm-up: right after the follow-up PR
+merges, launch `build` on that main commit, and hold other farm launches until
+it is green.
+
+```powershell
+uv run --frozen python farm_build.py run build --leaf-timeout 90 `
+  --display-name '<agent> - warm-up after the vNN bump on <sha>'
+```
+
+After v52, the v53 bump (a27a3e954a) cost a 182-leaf run (130 min) and a
+231-leaf run (82 min) of the three-worker farm, and main was cold for 6 h
+46 min. `build` runs 81 of the 133 feature leaves, so the other 52 stay cold
+until the next release run builds them.
+
 Every release also prepares and attaches
 `harmonic-analyzer-vNN-drawing-diff.zip`, separately from the main CAD bundle,
 the existing 3D changed-parts PNGs and the logs asset. Extract it and open
