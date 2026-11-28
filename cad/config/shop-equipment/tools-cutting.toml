@@ -255,13 +255,13 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 name = "Uncoated carbide square 3-flute end mill, 1/2 in, 3 in OAL"
 kind = "endmill"
 sku = "88815A45"
-status = "to_order"
-purchase = "One McMaster-Carr 88815A45, the same cutter, $96.42 (read live 2026-11-26, delivers next business day); in the McMaster cart, not ordered."
+status = "not_received"
+purchase = "Superseded on 2026-11-27 by Haas Tooling Order No. 1000560581 (4x Haas 03-0060 at $29.97 Black Friday + 2x Haas 03-0074 4 in OAL at $49.97, plus 2x Haas 03-3674 3/8 in .015R for R.02 MAX step floors; free 1-day shipping); do not reorder McMaster-Carr 88815A45 ($96.42)."
 pieces = 1
 flutes = 3
 oal_in = 3.0
-cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 13: \"Uncoated Carbide Square 3-Flute End Mill, 1/2\" Mill Diameter, 3\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
-note = "To buy: the one piece on hand is chipped (owner, 2026-11-26, reported through his retune session; PR #3634 paused); status set by delegated ruling 2026-11-26 (Main), no precedent; owner review #2144 (D46); owner form timed out. The measurements below were taken with that piece before the chip and stay valid for the replacement, the same McMaster-Carr 88815A45. Measured on the owner's PM-30MV, dechatter 0.4.0 reports v5 and v6, 2026-11-22, R8 collet, 27.94 mm (1.100 in) stick-out as the owner measured it (the reports' setup field reads 30.0), side-milling 1018 (cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5.html, -v6.html; cad/process/shop/ settings.em-half-carbide-1018-v5-face and -v6-deep; limits in measured-cuts.toml). Wider faces: session 1018-3.4mm-3fl-issue3439-v1, dechatter 0.5.0, 2026-11-23, setup stick-out 28.448 mm (cad/process/dechatter/2026-11-23-pm30mv-em-half-carbide-1018-issue3439-v1.html; settings.em-half-carbide-1018-3439-face)."
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 13: \"Uncoated Carbide Square 3-Flute End Mill, 1/2\" Mill Diameter, 3\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\"", "Owner (Pedro) 2026-11-27, Haas Tooling Order No. 1000560581 (11/27/2026 at 11:39 PM): ordered variable-pitch replacements 4x 03-0060, 2x 03-0074, and 2x 03-3674 in place of reordering 88815A45"]
+note = "Chipped on hand (owner, 2026-11-26, reported through his retune session; PR #3634 paused); status set to not_received while the ordered variable-pitch Haas replacements (Order No. 1000560581: tools.endmill-ferrous-1-2-var-4fl and tools.endmill-ferrous-1-2-var-5fl-long) are in transit and awaiting PM-30MV measurement to take over the process plans and measured-cuts.toml. Historical measurements taken with the original piece before the chip: PM-30MV, dechatter 0.4.0 reports v5 and v6, 2026-11-22, R8 collet, 27.94 mm (1.100 in) stick-out as the owner measured it (the reports' setup field reads 30.0), side-milling 1018 (cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5.html, -v6.html; cad/process/shop/ settings.em-half-carbide-1018-v5-face and -v6-deep; limits in measured-cuts.toml). Wider faces: session 1018-3.4mm-3fl-issue3439-v1, dechatter 0.5.0, 2026-11-23, setup stick-out 28.448 mm (cad/process/dechatter/2026-11-23-pm30mv-em-half-carbide-1018-issue3439-v1.html; settings.em-half-carbide-1018-3439-face)."
 
 [tools.roughing-endmill-carbide-4fl-3-8]
 name = "Roughing carbide square end mill, TiN coated, 4-flute, 3/8 in, 1/2 in length of cut"
@@ -721,6 +721,115 @@ pieces = 1
 shank_dia_in = 0.125
 included_angle_deg = 60.0
 cite = ["Owner (Pedro) 2026-11-26 photo research/shop-evidence/2026-11-26/kyocera-engravers.jpg: tube label \"KYOCERA IR3274040 EGR1250-060 1/8\\\" ENGRAVING TOOL 60 DEGREE 83407700-85009\"", "Owner (Pedro) 2026-11-26: \"add any relevant to inventory on hand\""]
+
+
+# --- Trimmed CNC end-mill additions (6 records / 7 SKUs / 18 cutters, 2026-11-27) ---
+#
+# Post-#3738-#3744 CNC end-mill additions, trimmed to eliminate duplicate sizes
+# already covered on hand (owned 3/8 in carbide rougher 87825A13, owned uncoated
+# 3-flute 1/8 and 1/4 in carbide 88815A18/88815A43, owned 1/4 in ball 8878A17,
+# owned 30/60/90 deg engravers, and owned 1/4 in 90 deg chamfer mills 3073A46 /
+# 330CH) and to avoid keeping multiple regular-length 1/2 in corner geometries:
+# - Ordered 2026-11-27 on Haas Tooling Order No. 1000560581 (3 records, 8
+#   cutters, status = "not_received"): 4x 03-0060 (1/2 in 4FL workhorse),
+#   2x 03-3674 (3/8 in 4FL 1 in LOC .015R), and 2x 03-0074 (1/2 in 5FL 4 in OAL
+#   square).
+# - Staged to order as needed (3 records, 4 SKUs, 10 cutters, status =
+#   "to_order"): 3x OnlineCarbide 400625-C3 (1/16 in stub), 5x OnlineCarbide
+#   511250S-C3 (1/8 in variable-helix stub), and 2x Harvey Tool 896262 /
+#   896262-C8 1/16 in downcut in tools-special-cutters.toml.
+# Existing cad/process/ plans stay on their current tool keys until the Haas
+# cutters arrive and are bench-verified on the PM-30MV.
+
+[tools.endmill-ferrous-3-8-var-r015]
+name = "Haas Tooling 03-3674 HSPM2 APX 4-flute variable-pitch carbide end mill, Hybrid AlCrN, 3/8 in, 1 in LOC, .015 in corner radius, 3 in OAL"
+kind = "endmill"
+make = "Haas Tooling"
+sku = "03-3674"
+source = "https://www.haastooling.com/p/03-3674"
+purchase = "Ordered 2026-11-27, Haas Tooling Order No. 1000560581 (11:39 PM PST, free 1-day shipping): 2x 03-3674 at $49.97 Black Friday ($99.94 line before Winner's Circle 10% and TAKE10 coupon; $61.95 list)"
+status = "not_received"
+pieces = 2
+flutes = 4
+dia_in = 0.375
+shank_dia_in = 0.375
+loc_in = 1.0
+oal_in = 3.0
+corner_radius_in = 0.015
+coating = "AlCrN"
+cite = ["Owner (Pedro) 2026-11-27, Haas Tooling Order No. 1000560581 (11/27/2026 at 11:39 PM, free 1-day shipping, order total $296.52 incl. $10.00 Winner's Circle 1-year membership, -$28.78 Winner's Circle 10%, -$31.98 TAKE10 coupon, and $27.52 tax estimate): 2x 03-3674, $99.94"]
+note = "Ordered 2026-11-27 (not yet received): rigid 1.0 in LOC 3/8 in variable-pitch finisher replacing the 4 in OAL / 1.75 in LOC McMaster 88815A56 (#3052: MHA-DT-06, MHA-PD-19) and finishing all three <=.380 in deep R.02 MAX ferrous inside-step floors (MHA-FR-02 .215 step, MHA-CH-07 .320 step #3744, MHA-CH-08 .380 step) plus R.040 MAX cast-iron corners (MHA-SM-03, MHA-PD-18)."
+
+[tools.endmill-ferrous-1-2-var-4fl]
+name = "Haas Tooling 03-0060 HSPM2 4-flute variable-pitch carbide end mill, Hybrid AlCrN, 1/2 in, 1-1/4 in LOC, .020 in chamfer, 3 in OAL"
+kind = "endmill"
+make = "Haas Tooling"
+sku = "03-0060"
+source = "https://www.haastooling.com/p/03-0060"
+purchase = "Ordered 2026-11-27, Haas Tooling Order No. 1000560581 (11:39 PM PST, free 1-day shipping): 4x 03-0060 at $29.97 Black Friday ($119.88 line before Winner's Circle 10% and TAKE10 coupon; $42.95 list)"
+status = "not_received"
+pieces = 4
+flutes = 4
+dia_in = 0.5
+shank_dia_in = 0.5
+loc_in = 1.25
+oal_in = 3.0
+corner_chamfer_in = 0.02
+coating = "AlCrN"
+cite = ["Owner (Pedro) 2026-11-27, Haas Tooling Order No. 1000560581 (11/27/2026 at 11:39 PM, free 1-day shipping): 4x 03-0060, $119.88"]
+note = "Ordered 2026-11-27 (not yet received): primary 1/2 in steel, 4140 pre-hard (MHA-SM-02), and cast-iron facing, roughing, through-bore (MHA-SH-01, MHA-SH-02 #3627), and exterior-wall workhorse (#3427: MHA-PD-27, MHA-DT-18; MHA-CH-13, MHA-PD-11) replacing equal-pitch uncoated McMaster 88815A45. NOT for R.02 MAX / R.020 MAX inside step floors: its .020 x 45 deg corner chamfer intrudes like R.034 (clears title-block R.040 MAX such as MHA-MG-01 #3742, violates R.02 MAX on MHA-FR-02, MHA-CH-07, and MHA-CH-08 — finish those three steps with tools.endmill-ferrous-3-8-var-r015)."
+
+[tools.endmill-ferrous-1-2-var-5fl-long]
+name = "Haas Tooling 03-0074 HTM2 5-flute variable-pitch square carbide end mill, AlTiN, 1/2 in, 2 in LOC, 4 in OAL"
+kind = "endmill"
+make = "Haas Tooling"
+sku = "03-0074"
+source = "https://www.haastooling.com/p/03-0074"
+purchase = "Ordered 2026-11-27, Haas Tooling Order No. 1000560581 (11:39 PM PST, free 1-day shipping): 2x 03-0074 at $49.97 Black Friday ($99.94 line before Winner's Circle 10% and TAKE10 coupon; $82.95 list)"
+status = "not_received"
+pieces = 2
+flutes = 5
+dia_in = 0.5
+shank_dia_in = 0.5
+loc_in = 2.0
+oal_in = 4.0
+coating = "AlTiN"
+cite = ["Owner (Pedro) 2026-11-27, Haas Tooling Order No. 1000560581 (11/27/2026 at 11:39 PM, free 1-day shipping): 2x 03-0074, $99.94"]
+note = "Ordered 2026-11-27 (not yet received): 4 in OAL long-shank 1/2 in 5-flute square finisher for 50.8 mm vise-jaw clearance reach on MHA-CH-01 (#3384, 20 bars) and 47 mm neck reach on MHA-MG-01."
+
+[tools.endmill-ferrous-1-16-stub]
+name = "OnlineCarbide 400625-C3 4-flute stub square carbide end mill, TiAlN, 1/16 in, 1/8 in LOC, 1/8 in shank, 1-1/2 in OAL"
+kind = "endmill"
+make = "OnlineCarbide"
+sku = "400625-C3"
+source = "https://onlinecarbide.com/1-16-4fl-stub-tialn/"
+purchase = "Three OnlineCarbide 400625-C3, $11.30 each ($33.90 total, everyday price; buy as needed), in stock (listing read live 2026-11-27)"
+status = "to_order"
+pieces = 3
+flutes = 4
+dia_in = 0.0625
+shank_dia_in = 0.125
+loc_in = 0.125
+oal_in = 1.5
+coating = "TiAlN"
+note = "Not owned: buy as needed. Breakage spares for CNC side-stepped 1/16 in shaft keyseats and shallow steel relief cuts (MHA-DT-03-TL-03; single-pass MHA-DT-04 keyseats retain tools.keyseat-endmill-1-16 0/+.002 HSS in tools-gear-cutting.toml)."
+
+[tools.endmill-ferrous-1-8-var-stub]
+name = "OnlineCarbide 511250S-C3 4-flute variable-helix stub square carbide end mill, TiAlN, 1/8 in, 1/4 in LOC, 1/8 in shank, 1-1/2 in OAL"
+kind = "endmill"
+make = "OnlineCarbide"
+sku = "511250S-C3"
+source = "https://onlinecarbide.com/1-8-4fl-vh-stub-tialn/"
+purchase = "Five OnlineCarbide 511250S-C3, $10.90 each ($54.50 total, everyday price; buy as needed), in stock (listing read live 2026-11-27)"
+status = "to_order"
+pieces = 5
+flutes = 4
+dia_in = 0.125
+shank_dia_in = 0.125
+loc_in = 0.25
+oal_in = 1.5
+coating = "TiAlN"
+note = "Not owned: buy as needed. Breakage spares (shop holds 1 piece of 88815A18) for shallow steel plates (MHA-CH-13), R.065 corners (MHA-CH-02, MHA-CH-03), MHA-DT-14 seat, MHA-PN-02 .201 slots (#3741), and MHA-PD-27 .219 deep Ø.125 rack-screw counterbores (#3738)."
 
 
 # Lathe inserts, insert code CCMT-32.51, one each. No holder for them is on
