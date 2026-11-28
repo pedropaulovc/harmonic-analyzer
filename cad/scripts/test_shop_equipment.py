@@ -190,45 +190,65 @@ def test_pm30mv_spindle_envelope_rejects_inverted_bounds_or_missing_photo(
         _verify_pm30mv_spindle_envelope({"pm-30mv": valid_mill}, tmp_path)
 
 
-APPROVED_CNC_ENDMILL_KIT_KEYS = (
+ORDERED_HAAS_ENDMILL_KEYS = (
+    "endmill-ferrous-3-8-var-r015",
+    "endmill-ferrous-1-2-var-4fl",
+    "endmill-ferrous-1-2-var-5fl-long",
+)
+STAGED_TO_ORDER_ENDMILL_KEYS = (
     "endmill-ferrous-1-16-stub",
     "endmill-ferrous-1-8-var-stub",
+    "endmill-carbide-3fl-1-16-downcut",
+)
+DEFERRED_ENDMILL_KEYS = {
     "endmill-ferrous-1-8-var-reg",
     "endmill-ferrous-1-4-var-stub",
     "endmill-ferrous-3-8-var-chamfer",
-    "endmill-ferrous-3-8-var-r015",
     "roughing-endmill-cobalt-1-2",
-    "endmill-ferrous-1-2-var-4fl",
     "endmill-ferrous-1-2-var-5fl-r015",
-    "endmill-ferrous-1-2-var-5fl-long",
-    "endmill-carbide-3fl-1-16-downcut",
     "endmill-nonferrous-1-8-3fl",
     "endmill-nonferrous-1-4-3fl",
     "endmill-nonferrous-3-8-3fl",
     "chamfer-mill-carbide-1-4-90-tialn",
     "chamfer-mill-carbide-3-8-90-tialn",
-)
+}
 
 
 def _verify_cnc_endmill_kit(
     tools: dict, shop_tools: dict, known_part_numbers: set[str]
-) -> int:
+) -> tuple[int, int]:
     import re
 
-    total_pieces = 0
-    for key in APPROVED_CNC_ENDMILL_KIT_KEYS:
+    unexpected = DEFERRED_ENDMILL_KEYS & set(tools)
+    if unexpected:
+        raise ValueError(f"deferred end-mill records remain in inventory: {sorted(unexpected)}")
+
+    ordered_pieces = 0
+    staged_pieces = 0
+    expected_status_by_key = {
+        **{k: "not_received" for k in ORDERED_HAAS_ENDMILL_KEYS},
+        **{k: "to_order" for k in STAGED_TO_ORDER_ENDMILL_KEYS},
+    }
+    for key, expected_status in expected_status_by_key.items():
         rec = tools[key]
-        if rec.get("status") != "to_order":
-            raise ValueError(f"{key}: expected status 'to_order', got {rec.get('status')!r}")
+        if rec.get("status") != expected_status:
+            raise ValueError(
+                f"{key}: expected status {expected_status!r}, got {rec.get('status')!r}"
+            )
         for required in ("name", "make", "sku", "source", "purchase"):
             if not str(rec.get(required, "")).strip():
                 raise ValueError(f"{key}: missing {required}")
         if not str(rec["source"]).startswith("https://"):
             raise ValueError(f"{key}: source must be an https URL")
+        if expected_status == "not_received" and "1000560581" not in str(rec["purchase"]):
+            raise ValueError(f"{key}: ordered Haas cutter must cite Order No. 1000560581")
         pieces = rec.get("pieces")
         if isinstance(pieces, bool) or not isinstance(pieces, int) or pieces <= 0:
             raise ValueError(f"{key}: pieces must be a positive int")
-        total_pieces += pieces
+        if expected_status == "not_received":
+            ordered_pieces += pieces
+        else:
+            staged_pieces += pieces
         if rec.get("corner_radius_in", 0.0) > 0.015:
             raise ValueError(f"{key}: corner_radius_in exceeds R.015 policy")
         for number in re.findall(r"MHA-[A-Z0-9-]+", str(rec.get("note", ""))):
@@ -243,7 +263,9 @@ def _verify_cnc_endmill_kit(
                 raise ValueError(f"{key}: dia_in {rec['dia_in']} outside (0, 0.5]")
             if not (0.0 < rec["loc_in"] < rec["oal_in"]):
                 raise ValueError(f"{key}: expected 0 < loc_in < oal_in")
-    return total_pieces
+    if "NOT for R.02 MAX" not in str(tools["endmill-ferrous-1-2-var-4fl"].get("note", "")):
+        raise ValueError("endmill-ferrous-1-2-var-4fl must warn against R.02 MAX inside step floors")
+    return ordered_pieces, staged_pieces
 
 
 def test_approved_cnc_endmill_kit_records_are_complete_and_disjoint_from_prechips() -> None:
@@ -253,7 +275,8 @@ def test_approved_cnc_endmill_kit_records_are_complete_and_disjoint_from_prechip
     tools = _shop_equipment.load()["tools"]
     shop_tools = _process_plans.load_shop()["tools"]
     known_numbers = {info["number"] for info in _config.parts().values()}
-    assert _verify_cnc_endmill_kit(tools, shop_tools, known_numbers) == 34
+    assert _verify_cnc_endmill_kit(tools, shop_tools, known_numbers) == (8, 10)
+    assert tools["endmill-carbide-3fl-1-2"]["status"] == "not_received"
     assert "do not reorder McMaster-Carr 88815A45" in tools["endmill-carbide-3fl-1-2"]["purchase"]
 
 
@@ -276,7 +299,7 @@ def test_approved_cnc_endmill_kit_rejects_prechips_overlap_and_oversize_radius()
         with pytest.raises(ValueError, match="duplicates prechips sizing fields"):
             _verify_cnc_endmill_kit(bad_overlap, shop_tools, known_numbers)
 
-    for radius_key in ("endmill-ferrous-1-2-var-5fl-r015", "endmill-carbide-3fl-1-16-downcut"):
+    for radius_key in ("endmill-ferrous-3-8-var-r015", "endmill-carbide-3fl-1-16-downcut"):
         bad_radius = {
             **tools,
             radius_key: {**tools[radius_key], "corner_radius_in": 0.030},
@@ -293,10 +316,14 @@ def test_approved_cnc_endmill_kit_rejects_prechips_overlap_and_oversize_radius()
 
     bad_part = {
         **tools,
-        "endmill-nonferrous-1-8-3fl": {
-            **tools["endmill-nonferrous-1-8-3fl"],
+        "endmill-ferrous-1-8-var-stub": {
+            **tools["endmill-ferrous-1-8-var-stub"],
             "note": "Cuts MHA-PN-03 V-groove",
         },
     }
     with pytest.raises(ValueError, match="unknown part number 'MHA-PN-03'"):
         _verify_cnc_endmill_kit(bad_part, shop_tools, known_numbers)
+
+    bad_deferred = {**tools, "roughing-endmill-cobalt-1-2": {"status": "to_order"}}
+    with pytest.raises(ValueError, match="deferred end-mill records remain"):
+        _verify_cnc_endmill_kit(bad_deferred, shop_tools, known_numbers)
